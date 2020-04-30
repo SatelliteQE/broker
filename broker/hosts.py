@@ -35,6 +35,7 @@ class Host:
             "hostname": self.hostname,
             "_broker_provider": self._broker_provider,
             "type": "host",
+            "_broker_args": self._broker_args
         }
 
     @classmethod

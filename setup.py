@@ -16,7 +16,7 @@ requirements = [AWXKIT, "click", "dynaconf[yaml]", "logzero", "pyyaml"]
 
 setup(
     name="broker",
-    version="0.0.2",
+    version="0.0.3",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",
