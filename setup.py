@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 AWXKIT = (
     "awxkit @ git+ssh://git@github.com/ansible/awx"
-    "@11.1.0#egg=awxkit&subdirectory=awxkit"
+    "@11.2.0#egg=awxkit&subdirectory=awxkit"
 )
 
 from setuptools import setup, find_packages
@@ -16,12 +16,12 @@ requirements = [AWXKIT, "click", "dynaconf[yaml]", "logzero", "pyyaml"]
 
 setup(
     name="broker",
-    version="0.0.1",
+    version="0.0.2",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",
     author_email="jacob.callahan05@@gmail.com",
-    url="https://github.com/JacobCallahan/broker",
+    url="https://github.com/SatelliteQE/broker",
     packages=find_packages(),
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
     include_package_data=True,

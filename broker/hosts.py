@@ -8,7 +8,6 @@ class Host:
             self.__dict__.update(kwargs)
         else:
             self.hostname = hostname
-            self.provider = kwargs.get("provider")
         self.session = self._get_session()
 
     def _get_session(self):
@@ -34,7 +33,6 @@ class Host:
     def to_dict(self):
         return {
             "hostname": self.hostname,
-            "provider": self.provider,
             "_broker_provider": self._broker_provider,
             "type": "host",
         }
