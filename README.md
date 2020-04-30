@@ -8,7 +8,7 @@ Broker is a tool designed to provide a common interface between one or many serv
 ```
 cd <broker root directory>
 pip install .
-mv setting.yaml.example settings.yaml
+cp setting.yaml.example settings.yaml
 ```
 Then edit the settings.yaml file
 

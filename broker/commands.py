@@ -64,7 +64,7 @@ def checkin(vm):
 @click.option("--details", is_flag=True, help="Display all hist details")
 def inventory(details):
     """Get a list of all VMs you've checked out"""
-    logger.info("Pulling local ivnentory")
+    logger.info("Pulling local inventory")
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
         if details:
