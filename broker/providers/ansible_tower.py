@@ -29,12 +29,13 @@ class AnsibleTower(Provider):
     def _host_release(self):
         self._at_inst.release(self)
 
-    def _set_attributes(self, host_inst):
+    def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
             {
                 "release": self._host_release,
                 "_at_inst": self,
                 "_broker_provider": "AnsibleTower",
+                "_broker_args": broker_args,
             }
         )
 
@@ -77,7 +78,7 @@ class AnsibleTower(Provider):
         logger.debug(f"hostname: {hostname}, host type: {host_type}")
         if hostname:
             host_inst = host_classes[host_type](hostname=hostname, **kwargs)
-            self._set_attributes(host_inst)
+            self._set_attributes(host_inst, broker_args=kwargs)
             return host_inst
         raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
 

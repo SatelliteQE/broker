@@ -8,7 +8,7 @@ Broker is a tool designed to provide a common interface between one or many serv
 ```
 cd <broker root directory>
 pip install .
-mv setting.yaml.example settings.yaml
+cp setting.yaml.example settings.yaml
 ```
 Then edit the settings.yaml file
 
@@ -20,11 +20,23 @@ broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-
 You can pass in any arbitrary arguments you want
 
 **Nicks**
+
 Broker allows you to define configurable nicknames for checking out vms. Just add yours to setting.yaml and call with the ```--nick``` option
 ```
 broker checkout --nick rhel7
 ```
+
+**Duplicating a VM**
+
+Broker offers another shortcut for checking out a VM with the same recipe as one already checked out by Broker. This is via the ```duplicate``` command.
+```
+broker duplicate my.awesome.vm.com
+broker duplicate 0
+broker duplicate 1 3
+```
+
 **Listing your VMs**
+
 Broker maintains a local inventory of the VMs you've checked out. You can see these with the ```inventory``` command.
 ```
 broker inventory
