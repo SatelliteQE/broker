@@ -5,19 +5,7 @@ from dynaconf import settings
 from broker.broker import VMBroker
 from broker import logger as b_log
 from broker import helpers
-
-
-def _checkout(**broker_args):
-    """Internal function to provide a common checkout interface
-    This allows us to duplicate currently checked out systems
-    """
-    broker_inst = VMBroker(**broker_args)
-    broker_inst.checkout()
-    new_hosts = []
-    for host in broker_inst._hosts:
-        logger.info(f"{host.__class__.__name__}: {host.hostname}")
-        new_hosts.append(host.to_dict())
-    helpers.update_inventory(new_hosts)
+from broker.hosts import Host
 
 
 @click.group()
@@ -40,12 +28,13 @@ def checkout(ctx, workflow, nick):
     """
     broker_args = {}
     if nick:
-        broker_args = helpers.resolve_nick(nick)
+        broker_args['nick'] = nick
     if workflow:
         broker_args["workflow"] = workflow
     # if additional arguments were passed, include them in the broker args
     broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
-    _checkout(**broker_args)
+    broker_inst = VMBroker(**broker_args)
+    broker_inst.checkout()
 
 
 @cli.command()
@@ -58,14 +47,11 @@ def checkin(vm, all_):
     """
     inventory = helpers.load_inventory()
     to_remove = []
-    for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or all_:
-            to_remove.append((num, host))
-    # reconstruct the hosts and call their release methhod
-    for num, host in to_remove[::-1]:
-        del inventory[num]
-        logger.info(f"Checking in {host['hostname']}")
-    helpers.update_inventory(inventory, replace_all=True)
+    for num, host_export in enumerate(inventory):
+        if str(num) in vm or host_export["hostname"] in vm or all_:
+            to_remove.append(VMBroker.reconstruct_host(host_export))
+    broker_inst = VMBroker(hosts=to_remove)
+    broker_inst.checkin()
 
 
 @cli.command()
@@ -95,7 +81,8 @@ def duplicate(vm, all_):
             broker_args = host.get("_broker_args")
             if broker_args:
                 logger.info(f"Duplicating: {host['hostname']}")
-                _checkout(**broker_args)
+                broker_inst = VMBroker(**broker_args)
+                broker_inst.checkout()
             else:
                 logger.warning(
                     f"Unable to duplicate {host['hostname']}, no _broker_args found"

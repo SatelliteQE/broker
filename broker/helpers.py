@@ -91,26 +91,31 @@ def load_inventory():
     return inv_data
 
 
-def update_inventory(new_hosts, replace_all=False):
+def update_inventory(add=None, remove=None):
     """Updates list of local hosts in the checkout interface
 
-    :param new_hosts: list of dictionaries
+    :param add: list of dictionaries representing new hosts
 
-    :param replace_all: True or False(Default False)
+    :param remove: list of dictionaries representing hosts to be removed
 
     :return: no return value
     """
     inventory_file = Path(settings.INVENTORY_FILE)
-    if not inventory_file.exists():
-        inv_data = []
-    else:
-        with inventory_file.open() as inv:
-            inv_data = yaml.load(inv, Loader=yaml.FullLoader) or []
+    if add and not isinstance(add, list):
+        add = [add]
+    if remove and not isinstance(remove, list):
+        remove = [remove]
+    inv_data = load_inventory()
+    if inv_data:
         inventory_file.unlink()
-    if replace_all:
-        inv_data = new_hosts
-    else:
-        inv_data.extend(new_hosts)
+
+    if remove:
+        for host in inv_data:
+            if host["hostname"] in remove:
+                inv_data.remove(host)
+    if add:
+        inv_data.extend(add)
+
     inventory_file.touch()
-    with inventory_file.open("w") as inv:
-        yaml.dump(inv_data, inv)
+    with inventory_file.open("w") as inv_file:
+        yaml.dump(inv_data, inv_file)

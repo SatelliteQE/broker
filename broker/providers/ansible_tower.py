@@ -1,3 +1,4 @@
+import inspect
 from dynaconf import settings
 from logzero import logger
 
@@ -27,7 +28,8 @@ class AnsibleTower(Provider):
         self.v2 = root.available_versions.v2.get()
 
     def _host_release(self):
-        self._at_inst.release(self)
+        caller_host = inspect.stack()[1][0].f_locals["host"]
+        self.release(caller_host.hostname)
 
     def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
@@ -63,24 +65,27 @@ class AnsibleTower(Provider):
         return artifacts
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        job = provider_params
-        job_attrs = self._merge_artifacts(
-            job, strategy=kwargs.get("strategy", "latest")
-        )
-        job_attrs = flatten_dict(job_attrs)
-        logger.debug(job_attrs)
-        hostname, host_type = None, "host"
-        for key, value in job_attrs.items():
-            if key.endswith("fqdn"):
-                hostname = value if not isinstance(value, list) else value[0]
-            if key.endswith("host_type"):
-                host_type = value
-        logger.debug(f"hostname: {hostname}, host type: {host_type}")
-        if hostname:
+        if provider_params:
+            job = provider_params
+            job_attrs = self._merge_artifacts(
+                job, strategy=kwargs.get("strategy", "latest")
+            )
+            job_attrs = flatten_dict(job_attrs)
+            logger.debug(job_attrs)
+            hostname, host_type = None, "host"
+            for key, value in job_attrs.items():
+                if key.endswith("fqdn"):
+                    hostname = value if not isinstance(value, list) else value[0]
+                if key.endswith("host_type"):
+                    host_type = value
+            if not hostname:
+                raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
+                logger.debug(f"hostname: {hostname}, host type: {host_type}")
             host_inst = host_classes[host_type](hostname=hostname, **kwargs)
-            self._set_attributes(host_inst, broker_args=kwargs)
-            return host_inst
-        raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
+        else:
+            host_inst = host_classes[kwargs.get('type')](**kwargs)
+        self._set_attributes(host_inst, broker_args=kwargs)
+        return host_inst
 
     def exec_workflow(self, **kwargs):
         workflow = kwargs.get("workflow")
@@ -91,4 +96,5 @@ class AnsibleTower(Provider):
         return job
 
     def release(self, host_obj):
-        return self.exec_workflow(RELEASE_WORKFLOW, **host_obj.to_dict())
+        pass
+        # return self.exec_workflow(workflow=RELEASE_WORKFLOW, **host_obj.to_dict())
