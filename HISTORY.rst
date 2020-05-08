@@ -2,6 +2,12 @@
 History
 =======
 
+0.0.4 (2020-05-08)
+==================
+
++ Refactored location and process of checkin/checkout
++ Added a Test Provider ahead of adding tests
+
 0.0.3 (2020-04-30)
 ==================
 
