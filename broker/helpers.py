@@ -74,7 +74,7 @@ def resolve_nick(nick):
     """
     nick_names = settings.get("NICKS", {})
     if nick in nick_names:
-        return settings.NICKS[nick].to_dupdateict()
+        return settings.NICKS[nick].to_dict()
 
 
 def load_inventory():
