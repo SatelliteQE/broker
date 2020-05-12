@@ -66,13 +66,14 @@ class VMBroker:
         elif host:
             logger.info(f"Checking in {host.hostname}")
             host.release()
+            self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)
 
     @staticmethod
     def reconstruct_host(host_export_data):
         """reconstruct a host from export data"""
         logger.debug(f"reconstructing host with export: {host_export_data}")
-        provider = PROVIDERS[host_export_data.get("_broker_provider")]
+        provider = PROVIDERS.get(host_export_data.get("_broker_provider"))
         if not provider:
             logger.warning(
                 f"No provider found with name {host_export_data.get('_broker_provider')}"

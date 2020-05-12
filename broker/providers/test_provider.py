@@ -1,3 +1,4 @@
+import inspect
 from dynaconf import settings
 from logzero import logger
 
@@ -16,7 +17,8 @@ HOST_PROPERTIES = {
 
 class TestProvider(Provider):
     def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
+        self.config = settings.TESTPROVIDER
+        # self.__dict__.update(kwargs)
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -35,7 +37,7 @@ class TestProvider(Provider):
     def construct_host(self, provider_params, host_classes, **kwargs):
         host_params = provider_params.copy()
         host_params.update(kwargs)
-        host_inst = host_classes[host_type](**host_params)
+        host_inst = host_classes[host_params["host_type"]](**host_params)
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
@@ -45,7 +47,7 @@ class TestProvider(Provider):
             return "released", kwargs
         if action in HOST_PROPERTIES:
             return HOST_PROPERTIES
-        return HOST_PROPERTIES["default"]
+        return HOST_PROPERTIES["basic"]
 
     def release(self, host_obj):
         return self.test_action(test_action="release", **host_obj.to_dict())
