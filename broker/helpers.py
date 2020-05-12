@@ -7,7 +7,10 @@ import yaml
 
 
 def merge_dicts(dict1, dict2):
-    """Merge two nested dicitonaries together"""
+    """Merge two nested dictionaries together
+
+    :return: merged dictionary
+    """
     if not isinstance(dict1, dict) or not isinstance(dict2, dict):
         return dict1
     merged = {}
@@ -22,7 +25,7 @@ def merge_dicts(dict1, dict2):
 
 
 def flatten_dict(nested_dict, parent_key=""):
-    """flatten a nested dictionary, keeping nested notation in key
+    """Flatten a nested dictionary, keeping nested notation in key
     {
         'key': 'value1',
         'another': {
@@ -38,6 +41,8 @@ def flatten_dict(nested_dict, parent_key=""):
         "another_nested2_deep": "value3"
     }
     note that dictionaries nested in lists will be removed from the list
+
+    :return: dictionary
     """
 
     flattened = []
@@ -61,13 +66,22 @@ def flatten_dict(nested_dict, parent_key=""):
 
 
 def resolve_nick(nick):
-    """check if the nick exists and if so, return the arguments"""
+    """Checks if the nickname exists. Used to define broker arguments
+
+    :param nick: String representing the name of a nick
+
+    :return: a dictionary mapping argument names and values
+    """
     nick_names = settings.get("NICKS", {})
     if nick in nick_names:
         return settings.NICKS[nick].to_dict()
 
 
 def load_inventory():
+    """Loads all local hosts in inventory
+
+    :return: list of dictionaries
+    """
     inventory_file = Path(settings.INVENTORY_FILE)
     if not inventory_file.exists():
         inv_data = []
@@ -78,6 +92,14 @@ def load_inventory():
 
 
 def update_inventory(new_hosts, replace_all=False):
+    """Updates list of local hosts in the checkout interface
+
+    :param new_hosts: list of dictionaries
+
+    :param replace_all: True or False(Default False)
+
+    :return: no return value
+    """
     inventory_file = Path(settings.INVENTORY_FILE)
     if not inventory_file.exists():
         inv_data = []
