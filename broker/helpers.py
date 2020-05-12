@@ -68,9 +68,9 @@ def flatten_dict(nested_dict, parent_key=""):
 def resolve_nick(nick):
     """Checks if the nickname exists. Used to define broker arguments
 
-    :param nick: pulled from dictionary by keyword
+    :param nick: String representing the name of a nick
 
-    :return: the value of NICKS
+    :return: a dictionary mapping argument names and values
     """
     nick_names = settings.get("NICKS", {})
     if nick in nick_names:
