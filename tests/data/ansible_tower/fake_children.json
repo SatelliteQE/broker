@@ -1,0 +1,28 @@
+[
+    {
+        "id": 274,
+        "type": "workflow_job_node",
+        "summary_fields": {
+            "job": {
+                "id": 1337,
+                "name": "deploy-baserhel-from-rhvm",
+                "status": "successful",
+                "failed": false,
+                "type": "job"
+            }
+        }
+    },
+    {
+        "id": 275,
+        "type": "workflow_job_node",
+        "summary_fields": {
+            "job": {
+                "id": 1338,
+                "name": "deploy-set-stats-for-jenkins",
+                "status": "successful",
+                "failed": false,
+                "type": "job"
+            }
+        }
+    }
+ ]

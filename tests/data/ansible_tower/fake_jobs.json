@@ -1,0 +1,50 @@
+[
+    {
+        "id": 343,
+        "type": "workflow_job",
+        "related": {
+            "workflow_nodes": "/api/v2/workflow_jobs/343/workflow_nodes/"
+        },
+        "name": "deploy-base-rhel",
+        "status": "successful"
+    },
+    {
+        "id": 1337,
+        "type": "job",
+        "related": {
+        },
+        "name": "deploy-baserhel-from-rhvm",
+        "artifacts": {
+            "vm_fqdn": [
+                "fake.host.test.com"
+            ],
+            "vm_provisioned": [
+                "fake-physical-host"
+            ]
+        }
+    },
+    {
+        "id": 1338,
+        "type": "job",
+        "related": {
+        },
+        "name": "deploy-set-stats-for-jenkins",
+        "artifacts": {
+            "JENKINS_EXPORT": {
+                "reported_devices": {
+                    "nics": [
+                        "lo",
+                        "eth0"
+                    ]
+                },
+                "host_type": "host",
+                "os_distribution_version": "7.8",
+                "fqdn": "fake.host.test.com",
+                "template": "",
+                "provider": "RHEV",
+                "os_distribution": "RedHat",
+                "name": "fake-physical-host"
+            }
+        }
+    }
+]

@@ -3,7 +3,7 @@ from dynaconf import settings
 from logzero import logger
 
 try:
-    from awxkit import api, config
+    import awxkit
 except:
     logger.error("Unable to import awxkit. Is it installed?")
     raise Exception("Unable to import awxkit. Is it installed?")
@@ -20,16 +20,20 @@ RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
 class AnsibleTower(Provider):
     def __init__(self, **kwargs):
         self._construct_params = []
+        config = kwargs.get("config", awxkit.config)
         config.base_url = AT_URL
         config.credentials = {"default": {"username": UNAME, "password": PWORD}}
         config.use_sessions = True
-        root = api.Api()
+        if "root" in kwargs:
+            root = kwargs.get("root")
+        else:
+            root = awxkit.api.Api()
         root.load_session().get()
         self.v2 = root.available_versions.v2.get()
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
-        self.release(caller_host.hostname)
+        self.release(caller_host.name)
 
     def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
@@ -72,16 +76,18 @@ class AnsibleTower(Provider):
             )
             job_attrs = flatten_dict(job_attrs)
             logger.debug(job_attrs)
-            hostname, host_type = None, "host"
+            hostname, name, host_type = None, None, "host"
             for key, value in job_attrs.items():
-                if key.endswith("fqdn"):
+                if key.endswith("fqdn") and not hostname:
                     hostname = value if not isinstance(value, list) else value[0]
+                if key == "vm_provisioned" and not name:
+                    name = value if not isinstance(value, list) else value[0]
                 if key.endswith("host_type"):
                     host_type = value
             if not hostname:
                 raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
-                logger.debug(f"hostname: {hostname}, host type: {host_type}")
-            host_inst = host_classes[host_type](hostname=hostname, **kwargs)
+            logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
+            host_inst = host_classes[host_type](hostname=hostname, name=name, **kwargs)
         else:
             host_inst = host_classes[kwargs.get('type')](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs)
@@ -95,6 +101,5 @@ class AnsibleTower(Provider):
         assert job.status == "successful"
         return job
 
-    def release(self, host_obj):
-        pass
-        # return self.exec_workflow(workflow=RELEASE_WORKFLOW, **host_obj.to_dict())
+    def release(self, name):
+        return self.exec_workflow(workflow=RELEASE_WORKFLOW, source_vm=name)
