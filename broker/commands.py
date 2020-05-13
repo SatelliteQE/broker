@@ -36,7 +36,15 @@ def cli():
 @click.pass_context
 def checkout(ctx, workflow, nick):
     """Checkout a Virtual Machine
-    COMMAND: broker checkout --<action> <argument>
+    COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
+    or
+    COMMAND: broker checkout --nick "nickname"
+
+    :param ctx: clicks content object
+
+    :param workflow: workflow template stored in AnsibleTower, passed in as a string
+
+    :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
     """
     broker_args = {}
     if nick:
@@ -56,6 +64,10 @@ def checkin(vm, all_):
     """Checkin a VM or series of VMs
 
     COMMAND: broker checkin <vm hostname>|<local id>|all
+
+    :param vm:
+
+    :param all_:
     """
     inventory = helpers.load_inventory()
     to_remove = []
