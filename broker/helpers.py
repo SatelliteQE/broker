@@ -1,4 +1,5 @@
 """Miscellaneous helpers live here"""
+from collections import UserDict
 from collections.abc import MutableMapping
 from copy import deepcopy
 from pathlib import Path
@@ -11,7 +12,7 @@ def merge_dicts(dict1, dict2):
 
     :return: merged dictionary
     """
-    if not isinstance(dict1, dict) or not isinstance(dict2, dict):
+    if not isinstance(dict1, MutableMapping) or not isinstance(dict2, MutableMapping):
         return dict1
     merged = {}
     dupe_keys = dict1.keys() & dict2.keys()
@@ -119,3 +120,38 @@ def update_inventory(add=None, remove=None):
     inventory_file.touch()
     with inventory_file.open("w") as inv_file:
         yaml.dump(inv_data, inv_file)
+
+
+class MockStub(UserDict):
+    """Test helper class. Allows for both arbitrary mocking and stubbing"""
+
+    def __init__(self, in_dict=None):
+        """Initialize the class and all nested dictionaries"""
+        if in_dict is None:
+            in_dict = {}
+        for key, value in in_dict.items():
+            if isinstance(value, dict):
+                setattr(self, key, MockStub(value))
+            elif type(value) in (list, tuple):
+                setattr(
+                    self,
+                    key,
+                    [MockStub(x) if isinstance(x, dict) else x for x in value],
+                )
+            else:
+                setattr(self, key, value)
+        super().__init__(in_dict)
+
+    def __getattr__(self, name):
+        return self
+
+    def __getitem__(self, key):
+        item = getattr(self, key, self)
+        try:
+            item = super().__getitem__(key)
+        except KeyError:
+            pass
+        return item
+
+    def __call__(self, *args, **kwargs):
+        return self

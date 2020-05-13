@@ -2,12 +2,14 @@
 
 
 class Host:
-    def __init__(self, hostname, from_dict=False, **kwargs):
+    def __init__(self, hostname, name=None, from_dict=False, **kwargs):
         # Allow the class to construct itself from kwargs
         if from_dict:
             self.__dict__.update(kwargs)
         else:
             self.hostname = hostname
+            self.name = name
+
         self.session = self._get_session()
 
     def _get_session(self):
@@ -33,6 +35,7 @@ class Host:
     def to_dict(self):
         return {
             "hostname": self.hostname,
+            "name": getattr(self, "name", None),
             "_broker_provider": self._broker_provider,
             "type": "host",
             "_broker_args": self._broker_args

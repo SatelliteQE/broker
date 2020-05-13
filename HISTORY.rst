@@ -2,6 +2,14 @@
 History
 =======
 
+0.0.5 (2020-05-14)
+==================
+
++ Added initial tests
++ Added travis integration
++ Added a helper method for tests
++ Minor fixes and tweaks
+
 0.0.4 (2020-05-08)
 ==================
 

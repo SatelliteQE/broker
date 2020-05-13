@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 AWXKIT = (
-    "awxkit @ git+ssh://git@github.com/ansible/awx"
+    "awxkit @ git+https://github.com/ansible/awx.git"
     "@11.2.0#egg=awxkit&subdirectory=awxkit"
 )
 
@@ -16,7 +16,7 @@ requirements = [AWXKIT, "click", "dynaconf[yaml]", "logzero", "pyyaml"]
 
 setup(
     name="broker",
-    version="0.0.4",
+    version="0.0.5",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",
