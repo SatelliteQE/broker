@@ -1,5 +1,6 @@
 from pathlib import Path
 import click
+import logging
 from logzero import logger
 from dynaconf import settings
 from broker.broker import VMBroker
@@ -8,12 +9,23 @@ from broker import helpers
 from broker.hosts import Host
 
 
+def update_log_level(ctx, param, value):
+    if getattr(logging, value.upper()) is not logger.getEffectiveLevel():
+        b_log.setup_logzero(level=value)
+        click.echo(f"Log level changed to [{value}]")
+
+
 @click.group()
-@click.option("--debug", is_flag=True)
-def cli(debug):
-    if debug or settings.DEBUG:
-        b_log.setup_logzero(level="debug")
-    logger.debug("I'm in debug mode")
+@click.option(
+    "--log-level",
+    type=click.Choice(['info', 'warning', 'error', 'critical', 'debug']),
+    default='info',
+    callback=update_log_level,
+    is_eager=True,
+    expose_value=False
+)
+def cli():
+    pass
 
 
 @cli.command(
