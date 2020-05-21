@@ -79,7 +79,8 @@ class AnsibleTower(Provider):
     def construct_host(self, provider_params, host_classes, **kwargs):
         """ Constructs host to be read by Ansible Tower
 
-        :param provider_params: dictionary of Ansible Tower workflow job information
+        :param provider_params: dictionary of what the provider returns when initially
+        creating the vm
 
         :param host_classes: host object
 
