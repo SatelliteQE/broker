@@ -51,6 +51,14 @@ class AnsibleTower(Provider):
            - latest: overwite existing values with newer values
            - branch: each branched child gets its own sub-dictionary (todo)
            - min-branch: only branch children if conflict is detected (todo)
+
+        :param at_object: object you want to merge
+
+        :param strategy: default to latest
+
+        :param artifacts: default to none
+
+        :return: dictionary of merged artifact, used for constructing host
         """
         logger.debug(f"Attempting to merge: {at_object.name}")
         if not artifacts:
@@ -69,8 +77,19 @@ class AnsibleTower(Provider):
         return artifacts
 
     def construct_host(self, provider_params, host_classes, **kwargs):
+        """ Constructs host to be read by Ansible Tower
+
+        :param provider_params: dictionary of Ansible Tower workflow job information
+
+        :param host_classes: host object
+
+        :return: broker object of constructed host instance
+        """
         if provider_params:
             job = provider_params
+            print(job)
+            host = host_classes
+            print(host)
             job_attrs = self._merge_artifacts(
                 job, strategy=kwargs.get("strategy", "latest")
             )
@@ -94,6 +113,12 @@ class AnsibleTower(Provider):
         return host_inst
 
     def exec_workflow(self, **kwargs):
+        """Execute template job in Ansible Tower
+
+        :param kwargs: workflow template name passed in a string
+
+        :return: dictionary containing all information about executed workflow
+        """
         workflow = kwargs.get("workflow")
         wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
