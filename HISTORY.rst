@@ -2,6 +2,14 @@
 History
 =======
 
+0.0.6 (2020-05-27)
+==================
+
++ Added nick-help subcommand
++ Added new helper method for presenting complex data structures
++ Changed --debug to --log-level allowing for greater log control
++ Improved in-code documentation
+
 0.0.5 (2020-05-14)
 ==================
 

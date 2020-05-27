@@ -18,11 +18,11 @@ def update_log_level(ctx, param, value):
 @click.group()
 @click.option(
     "--log-level",
-    type=click.Choice(['info', 'warning', 'error', 'critical', 'debug']),
-    default='info',
+    type=click.Choice(["info", "warning", "error", "critical", "debug"]),
+    default="info",
     callback=update_log_level,
     is_eager=True,
-    expose_value=False
+    expose_value=False,
 )
 def cli():
     pass
@@ -48,13 +48,31 @@ def checkout(ctx, workflow, nick):
     """
     broker_args = {}
     if nick:
-        broker_args['nick'] = nick
+        broker_args["nick"] = nick
     if workflow:
         broker_args["workflow"] = workflow
     # if additional arguments were passed, include them in the broker args
     broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
     broker_inst = VMBroker(**broker_args)
     broker_inst.checkout()
+
+
+@cli.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+@click.option("--workflow", type=str)
+@click.pass_context
+def nick_help(ctx, workflow):
+    """Get information from an action to determine accepted arguments
+    COMMAND: broker nick-help --<action> <argument>
+    """
+    broker_args = {}
+    if workflow:
+        broker_args["workflow"] = workflow
+    # if additional arguments were passed, include them in the broker args
+    broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
+    broker_inst = VMBroker(**broker_args)
+    broker_inst.nick_help()
 
 
 @cli.command()
@@ -90,7 +108,9 @@ def inventory(details):
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
         if details:
-            logger.info(f"{num}: {host.pop('hostname')}, Details: {host}")
+            logger.info(
+                f"{num}: {host.pop('hostname')}, Details: {helpers.yaml_format(host)}"
+            )
         else:
             logger.info(f"{num}: {host['hostname']}")
 

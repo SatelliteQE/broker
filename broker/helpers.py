@@ -122,6 +122,18 @@ def update_inventory(add=None, remove=None):
         yaml.dump(inv_data, inv_file)
 
 
+def yaml_format(in_struct):
+    """Convert a yaml-compatible structure to a yaml dumped string
+
+    :param in_struct: yaml-compatible structure or string containing structure
+
+    :return: yaml-formatted string
+    """
+    if isinstance(in_struct, str):
+        in_struct = yaml.load(in_struct, Loader=yaml.FullLoader)
+    return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
+
+
 class MockStub(UserDict):
     """Test helper class. Allows for both arbitrary mocking and stubbing"""
 

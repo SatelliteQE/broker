@@ -51,3 +51,11 @@ broker checkin 0
 broker checkin 1 3 my.host.fqdn.com
 broker checkin all
 ```
+
+**Creating nicks**
+Broker will attempt to help your create your own nicks with the ```nick-help``` command.
+If supported by your chosen provider, nick-help will display the additional arguments you can use when defining a new nick.
+```
+broker nick-help --help
+broker nick-help --workflow my-awesome-workflow
+```

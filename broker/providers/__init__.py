@@ -22,5 +22,8 @@ class Provider:
         self._set_attributes(host_inst, host_attrs)
         return host_inst
 
+    def nick_help(self, host_obj):
+        raise NotImplementedError("nick_help has not been implemented")
+
     def release(self, host_obj):
         raise NotImplementedError("release has not been implemented")
