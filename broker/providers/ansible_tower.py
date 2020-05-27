@@ -9,7 +9,7 @@ except:
     raise Exception("Unable to import awxkit. Is it installed?")
 
 from broker.providers import Provider
-from broker.helpers import merge_dicts, flatten_dict
+from broker import helpers
 
 AT_URL = settings.ANSIBLETOWER.base_url
 UNAME = settings.ANSIBLETOWER.username
@@ -58,7 +58,7 @@ class AnsibleTower(Provider):
         if getattr(at_object, "artifacts", None):
             logger.debug(f"Found artifacts: {at_object.artifacts}")
             if strategy == "latest":
-                artifacts = merge_dicts(artifacts, at_object.artifacts)
+                artifacts = helpers.merge_dicts(artifacts, at_object.artifacts)
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
             for child in children:
@@ -74,7 +74,7 @@ class AnsibleTower(Provider):
             job_attrs = self._merge_artifacts(
                 job, strategy=kwargs.get("strategy", "latest")
             )
-            job_attrs = flatten_dict(job_attrs)
+            job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
             for key, value in job_attrs.items():
@@ -100,6 +100,13 @@ class AnsibleTower(Provider):
         job.wait_until_completed()
         assert job.status == "successful"
         return job
+
+    def nick_help(self,  **kwargs):
+        workflow = kwargs.get("workflow")
+        wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
+        logger.info(
+            f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
+        )
 
     def release(self, name):
         return self.exec_workflow(workflow=RELEASE_WORKFLOW, source_vm=name)

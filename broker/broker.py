@@ -53,6 +53,13 @@ class VMBroker:
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
                 helpers.update_inventory(add=host.to_dict())
 
+    def nick_help(self):
+        """Use a provider's nick_help method to get argument information"""
+        for action, arg in self._provider_actions.items():
+            provider, _ = PROVIDER_ACTIONS[action]
+            logger.info(f"Querying provider {provider.__name__}")
+            self._act(provider, "nick_help", checkout=False)
+
     def checkin(self, host=None):
         """checkin one or more VMs"""
         if host is None:
