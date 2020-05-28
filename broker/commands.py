@@ -40,7 +40,7 @@ def checkout(ctx, workflow, nick):
     or
     COMMAND: broker checkout --nick "nickname"
 
-    :param ctx: clicks content object
+    :param ctx: clicks context object
 
     :param workflow: workflow template stored in Ansible Tower, passed in as a string
 
@@ -79,12 +79,12 @@ def checkin(vm, all_):
 
 
 @cli.command()
-@click.option("--details", is_flag=True, help="Display all hist details")
+@click.option("--details", is_flag=True, help="Display all host details")
 def inventory(details):
     """Get a list of all VMs you've checked out showing hostname and local id
         hostname pulled from list of dictionaries
 
-    :param details: click option to display all hist details
+    :param details: click option to display all host details
     """
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory()

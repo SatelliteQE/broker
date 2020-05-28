@@ -47,14 +47,14 @@ class AnsibleTower(Provider):
 
     def _merge_artifacts(self, at_object, strategy="latest", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children
-        strategies:
-           - latest: overwite existing values with newer values
-           - branch: each branched child gets its own sub-dictionary (todo)
-           - min-branch: only branch children if conflict is detected (todo)
 
         :param at_object: object you want to merge
 
-        :param strategy: default to latest
+        :param strategy:
+            strategies:-
+               - latest: overwrite existing values with newer values
+               - branch: each branched child gets its own sub-dictionary (todo)
+               - min-branch: only branch children if conflict is detected (todo)
 
         :param artifacts: default to none
 
@@ -88,9 +88,6 @@ class AnsibleTower(Provider):
         """
         if provider_params:
             job = provider_params
-            print(job)
-            host = host_classes
-            print(host)
             job_attrs = self._merge_artifacts(
                 job, strategy=kwargs.get("strategy", "latest")
             )
