@@ -2,6 +2,15 @@
 History
 =======
 
+0.0.7 (2020-05-29)
+==================
+
++ Added session class
++ Added session functionality to Host class
++ Updated VMBroker context manager
++ Added ssh2-python dependency (requires cmake)
++ New host settings added to settings.yaml.example
+
 0.0.6 (2020-05-27)
 ==================
 
