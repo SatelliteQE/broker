@@ -42,16 +42,24 @@ class VMBroker:
         else:
             return result
 
-    def checkout(self):
-        """checkout one or more VMs"""
+    def checkout(self, connect=False):
+        """checkout one or more VMs
+
+        :param connect: Boolean whether to establish host ssh connection
+
+        :return: Host obj or list of Host objects
+        """
         for action, arg in self._provider_actions.items():
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
             host = self._act(provider, method, checkout=True)
             if host:
+                if connect:
+                    host.connect()
                 self._hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
                 helpers.update_inventory(add=host.to_dict())
+        return self._hosts if not len(self._hosts) == 1 else self._hosts[0]
 
     def nick_help(self):
         """Use a provider's nick_help method to get argument information"""
@@ -72,6 +80,7 @@ class VMBroker:
                 self.checkin(_host)
         elif host:
             logger.info(f"Checking in {host.hostname}")
+            host.close()
             host.release()
             self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)
@@ -93,8 +102,7 @@ class VMBroker:
 
     def __enter__(self):
         try:
-            self.checkout()
-            return self._hosts
+            return self.checkout(connect=True)
         except Exception as err:
             self.checkin()
             raise Exception

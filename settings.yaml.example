@@ -2,6 +2,9 @@ default:
     # Broker settings
     debug: False
     inventory_file: "inventory.yaml"
+    # Host Settings
+    host_username: "root"
+    host_password: "<password>"
     # Provider settings
     AnsibleTower:
         base_url: "https://<ansible tower host>/"

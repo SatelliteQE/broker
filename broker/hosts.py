@@ -1,5 +1,6 @@
 # from functools import cached_property
-
+from dynaconf import settings
+from broker import session
 
 class Host:
     def __init__(self, hostname, name=None, from_dict=False, **kwargs):
@@ -9,12 +10,22 @@ class Host:
         else:
             self.hostname = hostname
             self.name = name
+        self.username = kwargs.get("username", settings.HOST_USERNAME)
+        self.password = kwargs.get("pwassword", settings.HOST_PASSWORD)
+        self.session = None
 
-        self.session = self._get_session()
+    def connect(self, username=None, password=None):
+        username = username or self.username
+        password = password or self.password
+        self.session = session.Session(
+            hostname=self.hostname,
+            username=username,
+            password=password
+        )
 
-    def _get_session(self):
-        pass
-
+    def close(self):
+        if isinstance(self.session, session.Session):
+            self.session.session.disconnect()
     def release(self):
         raise NotImplementedError("release has not been implemented for this provider")
 
@@ -30,7 +41,7 @@ class Host:
         return None
 
     def execute(self, command):
-        return self.session.execute(command)
+        return self.session.run(command)
 
     def to_dict(self):
         return {

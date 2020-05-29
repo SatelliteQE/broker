@@ -2,7 +2,6 @@ from pathlib import Path
 import click
 import logging
 from logzero import logger
-from dynaconf import settings
 from broker.broker import VMBroker
 from broker import logger as b_log
 from broker import helpers

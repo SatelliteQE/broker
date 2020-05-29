@@ -6,6 +6,7 @@ Broker is a tool designed to provide a common interface between one or many serv
 
 # Installation
 ```
+dnf install cmake
 cd <broker root directory>
 pip install .
 cp setting.yaml.example settings.yaml

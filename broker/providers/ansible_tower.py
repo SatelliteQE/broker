@@ -100,7 +100,7 @@ class AnsibleTower(Provider):
                 if key == "vm_provisioned" and not name:
                     name = value if not isinstance(value, list) else value[0]
                 if key.endswith("host_type"):
-                    host_type = value
+                    host_type = value if value in host_classes else host_type
             if not hostname:
                 raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
             logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
@@ -120,8 +120,10 @@ class AnsibleTower(Provider):
         workflow = kwargs.get("workflow")
         wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
-        job.wait_until_completed()
-        assert job.status == "successful"
+        job.wait_until_completed(timeout=1800)
+        if not job.status == "successful":
+            logger.error(f"Workflow Status: {job.status}\nExplanation: {job.job_explanation}")
+            return
         return job
 
     def nick_help(self,  **kwargs):
