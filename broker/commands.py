@@ -35,8 +35,16 @@ def cli():
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.pass_context
 def checkout(ctx, workflow, nick):
-    """Checkout a Virtual Machine
-    COMMAND: broker checkout --<action> <argument>
+    """Checkout or "create" a Virtual Machine broker instance
+    COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
+    or
+    COMMAND: broker checkout --nick "nickname"
+
+    :param ctx: clicks context object
+
+    :param workflow: workflow template stored in Ansible Tower, passed in as a string
+
+    :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
     """
     broker_args = {}
     if nick:
@@ -53,9 +61,13 @@ def checkout(ctx, workflow, nick):
 @click.argument("vm", type=str, nargs=-1)
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
 def checkin(vm, all_):
-    """Checkin a VM or series of VMs
+    """Checkin or "remove" a VM or series of VM broker instances
 
     COMMAND: broker checkin <vm hostname>|<local id>|all
+
+    :param vm: Hostname or local id of host
+
+    :param all_: Click option all
     """
     inventory = helpers.load_inventory()
     to_remove = []
@@ -67,9 +79,13 @@ def checkin(vm, all_):
 
 
 @cli.command()
-@click.option("--details", is_flag=True, help="Display all hist details")
+@click.option("--details", is_flag=True, help="Display all host details")
 def inventory(details):
-    """Get a list of all VMs you've checked out"""
+    """Get a list of all VMs you've checked out showing hostname and local id
+        hostname pulled from list of dictionaries
+
+    :param details: click option to display all host details
+    """
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
@@ -78,7 +94,6 @@ def inventory(details):
         else:
             logger.info(f"{num}: {host['hostname']}")
 
-
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
@@ -86,6 +101,10 @@ def duplicate(vm, all_):
     """Duplicate a broker-procured vm
 
     COMMAND: broker duplicate <vm hostname>|<local id>|all
+
+    :param vm: Hostname or local id of host
+
+    :param all_: Click option all
     """
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
