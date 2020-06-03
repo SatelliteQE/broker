@@ -61,6 +61,21 @@ class VMBroker:
                 helpers.update_inventory(add=host.to_dict())
         return self._hosts if not len(self._hosts) == 1 else self._hosts[0]
 
+    def execute(self, **kwargs):
+        """execute a provider action
+
+        :return: Any The results given back by the provider
+        """
+        if not self._provider_actions:
+            for key, action in PROVIDER_ACTIONS.items():
+                if key in kwargs:
+                    self._provider_actions[key] = action
+        self._kwargs.update(kwargs)
+        for action, arg in self._provider_actions.items():
+            provider, method = PROVIDER_ACTIONS[action]
+        logger.info(f"Using provider {provider.__name__} for execution")
+        return self._act(provider, method)
+
     def nick_help(self):
         """Use a provider's nick_help method to get argument information"""
         for action, arg in self._provider_actions.items():

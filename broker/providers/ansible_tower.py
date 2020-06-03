@@ -106,7 +106,7 @@ class AnsibleTower(Provider):
             logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
             host_inst = host_classes[host_type](hostname=hostname, name=name, **kwargs)
         else:
-            host_inst = host_classes[kwargs.get('type')](**kwargs)
+            host_inst = host_classes[kwargs.get("type")](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
@@ -118,15 +118,24 @@ class AnsibleTower(Provider):
         :return: dictionary containing all information about executed workflow
         """
         workflow = kwargs.get("workflow")
+        if "artifacts" in kwargs:
+            kwargs.pop("artifacts")
+            artifacts = True
+        else:
+            artifacts = False
         wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
         job.wait_until_completed(timeout=1800)
         if not job.status == "successful":
-            logger.error(f"Workflow Status: {job.status}\nExplanation: {job.job_explanation}")
+            logger.error(
+                f"Workflow Status: {job.status}\nExplanation: {job.job_explanation}"
+            )
             return
+        if artifacts:
+            return self._merge_artifacts(job)
         return job
 
-    def nick_help(self,  **kwargs):
+    def nick_help(self, **kwargs):
         workflow = kwargs.get("workflow")
         wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
         logger.info(

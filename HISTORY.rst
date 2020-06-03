@@ -2,6 +2,13 @@
 History
 =======
 
+0.0.8 (2020-06-03)
+==================
+
++ Added execute functionality to broker
++ Added more functionality to VMBroker subclass to handle execute
++ Slightly changed AnsibleTower provider to allow for arbitrary workflow execution
+
 0.0.7 (2020-05-29)
 ==================
 
