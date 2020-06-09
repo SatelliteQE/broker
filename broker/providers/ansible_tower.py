@@ -118,11 +118,10 @@ class AnsibleTower(Provider):
         :return: dictionary containing all information about executed workflow
         """
         workflow = kwargs.get("workflow")
+        artifacts = False
         if "artifacts" in kwargs:
             kwargs.pop("artifacts")
             artifacts = True
-        else:
-            artifacts = False
         wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
         job.wait_until_completed(timeout=1800)
