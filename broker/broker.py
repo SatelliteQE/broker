@@ -120,7 +120,7 @@ class VMBroker:
             return self.checkout(connect=True)
         except Exception as err:
             self.checkin()
-            raise Exception
+            raise err
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.checkin()
