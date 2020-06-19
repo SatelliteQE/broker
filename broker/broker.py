@@ -78,8 +78,13 @@ class VMBroker:
 
     def nick_help(self):
         """Use a provider's nick_help method to get argument information"""
-        for action, arg in self._provider_actions.items():
-            provider, _ = PROVIDER_ACTIONS[action]
+        if self._provider_actions:
+            for action, arg in self._provider_actions.items():
+                provider, _ = PROVIDER_ACTIONS[action]
+                logger.info(f"Querying provider {provider.__name__}")
+                self._act(provider, "nick_help", checkout=False)
+        elif self._kwargs.get("provider"):
+            provider = PROVIDERS[self._kwargs["provider"]]
             logger.info(f"Querying provider {provider.__name__}")
             self._act(provider, "nick_help", checkout=False)
 
@@ -99,6 +104,36 @@ class VMBroker:
             host.release()
             self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)
+
+    @staticmethod
+    def sync_inventory(provider):
+        """Acquire a list of hosts from a provider and update our inventory"""
+        additional_arg = None
+        if ":" in provider:
+            provider, additional_arg = provider.split(":")
+        logger.info(f"Pulling remote inventory from {provider}")
+        prov_inventory = PROVIDERS[provider]().get_inventory(additional_arg)
+        curr_inventory = [
+            host["hostname"] or host["name"] for host in helpers.load_inventory()
+        ]
+        new_hosts = []
+        remove_hosts = curr_inventory[:]
+        for n_host in prov_inventory:
+            name = n_host["hostname"] or n_host["name"]
+            if name in curr_inventory:
+                remove_hosts.remove(name)
+            else:
+                new_hosts.append(n_host)
+        if new_hosts:
+            msg = ", ".join([host["hostname"] or host["name"] for host in new_hosts])
+            logger.info(f"Adding new hosts: {msg}")
+            helpers.update_inventory(add=new_hosts)
+        else:
+            logger.info("No new hosts found")
+        if remove_hosts:
+            msg = ", ".join(remove_hosts)
+            logger.info(f"Removing old hosts: {msg}")
+            helpers.update_inventory(remove=remove_hosts)
 
     @staticmethod
     def reconstruct_host(host_export_data):

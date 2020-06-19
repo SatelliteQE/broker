@@ -97,7 +97,7 @@ def update_inventory(add=None, remove=None):
 
     :param add: list of dictionaries representing new hosts
 
-    :param remove: list of dictionaries representing hosts to be removed
+    :param remove: list of strings representing hostnames or names to be removed
 
     :return: no return value
     """
@@ -111,8 +111,8 @@ def update_inventory(add=None, remove=None):
         inventory_file.unlink()
 
     if remove:
-        for host in inv_data:
-            if host["hostname"] in remove:
+        for host in inv_data[::-1]:
+            if host["hostname"] in remove or host["name"] in remove:
                 inv_data.remove(host)
     if add:
         inv_data.extend(add)

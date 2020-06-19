@@ -2,6 +2,13 @@
 History
 =======
 
+0.0.9 (2020-06-19)
+==================
+
++ Added inventory sync functionality to broker
++ Added the ability to query actions from providers using nick-help
++ Misc enhancements and tweaks including improving inventory host removal
+
 0.0.8 (2020-06-03)
 ==================
 
