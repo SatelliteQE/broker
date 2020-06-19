@@ -60,3 +60,15 @@ If supported by your chosen provider, nick-help will display the additional argu
 broker nick-help --help
 broker nick-help --workflow my-awesome-workflow
 ```
+Additionally, if you're unfamiliar with what actions are supported by your provider, you can get a list by passing the provider's name.
+```
+broker nick-help --provider AnsibleTower
+```
+
+**Run arbitrary actions**
+If a provider action doesn't result in a host creation/removal, Broker allows you to execute that action as well. There are a few output options available as well.
+```
+broker execute --help
+broker execute --workflow my-awesome-workflow --aditional-arg True
+broker execute -o raw --workflow my-awesome-workflow --aditional-arg True
+```

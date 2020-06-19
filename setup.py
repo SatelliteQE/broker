@@ -16,7 +16,7 @@ requirements = [AWXKIT, "click", "dynaconf[yaml]", "logzero", "pyyaml", "ssh2-py
 
 setup(
     name="broker",
-    version="0.0.8",
+    version="0.0.9",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",

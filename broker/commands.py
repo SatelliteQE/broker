@@ -59,15 +59,20 @@ def checkout(ctx, workflow, nick):
 @cli.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
-@click.option("--workflow", type=str)
+@click.option("--workflow", type=str, help="Get a set of valid arguments for a workflow")
+@click.option("--provider", type=str, help="Class-style name of a supported broker provider. (AnsibleTower)")
 @click.pass_context
-def nick_help(ctx, workflow):
+def nick_help(ctx, workflow, provider):
     """Get information from an action to determine accepted arguments
+    or get a list of valid actions available from a provider
     COMMAND: broker nick-help --<action> <argument>
+    COMMAND: broker nick-help --provider <ProviderName>
     """
     broker_args = {}
     if workflow:
         broker_args["workflow"] = workflow
+    if provider:
+        broker_args["provider"] = provider
     # if additional arguments were passed, include them in the broker args
     broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
     broker_inst = VMBroker(**broker_args)
@@ -83,8 +88,6 @@ def checkin(vm, all_):
     COMMAND: broker checkin <vm hostname>|<local id>|all
 
     :param vm: Hostname or local id of host
-
-    :param all_: Click option all
     """
     inventory = helpers.load_inventory()
     to_remove = []
@@ -97,21 +100,22 @@ def checkin(vm, all_):
 
 @cli.command()
 @click.option("--details", is_flag=True, help="Display all host details")
-def inventory(details):
+@click.option("--sync", type=str, help="Class-style name of a supported broker provider. (AnsibleTower)")
+def inventory(details, sync):
     """Get a list of all VMs you've checked out showing hostname and local id
         hostname pulled from list of dictionaries
-
-    :param details: click option to display all host details
     """
+    if sync:
+        VMBroker.sync_inventory(provider=sync)
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
         if details:
             logger.info(
-                f"{num}: {host.pop('hostname')}, Details: {helpers.yaml_format(host)}"
+                f"{num}: {host['hostname'] or host['name']}, Details: {helpers.yaml_format(host)}"
             )
         else:
-            logger.info(f"{num}: {host['hostname']}")
+            logger.info(f"{num}: {host['hostname'] or host['name']}")
 
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)

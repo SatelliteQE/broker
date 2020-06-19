@@ -1,4 +1,5 @@
 import inspect
+import json
 from dynaconf import settings
 from logzero import logger
 
@@ -76,6 +77,23 @@ class AnsibleTower(Provider):
                     artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
         return artifacts
 
+    def _compile_host_info(self, host):
+        host_info = {
+            "name": host.name,
+            "type": host.type,
+            "hostname": host.variables["fqdn"],
+            "_broker_provider": "AnsibleTower",
+        }
+        if "last_job" in host.related:
+            job_vars = json.loads(host.get_related("last_job").extra_vars)
+            broker_args = {
+                arg: val
+                for arg, val in job_vars.items()
+                if val and isinstance(val, str)
+            }
+            host_info["_broker_args"] = broker_args
+        return host_info
+
     def construct_host(self, provider_params, host_classes, **kwargs):
         """ Constructs host to be read by Ansible Tower
 
@@ -134,12 +152,28 @@ class AnsibleTower(Provider):
             return self._merge_artifacts(job)
         return job
 
+    def get_inventory(self, user=None):
+        """Compile a list of hosts based on any inventory a user's name is mentioned"""
+        user = user if user else UNAME
+        invs = [inv for inv in self.v2.inventory.get().results if user in inv.name]
+        hosts = []
+        for inv in invs:
+            inv_hosts = inv.get_related("hosts").results
+            hosts.extend(inv_hosts)
+        return [self._compile_host_info(host) for host in hosts]
+
     def nick_help(self, **kwargs):
+        """Get a list of extra vars and their defaults from a workflow"""
         workflow = kwargs.get("workflow")
-        wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
-        logger.info(
-            f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
-        )
+        if workflow:
+            wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
+            logger.info(
+                f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
+            )
+        else:
+            workflows = self.v2.workflow_job_templates.get().results
+            workflows = "\n".join([workflow.name for workflow in workflows])
+            logger.info(f"Available workflows:\n{workflows}")
 
     def release(self, name):
         return self.exec_workflow(workflow=RELEASE_WORKFLOW, source_vm=name)
