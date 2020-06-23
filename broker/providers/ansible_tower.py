@@ -72,8 +72,11 @@ class AnsibleTower(Provider):
             for child in children:
                 if child.type == "workflow_job_node":
                     child_id = child.summary_fields.job.id
-                    child_obj = self.v2.jobs.get(id=child_id).results.pop()
-                    artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
+                    try:
+                        child_obj = self.v2.jobs.get(id=child_id).results.pop()
+                        artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
+                    except IndexError:
+                        pass
         return artifacts
 
     def construct_host(self, provider_params, host_classes, **kwargs):
