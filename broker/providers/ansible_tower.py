@@ -72,9 +72,13 @@ class AnsibleTower(Provider):
             children = at_object.get_related("workflow_nodes").results
             for child in children:
                 if child.type == "workflow_job_node":
+                    logger.debug(child)
                     child_id = child.summary_fields.job.id
                     child_obj = self.v2.jobs.get(id=child_id).results.pop()
-                    artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
+                    if child_obj:
+                        artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
+                    else:
+                        logger.warning(f"Unable to pull information from child job with id {child_id}.")
         return artifacts
 
     def _compile_host_info(self, host):
@@ -91,6 +95,10 @@ class AnsibleTower(Provider):
                 for arg, val in job_vars.items()
                 if val and isinstance(val, str)
             }
+            try:
+                broker_args["workflow"] = host.get_related("last_job").summary_fields.source_workflow_job.name
+            except:
+                logger.warning(f"Unable to determine workflow for {host_info['hostname']}")
             host_info["_broker_args"] = broker_args
         return host_info
 
@@ -154,7 +162,7 @@ class AnsibleTower(Provider):
 
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned"""
-        user = user if user else UNAME
+        user = user or UNAME
         invs = [inv for inv in self.v2.inventory.get().results if user in inv.name]
         hosts = []
         for inv in invs:

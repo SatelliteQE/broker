@@ -69,6 +69,6 @@ broker nick-help --provider AnsibleTower
 If a provider action doesn't result in a host creation/removal, Broker allows you to execute that action as well. There are a few output options available as well.
 ```
 broker execute --help
-broker execute --workflow my-awesome-workflow --aditional-arg True
-broker execute -o raw --workflow my-awesome-workflow --aditional-arg True
+broker execute --workflow my-awesome-workflow --additional-arg True
+broker execute -o raw --workflow my-awesome-workflow --additional-arg True
 ```
