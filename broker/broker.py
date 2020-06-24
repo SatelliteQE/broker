@@ -92,6 +92,7 @@ class VMBroker:
         """checkin one or more VMs"""
         if host is None:
             host = self._hosts
+        logger.debug(host)
         if isinstance(host, dict):
             for _host in host.values():
                 self.checkin(_host)
