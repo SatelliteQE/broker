@@ -2,6 +2,13 @@
 History
 =======
 
+0.0.10 (2020-06-29)
+==================
+
++ Updated broker to be compatible with dynaconf 3.0.0
++ Added the ability to specify a BROKER_DIRECTORY envrionment variable
++ Changed settings.yaml to broker_settings.yaml
+
 0.0.9 (2020-06-19)
 ==================
 

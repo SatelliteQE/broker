@@ -4,5 +4,5 @@ python:
     - "3.8"
 install: pip install .
 script:
-    - mv settings.yaml.example settings.yaml
+    - mv broker_settings.yaml.example broker_settings.yaml
     - pytest -v

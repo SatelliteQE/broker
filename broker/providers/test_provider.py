@@ -1,5 +1,5 @@
 import inspect
-from dynaconf import settings
+from broker.settings import settings
 from logzero import logger
 
 from broker.providers import Provider
