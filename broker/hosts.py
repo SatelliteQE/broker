@@ -1,5 +1,5 @@
 # from functools import cached_property
-from dynaconf import settings
+from broker.settings import settings
 from broker import session
 
 class Host:

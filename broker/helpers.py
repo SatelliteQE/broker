@@ -1,9 +1,10 @@
 """Miscellaneous helpers live here"""
+import os
 from collections import UserDict
 from collections.abc import MutableMapping
 from copy import deepcopy
 from pathlib import Path
-from dynaconf import settings
+from broker import settings
 import yaml
 
 
@@ -73,9 +74,9 @@ def resolve_nick(nick):
 
     :return: a dictionary mapping argument names and values
     """
-    nick_names = settings.get("NICKS", {})
+    nick_names = settings.settings.get("NICKS", {})
     if nick in nick_names:
-        return settings.NICKS[nick].to_dict()
+        return settings.settings.NICKS[nick].to_dict()
 
 
 def load_inventory():
@@ -83,7 +84,7 @@ def load_inventory():
 
     :return: list of dictionaries
     """
-    inventory_file = Path(settings.INVENTORY_FILE)
+    inventory_file = settings.BROKER_DIRECTORY.joinpath(settings.settings.INVENTORY_FILE)
     if not inventory_file.exists():
         inv_data = []
     else:
@@ -101,7 +102,7 @@ def update_inventory(add=None, remove=None):
 
     :return: no return value
     """
-    inventory_file = Path(settings.INVENTORY_FILE)
+    inventory_file = settings.BROKER_DIRECTORY.joinpath(settings.settings.INVENTORY_FILE)
     if add and not isinstance(add, list):
         add = [add]
     if remove and not isinstance(remove, list):

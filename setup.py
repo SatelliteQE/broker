@@ -12,11 +12,11 @@ with open("README.md") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = [AWXKIT, "click", "dynaconf[yaml]", "logzero", "pyyaml", "ssh2-python"]
+requirements = [AWXKIT, "click", "dynaconf", "logzero", "pyyaml", "ssh2-python"]
 
 setup(
     name="broker",
-    version="0.0.9",
+    version="0.0.10",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",

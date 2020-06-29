@@ -1,6 +1,6 @@
 import inspect
 import json
-from dynaconf import settings
+from broker.settings import settings
 from logzero import logger
 
 try:

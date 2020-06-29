@@ -94,5 +94,5 @@ ENV/
 .pytest_cache/
 
 # project
-settings.yaml
+*settings.yaml
 inventory.yaml
