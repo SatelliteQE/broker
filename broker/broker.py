@@ -89,7 +89,14 @@ class VMBroker:
             self._act(provider, "nick_help", checkout=False)
 
     def checkin(self, host=None):
-        """checkin one or more VMs"""
+        """checkin one or more VMs
+
+        :param host: can be one of:
+            None - Will use the contents of self._hosts
+            A single host object
+            A list of host objects
+            A dictionary mapping host types to one or more host objects
+        """
         if host is None:
             host = self._hosts
         logger.debug(host)
@@ -97,7 +104,8 @@ class VMBroker:
             for _host in host.values():
                 self.checkin(_host)
         elif isinstance(host, list):
-            for _host in host:
+            # reversing over a copy of the list to avoid skipping
+            for _host in host[::-1]:
                 self.checkin(_host)
         elif host:
             logger.info(f"Checking in {host.hostname}")
