@@ -54,7 +54,7 @@ You may use either the local id (```broker inventory```), the hostname, or "all"
 broker checkin my.host.fqdn.com
 broker checkin 0
 broker checkin 1 3 my.host.fqdn.com
-broker checkin all
+broker checkin --all
 ```
 
 **Creating nicks**
@@ -75,4 +75,14 @@ If a provider action doesn't result in a host creation/removal, Broker allows yo
 broker execute --help
 broker execute --workflow my-awesome-workflow --additional-arg True
 broker execute -o raw --workflow my-awesome-workflow --additional-arg True
+```
+
+**Run Broker in the background**
+Certain Broker actions can be run in the background, these currently are: checkout, checkin, duplicate, and execute. When running a command in this mode, it will spin up a new Broker process and no longer log to stderr. To check progress, you can still follow broker's log file.
+Note that background mode will interfere with output options for execute since it won't be able to print to stdout. Those should kept in log mode.
+```
+broker checkout --background --nick rhel7
+broker checkin -b --all
+broker duplicate -b 0
+broker execute -b --workflow my-awesome-workflow --artifacts
 ```

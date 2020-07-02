@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dynaconf import Dynaconf
+from logzero import logger
 
 settings_file = "broker_settings.yaml"
 BROKER_DIRECTORY = Path()
