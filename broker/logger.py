@@ -7,7 +7,7 @@ import logzero
 from broker.settings import BROKER_DIRECTORY
 
 
-def setup_logzero(level="info", path="logs/broker.log"):
+def setup_logzero(level="info", path="logs/broker.log", silent=False):
     log_fmt = "%(color)s[%(levelname)s %(asctime)s]%(end_color)s %(message)s"
     debug_fmt = (
         "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d]"
@@ -16,7 +16,7 @@ def setup_logzero(level="info", path="logs/broker.log"):
     log_level = getattr(logging, level.upper(), logging.INFO)
 
     formatter = logzero.LogFormatter(fmt=debug_fmt if log_level is logging.DEBUG else log_fmt)
-    logzero.setup_default_logger(formatter=formatter)
+    logzero.setup_default_logger(formatter=formatter, disableStderrLogger=silent)
     logzero.loglevel(log_level)
     path = str(BROKER_DIRECTORY.joinpath(path))
     logzero.logfile(
