@@ -24,13 +24,27 @@ class AwxkitApiStub(MockStub):
         if "job_id" in kwargs:
             # we're a job, so load in job information
             super().__init__(self._load_job(kwargs.pop("job_id")))
+        elif "name" in kwargs:
+            # workflow job template lookup
+            super().__init__(self._load_workflow(kwargs.pop("name")))
+        else:
+            super().__init__()
 
-    def _load_job(self, job_id):
+    @staticmethod
+    def _load_job(job_id):
         with open("tests/data/ansible_tower/fake_jobs.json") as job_file:
             job_data = json.load(job_file)
         for job in job_data:
             if job["id"] == job_id:
                 return job
+
+    @staticmethod
+    def _load_workflow(workflow_name):
+        with open("tests/data/ansible_tower/fake_workflows.json") as workflow_file:
+            workflow_data = json.load(workflow_file)
+        for workflow in workflow_data:
+            if workflow["name"] == workflow_name:
+                return workflow
 
     def get_related(self, related=None):
         with open("tests/data/ansible_tower/fake_children.json") as child_file:
@@ -43,7 +57,7 @@ class AwxkitApiStub(MockStub):
             return AwxkitApiStub(job_id=kwargs.pop("id"))
         if "name" in kwargs:
             # requesting a workflow job template by name
-            return AwxkitApiStub()
+            return AwxkitApiStub(name=kwargs.pop("name"))
         return self
 
     def launch(self, payload={}):
@@ -67,15 +81,23 @@ def config_stub():
     yield MockStub()
 
 
-def test_exec_workflow(api_stub, config_stub):
-    at_inst = AnsibleTower(root=api_stub, config=config_stub)
-    job = at_inst.exec_workflow(workflow="deploy-base-rhel")
+@pytest.fixture(scope="function")
+def tower_stub(api_stub, config_stub):
+    yield AnsibleTower(root=api_stub, config=config_stub)
+
+
+def test_exec_workflow(tower_stub):
+    job = tower_stub.exec_workflow(workflow="deploy-base-rhel")
     assert "workflow_nodes" in job.related
 
 
-def test_host_creation(api_stub, config_stub):
-    at_inst = AnsibleTower(root=api_stub, config=config_stub)
-    job = at_inst.exec_workflow(workflow="deploy-base-rhel")
-    host = at_inst.construct_host(job, HOST_CLASSES)
+def test_host_creation(tower_stub):
+    job = tower_stub.exec_workflow(workflow="deploy-base-rhel")
+    host = tower_stub.construct_host(job, HOST_CLASSES)
     assert isinstance(host, HOST_CLASSES["host"])
     assert host.hostname == "fake.host.test.com"
+
+
+def test_workflow_lookup_failure(tower_stub):
+    job = tower_stub.exec_workflow(workflow="this-does-not-exist")
+    assert job is None

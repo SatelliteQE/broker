@@ -148,8 +148,15 @@ class AnsibleTower(Provider):
         if "artifacts" in kwargs:
             kwargs.pop("artifacts")
             artifacts = True
-        wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
+        wfjts = self.v2.workflow_job_templates.get(name=workflow).results
+        if wfjts:
+            wfjt = wfjts.pop()
+        else:
+            logger.error(f'Workflow not found by name: {workflow}')
+            return
+        logger.debug(f'Launching workflow template: {AT_URL}{wfjt.url}')
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
+        logger.info(f'Waiting for job: {AT_URL}{job.url}')
         job.wait_until_completed(timeout=1800)
         if not job.status == "successful":
             logger.error(
