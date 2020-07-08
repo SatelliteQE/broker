@@ -12,7 +12,7 @@ with open("README.md") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = [AWXKIT, "click", "dynaconf", "logzero", "pyyaml", "ssh2-python"]
+requirements = [AWXKIT, "click", "dynaconf>=3.0", "logzero", "pyyaml", "ssh2-python"]
 
 setup(
     name="broker",
