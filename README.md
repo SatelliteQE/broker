@@ -9,9 +9,9 @@ Broker is a tool designed to provide a common interface between one or many serv
 dnf install cmake
 cd <broker root directory>
 pip install .
-cp broker_settings.yaml.example broker_settings.yaml
+cp broker_settings.yaml.example settings.yaml
 ```
-Then edit the broker_settings.yaml file
+Then edit the settings.yaml file
 
 Broker can also be ran outside of its base directory. In order to do so, specify the directory broker's files are in with the
 `BROKER_DIRECTORY` envronment variable.
