@@ -170,7 +170,7 @@ class AnsibleTower(Provider):
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned"""
         user = user or UNAME
-        invs = [inv for inv in self.v2.inventory.get().results if user in inv.name]
+        invs = [inv for inv in self.v2.inventory.get(page_size=100).results if user in inv.name]
         hosts = []
         for inv in invs:
             inv_hosts = inv.get_related("hosts").results
