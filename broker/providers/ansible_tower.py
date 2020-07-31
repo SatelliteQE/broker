@@ -16,6 +16,7 @@ AT_URL = settings.ANSIBLETOWER.base_url
 UNAME = settings.ANSIBLETOWER.username
 PWORD = settings.ANSIBLETOWER.password
 RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
+EXTEND_WORKFLOW = settings.ANSIBLETOWER.extend_workflow
 
 
 class AnsibleTower(Provider):
@@ -46,14 +47,14 @@ class AnsibleTower(Provider):
             }
         )
 
-    def _merge_artifacts(self, at_object, strategy="latest", artifacts=None):
+    def _merge_artifacts(self, at_object, strategy="merge", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children
 
         :param at_object: object you want to merge
 
         :param strategy:
-            strategies:-
-               - latest: overwrite existing values with newer values
+            strategies:
+               - merge: merge artifact dictionaries together
                - branch: each branched child gets its own sub-dictionary (todo)
                - min-branch: only branch children if conflict is detected (todo)
 
@@ -66,8 +67,10 @@ class AnsibleTower(Provider):
             artifacts = {}
         if getattr(at_object, "artifacts", None):
             logger.debug(f"Found artifacts: {at_object.artifacts}")
-            if strategy == "latest":
+            if strategy == "merge":
                 artifacts = helpers.merge_dicts(artifacts, at_object.artifacts)
+            elif strategy == "last":
+                artifacts = at_object.artifacts
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
             for child in children:
@@ -76,7 +79,7 @@ class AnsibleTower(Provider):
                     child_id = child.summary_fields.job.id
                     child_obj = self.v2.jobs.get(id=child_id).results.pop()
                     if child_obj:
-                        artifacts = self._merge_artifacts(child_obj, strategy, artifacts)
+                        artifacts = self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
                     else:
                         logger.warning(f"Unable to pull information from child job with id {child_id}.")
         return artifacts
@@ -115,7 +118,7 @@ class AnsibleTower(Provider):
         if provider_params:
             job = provider_params
             job_attrs = self._merge_artifacts(
-                job, strategy=kwargs.get("strategy", "latest")
+                job, strategy=kwargs.get("strategy", "merge")
             )
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
@@ -146,17 +149,16 @@ class AnsibleTower(Provider):
         workflow = kwargs.get("workflow")
         artifacts = False
         if "artifacts" in kwargs:
-            kwargs.pop("artifacts")
-            artifacts = True
+            artifacts = kwargs.pop("artifacts")
         wfjts = self.v2.workflow_job_templates.get(name=workflow).results
         if wfjts:
             wfjt = wfjts.pop()
         else:
             logger.error(f'Workflow not found by name: {workflow}')
             return
-        logger.debug(f'Launching workflow template: {AT_URL}{wfjt.url}')
+        logger.debug(f'Launching workflow template: {AT_URL}{wfjt.url}'.replace("//","/"))
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
-        logger.info(f'Waiting for job: {AT_URL}{job.url}')
+        logger.info(f'Waiting for job: {AT_URL}{job.url}'.replace("//","/"))
         job.wait_until_completed(timeout=1800)
         if not job.status == "successful":
             logger.error(
@@ -164,7 +166,7 @@ class AnsibleTower(Provider):
             )
             return
         if artifacts:
-            return self._merge_artifacts(job)
+            return self._merge_artifacts(job, strategy=artifacts)
         return job
 
     def get_inventory(self, user=None):
@@ -176,6 +178,13 @@ class AnsibleTower(Provider):
             inv_hosts = inv.get_related("hosts").results
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
+
+    def extend_vm(self, target_vm):
+        """Run the extend workflow with defaults args
+
+        :param target_vm: This will likely be the vm name
+        """
+        return self.exec_workflow(workflow=EXTEND_WORKFLOW, target_vm=target_vm)
 
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
