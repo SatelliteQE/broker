@@ -10,6 +10,7 @@ AnsibleTower:
     username: "<username>"
     password: "<plain text password>"
     release_workflow: "remove-vm"
+    extend_workflow: "extend-vm"
 TestProvider:
     config_value: "something"
 # You can set a nickname as a shortcut for arguments

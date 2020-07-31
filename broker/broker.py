@@ -114,6 +114,32 @@ class VMBroker:
             self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)
 
+    def extend(self, host=None):
+        """extend one or more VMs
+
+        :param host: can be one of:
+            None - Will use the contents of self._hosts
+            A single host object
+            A list of host objects
+            A dictionary mapping host types to one or more host objects
+        """
+        if host is None:
+            host = self._hosts
+        logger.debug(host)
+        if isinstance(host, dict):
+            for _host in host.values():
+                self.extend(_host)
+        elif isinstance(host, list):
+            # reversing over a copy of the list to avoid skipping
+            for _host in host[::-1]:
+                self.extend(_host)
+        elif host:
+            logger.info(f"Extending host {host.hostname}")
+            provider = PROVIDERS[host._broker_provider]
+            self._kwargs["target_vm"] = host.name
+            logger.debug(f"Executing extend with provider {provider.__name__}")
+            self._act(provider, "extend_vm", checkout=False)
+
     @staticmethod
     def sync_inventory(provider):
         """Acquire a list of hosts from a provider and update our inventory"""

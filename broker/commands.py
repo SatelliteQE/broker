@@ -120,9 +120,9 @@ def checkin(vm, background, all_):
         fork_broker()
     inventory = helpers.load_inventory()
     to_remove = []
-    for num, host_export in enumerate(inventory):
-        if str(num) in vm or host_export["hostname"] in vm or all_:
-            to_remove.append(VMBroker.reconstruct_host(host_export))
+    for num, host in enumerate(inventory):
+        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
+            to_remove.append(VMBroker.reconstruct_host(host))
     broker_inst = VMBroker(hosts=to_remove)
     broker_inst.checkin()
 
@@ -153,7 +153,37 @@ def inventory(details, sync):
 
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)
-@click.option("-b", "--background", is_flag=True, help="Run duplicate in the background")
+@click.option(
+    "-b", "--background", is_flag=True, help="Run extend in the background"
+)
+@click.option("--all", "all_", is_flag=True, help="Select all VMs")
+def extend(vm, background, all_):
+    """Extend a host's lease time
+
+    COMMAND: broker extend <vm hostname>|<vm name>|<local id>
+
+    :param vm: Hostname, VM Name, or local id of host
+
+    :param background: run a new broker subprocess to carry out command
+
+    :param all_: Click option all
+    """
+    if background:
+        fork_broker()
+    inventory = helpers.load_inventory()
+    to_extend = []
+    for num, host in enumerate(inventory):
+        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
+            to_extend.append(VMBroker.reconstruct_host(host))
+    broker_inst = VMBroker(hosts=to_extend)
+    broker_inst.extend()
+
+
+@cli.command()
+@click.argument("vm", type=str, nargs=-1)
+@click.option(
+    "-b", "--background", is_flag=True, help="Run duplicate in the background"
+)
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
 def duplicate(vm, background, all_):
     """Duplicate a broker-procured vm
@@ -170,7 +200,7 @@ def duplicate(vm, background, all_):
         fork_broker()
     inventory = helpers.load_inventory()
     for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or all_:
+        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             broker_args = host.get("_broker_args")
             if broker_args:
                 logger.info(f"Duplicating: {host['hostname']}")
@@ -193,8 +223,8 @@ def duplicate(vm, background, all_):
 )
 @click.option(
     "--artifacts",
-    is_flag=True,
-    help="AnsibleTower: return all artifacts associated with the execution.",
+    type=click.Choice(["merge", "last"]),
+    help="AnsibleTower: return artifacts associated with the execution.",
 )
 @click.pass_context
 def execute(ctx, background, workflow, nick, output_format, artifacts):
@@ -221,7 +251,7 @@ def execute(ctx, background, workflow, nick, output_format, artifacts):
     if workflow:
         broker_args["workflow"] = workflow
     if artifacts:
-        broker_args["artifacts"] = True
+        broker_args["artifacts"] = artifacts
     # if additional arguments were passed, include them in the broker args
     broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
     if background:

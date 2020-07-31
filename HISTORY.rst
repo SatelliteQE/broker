@@ -2,6 +2,13 @@
 History
 =======
 
+0.0.12 (2020-07-31)
+==================
+
++ Added ability to extend vm lease time
++ Changed --artifacts to now accept merge or last
++ Misc small changes
+
 0.0.11 (2020-07-02)
 ==================
 

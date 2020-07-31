@@ -28,5 +28,8 @@ class Provider:
     def get_inventory(self, **kwargs):
         raise NotImplementedError("get_inventory has not been implemented")
 
+    def extend(self):
+        raise NotImplementedError("extend has not been implemented")
+
     def release(self, host_obj):
         raise NotImplementedError("release has not been implemented")

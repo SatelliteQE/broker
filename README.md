@@ -46,6 +46,19 @@ Broker maintains a local inventory of the VMs you've checked out. You can see th
 ```
 broker inventory
 ```
+To sync your inventory from a supported provider, use the `--sync` option.
+```
+broker inventory --sync AnsibleTower
+```
+
+**Extending your VM lease time***
+Providers supporting extending a VM's lease time make that functionality available through the `extend` subcommand.
+```
+broker extend 0
+broker extend hostname
+broker extend vmname
+broker extend --all
+```
 
 **Checking in VMs**
 You can also return a VM to its provider with the ```checkin``` command.
@@ -75,6 +88,7 @@ If a provider action doesn't result in a host creation/removal, Broker allows yo
 broker execute --help
 broker execute --workflow my-awesome-workflow --additional-arg True
 broker execute -o raw --workflow my-awesome-workflow --additional-arg True
+broker execute -o raw --workflow my-awesome-workflow --additional-arg True --artifacts last
 ```
 
 **Run Broker in the background**
