@@ -13,16 +13,17 @@ PROVIDER_ACTIONS = {
     "test_action": (TestProvider, "test_action"),
 }
 
-HOST_CLASSES = {"host": Host}
-
 
 class VMBroker:
     def __init__(self, **kwargs):
         self._hosts = kwargs.pop("hosts", [])
+        self.host_classes = {"host": Host}
         # if a nick was specified, pull in the resolved arguments
         if "nick" in kwargs:
             nick = kwargs.pop("nick")
             kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick))
+        if "host_classes" in kwargs:
+            self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
         for key, action in PROVIDER_ACTIONS.items():
@@ -37,7 +38,7 @@ class VMBroker:
         logger.debug(result)
         if result and checkout:
             return provider_inst.construct_host(
-                provider_params=result, host_classes=HOST_CLASSES, **self._kwargs
+                provider_params=result, host_classes=self.host_classes, **self._kwargs
             )
         else:
             return result
@@ -170,8 +171,7 @@ class VMBroker:
             logger.info(f"Removing old hosts: {msg}")
             helpers.update_inventory(remove=remove_hosts)
 
-    @staticmethod
-    def reconstruct_host(host_export_data):
+    def reconstruct_host(self, host_export_data):
         """reconstruct a host from export data"""
         logger.debug(f"reconstructing host with export: {host_export_data}")
         provider = PROVIDERS.get(host_export_data.get("_broker_provider"))
@@ -182,7 +182,7 @@ class VMBroker:
             return
         provider_inst = provider(**host_export_data)
         return provider_inst.construct_host(
-            provider_params=None, host_classes=HOST_CLASSES, **host_export_data
+            provider_params=None, host_classes=self.host_classes, **host_export_data
         )
 
     def __enter__(self):

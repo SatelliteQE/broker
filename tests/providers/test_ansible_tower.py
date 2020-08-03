@@ -1,6 +1,6 @@
 import json
 import pytest
-from broker.broker import HOST_CLASSES
+from broker.broker import VMBroker
 from broker.providers.ansible_tower import AnsibleTower
 from broker.helpers import MockStub
 
@@ -92,9 +92,10 @@ def test_exec_workflow(tower_stub):
 
 
 def test_host_creation(tower_stub):
+    vmb = VMBroker()
     job = tower_stub.exec_workflow(workflow="deploy-base-rhel")
-    host = tower_stub.construct_host(job, HOST_CLASSES)
-    assert isinstance(host, HOST_CLASSES["host"])
+    host = tower_stub.construct_host(job, vmb.host_classes)
+    assert isinstance(host, vmb.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
 
 

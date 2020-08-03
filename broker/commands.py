@@ -122,7 +122,7 @@ def checkin(vm, background, all_):
     to_remove = []
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
-            to_remove.append(VMBroker.reconstruct_host(host))
+            to_remove.append(VMBroker().reconstruct_host(host))
     broker_inst = VMBroker(hosts=to_remove)
     broker_inst.checkin()
 
@@ -174,7 +174,7 @@ def extend(vm, background, all_):
     to_extend = []
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
-            to_extend.append(VMBroker.reconstruct_host(host))
+            to_extend.append(VMBroker().reconstruct_host(host))
     broker_inst = VMBroker(hosts=to_extend)
     broker_inst.extend()
 
