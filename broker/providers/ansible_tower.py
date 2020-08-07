@@ -75,6 +75,8 @@ class AnsibleTower(Provider):
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
             children.sort(key=lambda child: child.summary_fields.job.id)
+            if strategy == "last":
+                children = children[-1:]
             for child in children:
                 if child.type == "workflow_job_node":
                     logger.debug(child)
