@@ -17,6 +17,7 @@ UNAME = settings.ANSIBLETOWER.username
 PWORD = settings.ANSIBLETOWER.password
 RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
 EXTEND_WORKFLOW = settings.ANSIBLETOWER.extend_workflow
+AT_TIMEOUT = settings.ANSIBLETOWER.workflow_timeout
 
 
 class AnsibleTower(Provider):
@@ -171,7 +172,7 @@ class AnsibleTower(Provider):
         )
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
         logger.info(f"Waiting for job: {AT_URL}{job.url}".replace("//", "/"))
-        job.wait_until_completed(timeout=1800)
+        job.wait_until_completed(timeout=AT_TIMEOUT)
         if not job.status == "successful":
             logger.error(
                 f"Workflow Status: {job.status}\nExplanation: {job.job_explanation}"
