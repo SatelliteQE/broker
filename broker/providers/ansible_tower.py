@@ -1,5 +1,6 @@
 import inspect
 import json
+import datetime
 from broker.settings import settings
 from logzero import logger
 
@@ -91,11 +92,16 @@ class AnsibleTower(Provider):
                         )
         return artifacts
 
+    def _get_expire_date(self, host_id):
+        time_stamp = self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
+        return str(datetime.datetime.fromtimestamp(int(time_stamp)))
+
     def _compile_host_info(self, host):
         host_info = {
             "name": host.name,
             "type": host.type,
             "hostname": host.variables["fqdn"],
+            "expire_time": self._get_expire_date(host.id),
             "_broker_provider": "AnsibleTower",
         }
         if "last_job" in host.related:
