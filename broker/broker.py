@@ -1,3 +1,5 @@
+import multiprocessing
+from functools import wraps
 from logzero import logger
 from broker.providers.ansible_tower import AnsibleTower
 from broker.providers.test_provider import TestProvider
@@ -12,6 +14,22 @@ PROVIDER_ACTIONS = {
     "workflow": (AnsibleTower, "exec_workflow"),
     "test_action": (TestProvider, "test_action"),
 }
+
+
+def mp_decorator(func):
+    """This decorator wraps VMBroker methods to enable multiprocessing"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        vmb_inst = args[0]
+        if "_count" in vmb_inst._kwargs:
+            count = vmb_inst._kwargs.pop("_count")
+            return vmb_inst._mp_split(vmb_inst.checkout, count, **vmb_inst._kwargs)
+        func_results = func(*args, **kwargs)
+        if "_mpq" in kwargs:
+            kwargs["_mpq"].put(func_results)
+        return func_results
+
+    return wrapper
 
 
 class VMBroker:
@@ -43,14 +61,32 @@ class VMBroker:
         else:
             return result
 
-    def checkout(self, connect=False):
+    def _mp_split(self, method, count=1, **kwargs):
+        """Split a broker action into multiple processes"""
+        mp_queue = multiprocessing.Queue()
+        kwargs["_mpq"] = mp_queue
+        mp_proc, result = [], []
+        for _ in range(count):
+            p = multiprocessing.Process(target=method, kwargs=kwargs)
+            mp_proc.append(p)
+            p.start()
+        for proc in mp_proc:
+            result.append(mp_queue.get())
+        for proc in mp_proc:
+            proc.join()
+        if "checkout" in method.__name__:
+            self._hosts.extend(result)
+        return result
+
+    @mp_decorator
+    def checkout(self, connect=False, **kwargs):
         """checkout one or more VMs
 
         :param connect: Boolean whether to establish host ssh connection
 
         :return: Host obj or list of Host objects
         """
-        for action, arg in self._provider_actions.items():
+        for action in self._provider_actions.keys():
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
             host = self._act(provider, method, checkout=True)

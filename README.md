@@ -22,7 +22,10 @@ Broker can also be ran outside of its base directory. In order to do so, specify
 ```
 broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-arg2 else
 ```
-You can pass in any arbitrary arguments you want
+You can pass in any arbitrary arguments you want. Broker can also checkout multiple VMs at once by specifying a count.
+```
+broker checkout --nick rhel7 --count 3
+```
 
 **Nicks**
 
@@ -38,6 +41,7 @@ Broker offers another shortcut for checking out a VM with the same recipe as one
 broker duplicate my.awesome.vm.com
 broker duplicate 0
 broker duplicate 1 3
+broker duplicate 0 --count 2
 ```
 
 **Listing your VMs**
