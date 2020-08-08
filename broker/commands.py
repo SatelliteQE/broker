@@ -45,9 +45,10 @@ def cli():
 )
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("--workflow", type=str)
-@click.option("--nick", type=str, help="Use a nickname defined in your settings")
+@click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
+@click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
 @click.pass_context
-def checkout(ctx, background, workflow, nick):
+def checkout(ctx, background, workflow, nick, count):
     """Checkout or "create" a Virtual Machine broker instance
     COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
     or
@@ -66,6 +67,8 @@ def checkout(ctx, background, workflow, nick):
         broker_args["nick"] = nick
     if workflow:
         broker_args["workflow"] = workflow
+    if count:
+        broker_args["_count"] = count
     # if additional arguments were passed, include them in the broker args
     broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
     if background:
@@ -184,8 +187,9 @@ def extend(vm, background, all_):
 @click.option(
     "-b", "--background", is_flag=True, help="Run duplicate in the background"
 )
+@click.option("-c", "--count", type=int, help="Number of times broker repeats the duplicate")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-def duplicate(vm, background, all_):
+def duplicate(vm, background, count, all_):
     """Duplicate a broker-procured vm
 
     COMMAND: broker duplicate <vm hostname>|<local id>|all
@@ -203,6 +207,8 @@ def duplicate(vm, background, all_):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             broker_args = host.get("_broker_args")
             if broker_args:
+                if count:
+                    broker_args["_count"] = count
                 logger.info(f"Duplicating: {host['hostname']}")
                 broker_inst = VMBroker(**broker_args)
                 broker_inst.checkout()
