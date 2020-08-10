@@ -1,5 +1,6 @@
 import inspect
 import json
+import sys
 from broker.settings import settings
 from logzero import logger
 
@@ -13,8 +14,9 @@ from broker.providers import Provider
 from broker import helpers
 
 AT_URL = settings.ANSIBLETOWER.base_url
-UNAME = settings.ANSIBLETOWER.username
-PWORD = settings.ANSIBLETOWER.password
+UNAME = settings.ANSIBLETOWER.get("username")
+PWORD = settings.ANSIBLETOWER.get("password")
+TOKEN = settings.ANSIBLETOWER.get("token")
 RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
 EXTEND_WORKFLOW = settings.ANSIBLETOWER.extend_workflow
 AT_TIMEOUT = settings.ANSIBLETOWER.workflow_timeout
@@ -25,14 +27,36 @@ class AnsibleTower(Provider):
         self._construct_params = []
         config = kwargs.get("config", awxkit.config)
         config.base_url = AT_URL
-        config.credentials = {"default": {"username": UNAME, "password": PWORD}}
-        config.use_sessions = True
-        if "root" in kwargs:
-            root = kwargs.get("root")
-        else:
-            root = awxkit.api.Api()
-        root.load_session().get()
-        self.v2 = root.available_versions.v2.get()
+        # Prefer token if its set, otherwise use username/password
+        # auth paths for the API taken from:
+        # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
+        # unit test mock structure means the root API instance can't be loaded on the same line
+        root = kwargs.get("root")
+        if root is None:
+            root = awxkit.api.Api()  # support mock stub for unit tests
+        if TOKEN:
+            logger.info("Using token authentication")
+            config.token = TOKEN
+            root.connection.login(username=None, password=None, token=TOKEN, auth_type='Bearer')
+            versions = root.get().available_versions
+            try:
+                # lookup the user that authenticated with the token
+                # If a username was specified in config, use that instead
+                my_username = UNAME or versions.v2.get().me.get().results[0].username
+            except (IndexError, AttributeError):
+                # lookup failed for whatever reason
+                logger.error("Failed to lookup a username for the given token, please check credentials")
+                sys.exit()
+        else:  # dynaconf validators should have checked that either token or password was provided
+            logger.info("Using username and password authentication")
+            config.credentials = {"default": {"username": UNAME, "password": PWORD}}
+            config.use_sessions = True
+            root.load_session().get()
+            versions = root.available_versions
+            my_username = UNAME
+        self.v2 = versions.v2.get()
+        self.username = my_username
+        
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -192,7 +216,7 @@ class AnsibleTower(Provider):
 
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned"""
-        user = user or UNAME
+        user = user or self.username
         invs = [
             inv
             for inv in self.v2.inventory.get(page_size=100).results
