@@ -17,6 +17,17 @@ Broker can also be ran outside of its base directory. In order to do so, specify
 `BROKER_DIRECTORY` envronment variable.
 ```BROKER_DIRECTORY=/home/jake/Programming/broker/ broker inventory```
 
+# Configuration
+The broker_settings.yaml file is used, through DynaConf, to set configuration values for broker's interaction with its 'providers'.
+
+DynaConf integration provides support for setting environment variables to override any settings from the yaml file.
+
+An environment variable override would take the form of: `DYNACONF_AnsibleTower__base_url="https://my.ansibletower.instance.com"`. Note the use of double underscores to model nested maps in yaml.
+
+For the AnsibleTower provider, authentication can be achieved either through setting a username and password, or through a token (Personal Access Token in Tower).
+
+A username can still be provided when using a token to authenticate. This user will be used for inventory sync (examples below). This may be helpful for AnsibleTower administrators who would like to use their own token to authenticate, but want to set a different user in configuration for checking inventory.
+
 # Usage
 **Checking out a VM**
 ```
@@ -53,6 +64,10 @@ broker inventory
 To sync your inventory from a supported provider, use the `--sync` option.
 ```
 broker inventory --sync AnsibleTower
+```
+To sync inventory for a specific user, use the following syntax with `--sync`.
+```
+broker inventory --sync AnsibleTower:<username>
 ```
 
 **Extending your VM lease time***
