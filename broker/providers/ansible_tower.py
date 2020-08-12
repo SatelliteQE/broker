@@ -74,6 +74,12 @@ class AnsibleTower(Provider):
                 artifacts = at_object.artifacts
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
+            # filter out children with no associated job
+            children = list(
+                filter(
+                    lambda child: getattr(child.summary_fields, "job", None), children
+                )
+            )
             children.sort(key=lambda child: child.summary_fields.job.id)
             if strategy == "last":
                 children = children[-1:]
