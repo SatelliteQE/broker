@@ -200,7 +200,7 @@ class AnsibleTower(Provider):
         ]
         hosts = []
         for inv in invs:
-            inv_hosts = inv.get_related("hosts").results
+            inv_hosts = inv.get_related("hosts", page_size=200).results
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
 
