@@ -18,6 +18,7 @@ PROVIDER_ACTIONS = {
 
 def mp_decorator(func):
     """This decorator wraps VMBroker methods to enable multiprocessing"""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         vmb_inst = args[0]
@@ -207,7 +208,7 @@ class VMBroker:
             logger.info(f"Removing old hosts: {msg}")
             helpers.update_inventory(remove=remove_hosts)
 
-    def reconstruct_host(self, host_export_data):
+    def reconstruct_host(self, host_export_data, connect=False):
         """reconstruct a host from export data"""
         logger.debug(f"reconstructing host with export: {host_export_data}")
         provider = PROVIDERS.get(host_export_data.get("_broker_provider"))
@@ -217,9 +218,22 @@ class VMBroker:
             )
             return
         provider_inst = provider(**host_export_data)
-        return provider_inst.construct_host(
+        host = provider_inst.construct_host(
             provider_params=None, host_classes=self.host_classes, **host_export_data
         )
+        if connect:
+            host.connect()
+        return host
+
+    def from_inventory(self, connect=False, filter=None):
+        """Reconstruct one or more hosts from the local inventory
+
+        :param connect: Boolean - establish ssh connection
+
+        :param filter: A broker-spec filter string
+        """
+        inv_hosts = helpers.load_inventory(filter=filter)
+        return [self.reconstruct_host(inv_host, connect) for inv_host in inv_hosts]
 
     def __enter__(self):
         try:

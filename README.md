@@ -70,7 +70,8 @@ To sync inventory for a specific user, use the following syntax with `--sync`.
 broker inventory --sync AnsibleTower:<username>
 ```
 
-**Extending your VM lease time***
+**Extending your VM lease time**
+
 Providers supporting extending a VM's lease time make that functionality available through the `extend` subcommand.
 ```
 broker extend 0
@@ -80,6 +81,7 @@ broker extend --all
 ```
 
 **Checking in VMs**
+
 You can also return a VM to its provider with the ```checkin``` command.
 You may use either the local id (```broker inventory```), the hostname, or "all" to checkin everything.
 ```
@@ -90,6 +92,7 @@ broker checkin --all
 ```
 
 **Creating nicks**
+
 Broker will attempt to help your create your own nicks with the ```nick-help``` command.
 If supported by your chosen provider, nick-help will display the additional arguments you can use when defining a new nick.
 ```
@@ -102,6 +105,7 @@ broker nick-help --provider AnsibleTower
 ```
 
 **Run arbitrary actions**
+
 If a provider action doesn't result in a host creation/removal, Broker allows you to execute that action as well. There are a few output options available as well.
 ```
 broker execute --help
@@ -111,6 +115,7 @@ broker execute -o raw --workflow my-awesome-workflow --additional-arg True --art
 ```
 
 **Run Broker in the background**
+
 Certain Broker actions can be run in the background, these currently are: checkout, checkin, duplicate, and execute. When running a command in this mode, it will spin up a new Broker process and no longer log to stderr. To check progress, you can still follow broker's log file.
 Note that background mode will interfere with output options for execute since it won't be able to print to stdout. Those should kept in log mode.
 ```
@@ -119,3 +124,28 @@ broker checkin -b --all
 broker duplicate -b 0
 broker execute -b --workflow my-awesome-workflow --artifacts
 ```
+
+**Filter hosts for Broker actions**
+
+Actions that Broker can take against hosts (checkin, duplicate, extend) can take in a filter argument. This filter will decide which hosts the actions are applied to. A filter by itself will not select hosts for these actions, you will still need to specify which hosts to act against, or use `--all` when available. From there, the filter decides which of those hosts make it through to be acted upon.
+
+Broker's filters are based on what is stored in its local inventory file. Therefore, only properties in that file are filter-able. Nested properties are annotated with a `.` notation. For example, a top-level property `hostname` can be accessed by itself. However, a nested property of `_broker_args` called `version` would be accessed by `_broker_args.version`.
+
+Filters take the form `"(property)(condition)(value)"`. Filters have several possible conditions:
+ - `<` means "in" or that the filter value exists within the actual value
+ - `=` means "equals"
+ - `{` means "starts with"
+ - `}` means "ends with"
+
+Furthermore, putting a `!` before the condition inverts the filter. So `!=` means "not equals" and `!<` means "not in".
+
+**Example filters:**
+
+`--filter 'hostname<test'` The string test should exist somewhere in the hostname value
+`--filter '_broker_args.template{deploy-sat'` The template should start with the string "deploy-sat"
+
+You can also chain multiple filters together by separating them with a comma. These are additive AND filters where each filter condition must match.
+
+`--filter 'name<test,_broker_args.provider!=RHEV'` The host's name should have test in it and the provider should not equal RHEV.
+
+**Note:** Due to shell expansion, it is recommended to wrap a filter in single quotes.
