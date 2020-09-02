@@ -2,6 +2,14 @@
 History
 =======
 
+0.1.1 (2020-09-02)
+==================
+
++ Settings values now have validation and some defaults
++ Filters are Introduced
++ VMBroker can now reconstruct hosts from the local inventory
++ Other miscellaneous enhancements and fixes
+
 0.1.0 (2020-08-08)
 ==================
 

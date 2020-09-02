@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 AWXKIT = (
     "awxkit @ git+https://github.com/ansible/awx.git"
-    "@11.2.0#egg=awxkit&subdirectory=awxkit"
+    "@14.1.0#egg=awxkit&subdirectory=awxkit"
 )
 
 from setuptools import setup, find_packages
@@ -12,11 +12,11 @@ with open("README.md") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-requirements = [AWXKIT, "click", "dynaconf>=3.0", "logzero", "pyyaml", "ssh2-python"]
+requirements = [AWXKIT, "click", "dynaconf>=3.1", "logzero", "pyyaml", "ssh2-python"]
 
 setup(
     name="broker",
-    version="0.1.0",
+    version="0.1.1",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     author="Jacob J Callahan",

@@ -110,7 +110,10 @@ def nick_help(ctx, workflow, provider):
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-def checkin(vm, background, all_):
+@click.option(
+    "--filter", type=str, help="Checkin only what matches the specified filter"
+)
+def checkin(vm, background, all_, filter):
     """Checkin or "remove" a VM or series of VM broker instances
 
     COMMAND: broker checkin <vm hostname>|<local id>|all
@@ -118,10 +121,12 @@ def checkin(vm, background, all_):
     :param vm: Hostname or local id of host
 
     :param background: run a new broker subprocess to carry out command
+
+    :param filter: a filter string matching broker's specification
     """
     if background:
         fork_broker()
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter=filter)
     to_remove = []
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
@@ -137,14 +142,17 @@ def checkin(vm, background, all_):
     type=str,
     help="Class-style name of a supported broker provider. (AnsibleTower)",
 )
-def inventory(details, sync):
+@click.option(
+    "--filter", type=str, help="Display only what matches the specified filter"
+)
+def inventory(details, sync, filter):
     """Get a list of all VMs you've checked out showing hostname and local id
-        hostname pulled from list of dictionaries
+    hostname pulled from list of dictionaries
     """
     if sync:
         VMBroker.sync_inventory(provider=sync)
     logger.info("Pulling local inventory")
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter=filter)
     for num, host in enumerate(inventory):
         if details:
             logger.info(
@@ -156,11 +164,12 @@ def inventory(details, sync):
 
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)
-@click.option(
-    "-b", "--background", is_flag=True, help="Run extend in the background"
-)
+@click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-def extend(vm, background, all_):
+@click.option(
+    "--filter", type=str, help="Extend only what matches the specified filter"
+)
+def extend(vm, background, all_, filter):
     """Extend a host's lease time
 
     COMMAND: broker extend <vm hostname>|<vm name>|<local id>
@@ -170,10 +179,12 @@ def extend(vm, background, all_):
     :param background: run a new broker subprocess to carry out command
 
     :param all_: Click option all
+
+    :param filter: a filter string matching broker's specification
     """
     if background:
         fork_broker()
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter=filter)
     to_extend = []
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
@@ -187,9 +198,14 @@ def extend(vm, background, all_):
 @click.option(
     "-b", "--background", is_flag=True, help="Run duplicate in the background"
 )
-@click.option("-c", "--count", type=int, help="Number of times broker repeats the duplicate")
+@click.option(
+    "-c", "--count", type=int, help="Number of times broker repeats the duplicate"
+)
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-def duplicate(vm, background, count, all_):
+@click.option(
+    "--filter", type=str, help="Duplicate only what matches the specified filter"
+)
+def duplicate(vm, background, count, all_, filter):
     """Duplicate a broker-procured vm
 
     COMMAND: broker duplicate <vm hostname>|<local id>|all
@@ -199,10 +215,12 @@ def duplicate(vm, background, count, all_):
     :param background: run a new broker subprocess to carry out command
 
     :param all_: Click option all
+
+    :param filter: a filter string matching broker's specification
     """
     if background:
         fork_broker()
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter=filter)
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             broker_args = host.get("_broker_args")
