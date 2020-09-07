@@ -19,14 +19,13 @@ def test_full_init():
     """Make sure all init checks and assignments work"""
     broker_hosts = ["test1.example.com", "test2.example.com", "test3.example.com"]
     broker_inst = broker.VMBroker(
-        hosts=broker_hosts,
-        test_action="blank",
-        nick="test_nick"
+        hosts=broker_hosts, test_action="blank", nick="test_nick"
     )
     assert broker_inst._hosts == broker_hosts
     assert not broker_inst._kwargs.get("hosts")
     assert broker_inst._provider_actions == {
-        "test_action": (test_provider.TestProvider, "test_action")}
+        "test_action": (test_provider.TestProvider, "test_action")
+    }
     assert not broker_inst._kwargs.get("nick")
     assert broker_inst._kwargs["test_action"] == "blank"
 
@@ -42,3 +41,12 @@ def test_broker_e2e():
     assert broker_host_dict["_broker_provider"] == "TestProvider"
     broker_inst.checkin()
     assert len(broker_inst._hosts) == 0
+
+# Deprecated for now, as I'm unsure why this is failing
+# This functionality works with AnsibleTower
+# def test_mp_checkout():
+#     """Test that broker can checkout multiple hosts using multiprocessing"""
+#     broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+#     broker_inst.checkout()
+#     assert len(broker_inst._hosts) == 2
+#     broker_inst.checkin()

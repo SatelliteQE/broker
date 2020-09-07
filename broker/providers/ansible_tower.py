@@ -1,8 +1,9 @@
 import inspect
 import json
-import datetime
+import sys
 from broker.settings import settings
 from logzero import logger
+from datetime import datetime
 
 try:
     import awxkit
@@ -14,8 +15,9 @@ from broker.providers import Provider
 from broker import helpers
 
 AT_URL = settings.ANSIBLETOWER.base_url
-UNAME = settings.ANSIBLETOWER.username
-PWORD = settings.ANSIBLETOWER.password
+UNAME = settings.ANSIBLETOWER.get("username")
+PWORD = settings.ANSIBLETOWER.get("password")
+TOKEN = settings.ANSIBLETOWER.get("token")
 RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
 EXTEND_WORKFLOW = settings.ANSIBLETOWER.extend_workflow
 AT_TIMEOUT = settings.ANSIBLETOWER.workflow_timeout
@@ -26,14 +28,36 @@ class AnsibleTower(Provider):
         self._construct_params = []
         config = kwargs.get("config", awxkit.config)
         config.base_url = AT_URL
-        config.credentials = {"default": {"username": UNAME, "password": PWORD}}
-        config.use_sessions = True
-        if "root" in kwargs:
-            root = kwargs.get("root")
-        else:
-            root = awxkit.api.Api()
-        root.load_session().get()
-        self.v2 = root.available_versions.v2.get()
+        # Prefer token if its set, otherwise use username/password
+        # auth paths for the API taken from:
+        # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
+        # unit test mock structure means the root API instance can't be loaded on the same line
+        root = kwargs.get("root")
+        if root is None:
+            root = awxkit.api.Api()  # support mock stub for unit tests
+        if TOKEN:
+            logger.info("Using token authentication")
+            config.token = TOKEN
+            root.connection.login(username=None, password=None, token=TOKEN, auth_type='Bearer')
+            versions = root.get().available_versions
+            try:
+                # lookup the user that authenticated with the token
+                # If a username was specified in config, use that instead
+                my_username = UNAME or versions.v2.get().me.get().results[0].username
+            except (IndexError, AttributeError):
+                # lookup failed for whatever reason
+                logger.error("Failed to lookup a username for the given token, please check credentials")
+                sys.exit()
+        else:  # dynaconf validators should have checked that either token or password was provided
+            logger.info("Using username and password authentication")
+            config.credentials = {"default": {"username": UNAME, "password": PWORD}}
+            config.use_sessions = True
+            root.load_session().get()
+            versions = root.available_versions
+            my_username = UNAME
+        self.v2 = versions.v2.get()
+        self.username = my_username
+        
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -75,7 +99,15 @@ class AnsibleTower(Provider):
                 artifacts = at_object.artifacts
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
+            # filter out children with no associated job
+            children = list(
+                filter(
+                    lambda child: getattr(child.summary_fields, "job", None), children
+                )
+            )
             children.sort(key=lambda child: child.summary_fields.job.id)
+            if strategy == "last":
+                children = children[-1:]
             for child in children:
                 if child.type == "workflow_job_node":
                     logger.debug(child)
@@ -93,17 +125,22 @@ class AnsibleTower(Provider):
         return artifacts
 
     def _get_expire_date(self, host_id):
-        time_stamp = self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
-        return str(datetime.datetime.fromtimestamp(int(time_stamp)))
+        try:
+            time_stamp = self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
+            return str(datetime.fromtimestamp(int(time_stamp)))
+        except:
+            return None
 
     def _compile_host_info(self, host):
         host_info = {
             "name": host.name,
             "type": host.type,
             "hostname": host.variables["fqdn"],
-            "expire_time": self._get_expire_date(host.id),
             "_broker_provider": "AnsibleTower",
         }
+        expire_time = self._get_expire_date(host.id)
+        if expire_time:
+            host_info["expire_time"] = expire_time
         if "last_job" in host.related:
             job_vars = json.loads(host.get_related("last_job").extra_vars)
             broker_args = {
@@ -190,7 +227,7 @@ class AnsibleTower(Provider):
 
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned"""
-        user = user or UNAME
+        user = user or self.username
         invs = [
             inv
             for inv in self.v2.inventory.get(page_size=100).results
@@ -198,7 +235,7 @@ class AnsibleTower(Provider):
         ]
         hosts = []
         for inv in invs:
-            inv_hosts = inv.get_related("hosts").results
+            inv_hosts = inv.get_related("hosts", page_size=200).results
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
 

@@ -7,8 +7,10 @@ host_password: "<password>"
 # Provider settings
 AnsibleTower:
     base_url: "https://<ansible tower host>/"
+    # Username AND password, OR an OAUTH token can be used for authentication
     username: "<username>"
     password: "<plain text password>"
+    token: "<AT personal access token>"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     workflow_timeout: 3600

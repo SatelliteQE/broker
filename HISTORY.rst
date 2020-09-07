@@ -2,6 +2,12 @@
 History
 =======
 
+0.1.0 (2020-08-08)
+==================
+
++ VMBroker now has the ability to multiprocess checkouts
++ Other miscellaneous enhancements and fixes
+
 0.0.12 (2020-07-31)
 ==================
 
