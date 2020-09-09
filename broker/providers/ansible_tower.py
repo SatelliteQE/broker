@@ -3,6 +3,7 @@ import json
 import sys
 from broker.settings import settings
 from logzero import logger
+from datetime import datetime
 
 try:
     import awxkit
@@ -123,6 +124,13 @@ class AnsibleTower(Provider):
                         )
         return artifacts
 
+    def _get_expire_date(self, host_id):
+        try:
+            time_stamp = self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
+            return str(datetime.fromtimestamp(int(time_stamp)))
+        except:
+            return None
+
     def _compile_host_info(self, host):
         host_info = {
             "name": host.name,
@@ -130,6 +138,9 @@ class AnsibleTower(Provider):
             "hostname": host.variables["fqdn"],
             "_broker_provider": "AnsibleTower",
         }
+        expire_time = self._get_expire_date(host.id)
+        if expire_time:
+            host_info["expire_time"] = expire_time
         if "last_job" in host.related:
             job_vars = json.loads(host.get_related("last_job").extra_vars)
             broker_args = {
