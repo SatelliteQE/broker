@@ -16,7 +16,6 @@ if "BROKER_DIRECTORY" in os.environ:
 settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 must_exist = [
     "ANSIBLETOWER.base_url",
-    "NICKS",
     "HOST_PASSWORD",
 ]
 validators = [
