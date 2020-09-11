@@ -7,7 +7,7 @@ from broker.settings import BROKER_DIRECTORY
 
 
 def setup_logzero(level="info", path="logs/broker.log", silent=False):
-    path = str(BROKER_DIRECTORY.joinpath(path))
+    path = BROKER_DIRECTORY.joinpath(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     log_fmt = "%(color)s[%(levelname)s %(asctime)s]%(end_color)s %(message)s"
     debug_fmt = (
