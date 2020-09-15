@@ -1,6 +1,7 @@
 import inspect
 import json
 import sys
+from urllib import parse as url_parser
 from broker.settings import settings
 from logzero import logger
 from datetime import datetime
@@ -210,11 +211,11 @@ class AnsibleTower(Provider):
         else:
             logger.error(f"Workflow not found by name: {workflow}")
             return
-        logger.debug(
-            f"Launching workflow template: {AT_URL}{wfjt.url}".replace("//", "/")
-        )
+        logger.debug(f"Launching workflow template: {url_parser.urljoin(AT_URL, str(wfjt.url))}")
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
-        logger.info(f"Waiting for job: {AT_URL}{job.url}".replace("//", "/"))
+        job_number = job.url.rstrip("/").split("/")[-1]
+        job_ui_url = url_parser.urljoin(AT_URL, f"/#/workflows/{job_number}")
+        logger.info(f"Waiting for job: \nAPI: {url_parser.urljoin(AT_URL, str(job.url))}\nUI: {job_ui_url}")
         job.wait_until_completed(timeout=AT_TIMEOUT)
         if not job.status == "successful":
             logger.error(
