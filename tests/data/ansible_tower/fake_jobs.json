@@ -6,7 +6,8 @@
             "workflow_nodes": "/api/v2/workflow_jobs/343/workflow_nodes/"
         },
         "name": "deploy-base-rhel",
-        "status": "successful"
+        "status": "successful",
+        "url": "/api/v2/workflow_jobs/1329/"
     },
     {
         "id": 1337,
