@@ -2,6 +2,14 @@
 History
 =======
 
+0.1.2 (2020-09-17)
+==================
+
++ nick-help command changed to providers
++ providers command is now dynamically populated
++ Fixes for logging
++ Now more resilient to running outside of broker's directory
+
 0.1.1 (2020-09-02)
 ==================
 
