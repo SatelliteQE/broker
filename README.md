@@ -91,17 +91,14 @@ broker checkin 1 3 my.host.fqdn.com
 broker checkin --all
 ```
 
-**Creating nicks**
+**Gaining information about Broker's providers**
 
-Broker will attempt to help your create your own nicks with the ```nick-help``` command.
-If supported by your chosen provider, nick-help will display the additional arguments you can use when defining a new nick.
+Broker's `providers` command allows you to gather information about what providers are avaiable as well as each providers actions. Additionally, you can find out information about different arguments for a provider's action with this command.
 ```
-broker nick-help --help
-broker nick-help --workflow my-awesome-workflow
-```
-Additionally, if you're unfamiliar with what actions are supported by your provider, you can get a list by passing the provider's name.
-```
-broker nick-help --provider AnsibleTower
+broker providers --help
+broker providers AnsibleTower --help
+broker providers AnsibleTower --workflows
+broker providers AnsibleTower --workflow remove-vm
 ```
 
 **Run arbitrary actions**

@@ -6,3 +6,12 @@ install: pip install .
 script:
     - mv broker_settings.yaml.example broker_settings.yaml
     - pytest -v
+deploy:
+    provider: pypi
+    user: jacobcallahan
+    password:
+        secure: ZUdoUV4c1AK7I1zVSk2CF2y2jzBxc4PRNvYtWrhdZFwFYF3TiyUCssUu0PC0V1OZo57rg/Y4TkhoQ6KnXQqaOlY8d+qGoL3Id4Oigv9sYB7cuIDPOviFag1Qw3lCAM2lflrMNHBFklZCR2xS7TddpwMEG1PTEuKQfYwdYV19oaViaJtYkcXiHoKA6triA6EtzsYq+tmFcJ0tiugV9NYAgqhQp+int0ZYzB0quZHgd/yTAIUH9Gf0QI+vKku0ymfAXHC+JlEqd8RuANgwkNFxVJkkxxX3QaBRtL7J8zYJY9k67LfIQUeiH6tQJYUGunHRRER3DXqEk5sPr+cMpJi3YZhxUBXJc6ss2dqKu47MRyDtJabPvbGHKdjt02+YLIXehzhKctKrtX640uBKRBwTGr2jwiDHyj3r1n/gdS0MqkMm2wB96Lb2RV17wy9xh4zIy2YZw1y41plX9o64cnQqJt9QVhjW0w4Efihkw/ylVEVgfEo6nOlVZ/fOmERxrGeLdwPaESpV1L6lViVJCawFiWKAocMaZ6s5WtHpUyeb2dxHwf56mnGKMiOfvqgs5/a6Wmhm1ad/hvjHPxjT9HxImv4YYwJnIxLdwuO1MPBIfqlWVfsP6d8LoDvHLYp+dbKItohvZVfDJVAU7vpYcyaCVzSwFxM6P5ox0WgBL1Wt++E=
+    on:
+        branch: master
+        repo: SatelliteQE/broker
+    skip_existing: true

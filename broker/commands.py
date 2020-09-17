@@ -3,7 +3,7 @@ import sys
 import click
 import logging
 from logzero import logger
-from broker.broker import VMBroker
+from broker.broker import PROVIDERS, PROVIDER_ACTIONS, VMBroker
 from broker import logger as b_log
 from broker import helpers
 
@@ -27,6 +27,42 @@ def fork_broker():
     update_log_level(None, None, "silent")
 
 
+def populate_providers(click_group):
+    """Populates the subcommands for providers subcommand using provider information
+    Providers become subcommands and their actions become arguments to their subcommand
+
+    Example:
+        Usage: broker providers AnsibleTower [OPTIONS]
+
+        Options:
+        --workflows      Get available workflows
+        --workflow TEXT  Get information about a workflow
+        --help           Show this message and exit.
+    """
+    for prov, prov_class in (
+        pairs for pairs in PROVIDERS.items() if pairs[0] != "TestProvider"
+    ):
+
+        @click_group.command(name=prov)
+        def provider_cmd(*args, **kwargs):  # the actual subcommand
+            """Get information about a provider's actions"""
+            broker_inst = VMBroker(**kwargs)
+            broker_inst.nick_help()
+
+        # iterate through available actions and populate options from them
+        for action in (
+            action
+            for action, prov_info in PROVIDER_ACTIONS.items()
+            if prov_info[0] == prov_class
+        ):
+            provider_cmd = click.option(
+                f"--{action}s", is_flag=True, help=f"Get available {action}s"
+            )(provider_cmd)
+            provider_cmd = click.option(
+                f"--{action}", type=str, help=f"Get information about a {action}"
+            )(provider_cmd)
+
+
 @click.group()
 @click.option(
     "--log-level",
@@ -46,7 +82,9 @@ def cli():
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("--workflow", type=str)
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
-@click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
+@click.option(
+    "-c", "--count", type=int, help="Number of times broker repeats the checkout"
+)
 @click.pass_context
 def checkout(ctx, background, workflow, nick, count):
     """Checkout or "create" a Virtual Machine broker instance
@@ -77,33 +115,13 @@ def checkout(ctx, background, workflow, nick, count):
     broker_inst.checkout()
 
 
-@cli.command(
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
-@click.option(
-    "--workflow", type=str, help="Get a set of valid arguments for a workflow"
-)
-@click.option(
-    "--provider",
-    type=str,
-    help="Class-style name of a supported broker provider. (AnsibleTower)",
-)
-@click.pass_context
-def nick_help(ctx, workflow, provider):
-    """Get information from an action to determine accepted arguments
-    or get a list of valid actions available from a provider
-    COMMAND: broker nick-help --<action> <argument>
-    COMMAND: broker nick-help --provider <ProviderName>
-    """
-    broker_args = {}
-    if workflow:
-        broker_args["workflow"] = workflow
-    if provider:
-        broker_args["provider"] = provider
-    # if additional arguments were passed, include them in the broker args
-    broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
-    broker_inst = VMBroker(**broker_args)
-    broker_inst.nick_help()
+@cli.group()
+def providers():
+    """Get information about a provider and its actions"""
+    pass
+
+
+populate_providers(providers)
 
 
 @cli.command()
