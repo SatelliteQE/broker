@@ -1,7 +1,5 @@
 import inspect
 from broker.settings import settings
-from logzero import logger
-
 from broker.providers import Provider
 
 
@@ -38,7 +36,8 @@ class TestProvider(Provider):
     def construct_host(self, provider_params, host_classes, **kwargs):
         host_params = provider_params.copy()
         host_params.update(kwargs)
-        host_inst = host_classes[host_params["host_type"]](**host_params)
+        host_type = host_classes[host_params["host_type"]]
+        host_inst = host_type(**host_params)
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 

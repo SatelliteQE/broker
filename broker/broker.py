@@ -1,10 +1,10 @@
-import multiprocessing
-from functools import wraps
 from logzero import logger
 from broker.providers.ansible_tower import AnsibleTower
 from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
 from broker import helpers
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Type
 
 
 PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
@@ -16,38 +16,50 @@ PROVIDER_ACTIONS = {
 }
 
 
-def mp_split(func, count, *args, **kwargs):
-    """Split a action into multiple processes"""
-    mp_queue = multiprocessing.Queue()
-    mp_proc, result = [], []
+class mp_decorator:
+    """This decorator wraps VMBroker methods to enable multiprocessing
 
-    def concurrency_shim():
-        res = func(*args, **kwargs)
-        mp_queue.put(res)
+    The decorated method is expected to return an itearable.
+    """
 
-    for _ in range(count):
-        p = multiprocessing.Process(target=concurrency_shim)
-        mp_proc.append(p)
-        p.start()
-    for proc in mp_proc:
-        result.extend(mp_queue.get())
-    for proc in mp_proc:
-        proc.join()
-    return result
+    # Note that this is a descriptor as the other option -- using nested function
+    # like this:
+    #
+    # def mp_decorator(func)
+    #   @wraps(func)
+    #   def wrapper(func)
+    #       return
+    #
+    #   return wrapper
+    #
+    # is not working with pickling that is necessary for the ProcessPoolExecutor of
+    # concurrent.futures. I got errors like:
+    # _pickle.PicklingError: Can't pickle ... it's not the same object as ...
 
+    MAX_WORKERS = 5
+    EXECUTOR = ProcessPoolExecutor
 
-def mp_decorator(func):
-    """This decorator wraps VMBroker methods to enable multiprocessing"""
+    def __init__(self, func: callable = None):
+        self.func = func
 
-    @wraps(func)
-    def wrapper(vmb_inst: 'VMBroker', *args, **kwargs):
-        if "_count" in vmb_inst._kwargs:
-            count = vmb_inst._kwargs["_count"]
-            return mp_split(func, count, vmb_inst, *args, **kwargs)
-        else:
-            return func(vmb_inst, *args, **kwargs)
+    def __get__(self, instance: 'VMBroker', owner: Type['VMBroker']):
+        if not instance:
+            return self.func
 
-    return wrapper
+        def mp_split(*args, **kwargs):
+            count = instance._kwargs.get("_count", None)
+            if count is None:
+                return self.func(instance, *args, **kwargs)
+
+            results = []
+            with self.EXECUTOR(max_workers=self.MAX_WORKERS) as workers:
+                completed_futures = as_completed(workers.submit(self.func, instance, *args, **kwargs)
+                                                 for _ in range(count))
+                for f in completed_futures:
+                    results.extend(f.result())
+            return results
+
+        return mp_split
 
 
 class VMBroker:
@@ -101,14 +113,14 @@ class VMBroker:
                 helpers.update_inventory(add=host.to_dict())
         return hosts
 
-    def checkout(self):
+    def checkout(self, connect=False):
         """checkout one or more VMs
 
         :param connect: Boolean whether to establish host ssh connection
 
         :return: Host obj or list of Host objects
         """
-        hosts = self._checkout()
+        hosts = self._checkout(connect=connect)
         self._hosts.extend(hosts)
         return hosts if not len(hosts) == 1 else hosts[0]
 
