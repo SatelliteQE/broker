@@ -16,19 +16,36 @@ PROVIDER_ACTIONS = {
 }
 
 
+def mp_split(func, count, *args, **kwargs):
+    """Split a action into multiple processes"""
+    mp_queue = multiprocessing.Queue()
+    mp_proc, result = [], []
+
+    def concurrency_shim():
+        res = func(*args, **kwargs)
+        mp_queue.put(res)
+
+    for _ in range(count):
+        p = multiprocessing.Process(target=concurrency_shim)
+        mp_proc.append(p)
+        p.start()
+    for proc in mp_proc:
+        result.extend(mp_queue.get())
+    for proc in mp_proc:
+        proc.join()
+    return result
+
+
 def mp_decorator(func):
     """This decorator wraps VMBroker methods to enable multiprocessing"""
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
-        vmb_inst = args[0]
+    def wrapper(vmb_inst: 'VMBroker', *args, **kwargs):
         if "_count" in vmb_inst._kwargs:
-            count = vmb_inst._kwargs.pop("_count")
-            return vmb_inst._mp_split(vmb_inst.checkout, count, **vmb_inst._kwargs)
-        func_results = func(*args, **kwargs)
-        if "_mpq" in kwargs:
-            kwargs["_mpq"].put(func_results)
-        return func_results
+            count = vmb_inst._kwargs["_count"]
+            return mp_split(func, count, vmb_inst, *args, **kwargs)
+        else:
+            return func(vmb_inst, *args, **kwargs)
 
     return wrapper
 
@@ -62,42 +79,38 @@ class VMBroker:
         else:
             return result
 
-    def _mp_split(self, method, count=1, **kwargs):
-        """Split a broker action into multiple processes"""
-        mp_queue = multiprocessing.Queue()
-        kwargs["_mpq"] = mp_queue
-        mp_proc, result = [], []
-        for _ in range(count):
-            p = multiprocessing.Process(target=method, kwargs=kwargs)
-            mp_proc.append(p)
-            p.start()
-        for proc in mp_proc:
-            result.append(mp_queue.get())
-        for proc in mp_proc:
-            proc.join()
-        if "checkout" in method.__name__:
-            self._hosts.extend(result)
-        return result
-
     @mp_decorator
-    def checkout(self, connect=False, **kwargs):
+    def _checkout(self, connect=False):
+        """checkout one or more VMs
+
+        :param connect: Boolean whether to establish host ssh connection
+
+        :return: List of Host objects
+        """
+        hosts = []
+        for action in self._provider_actions.keys():
+            provider, method = PROVIDER_ACTIONS[action]
+            logger.info(f"Using provider {provider.__name__} to checkout")
+            host = self._act(provider, method, checkout=True)
+            logger.debug(f"{host=} {connect=}")
+            if host:
+                if connect:
+                    host.connect()
+                hosts.append(host)
+                logger.info(f"{host.__class__.__name__}: {host.hostname}")
+                helpers.update_inventory(add=host.to_dict())
+        return hosts
+
+    def checkout(self):
         """checkout one or more VMs
 
         :param connect: Boolean whether to establish host ssh connection
 
         :return: Host obj or list of Host objects
         """
-        for action in self._provider_actions.keys():
-            provider, method = PROVIDER_ACTIONS[action]
-            logger.info(f"Using provider {provider.__name__} to checkout")
-            host = self._act(provider, method, checkout=True)
-            if host:
-                if connect:
-                    host.connect()
-                self._hosts.append(host)
-                logger.info(f"{host.__class__.__name__}: {host.hostname}")
-                helpers.update_inventory(add=host.to_dict())
-        return self._hosts if not len(self._hosts) == 1 else self._hosts[0]
+        hosts = self._checkout()
+        self._hosts.extend(hosts)
+        return hosts if not len(hosts) == 1 else hosts[0]
 
     def execute(self, **kwargs):
         """execute a provider action
