@@ -42,9 +42,25 @@ def test_broker_e2e():
     broker_inst.checkin()
     assert len(broker_inst._hosts) == 0
 
+
 def test_mp_checkout():
     """Test that broker can checkout multiple hosts using multiprocessing"""
     broker_inst = broker.VMBroker(nick="test_nick", _count=2)
     broker_inst.checkout()
     assert len(broker_inst._hosts) == 2
     broker_inst.checkin()
+    assert len(broker_inst._hosts) == 0
+
+
+def test_mp_checkout_twice():
+    broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+
+    def cycle():
+        assert len(broker_inst.checkout()) == 2
+        assert len(broker_inst._hosts) == 2
+
+        broker_inst.checkin()
+        assert len(broker_inst._hosts) == 0
+
+    cycle()
+    cycle()
