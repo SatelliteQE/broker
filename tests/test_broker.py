@@ -42,11 +42,9 @@ def test_broker_e2e():
     broker_inst.checkin()
     assert len(broker_inst._hosts) == 0
 
-# Deprecated for now, as I'm unsure why this is failing
-# This functionality works with AnsibleTower
-# def test_mp_checkout():
-#     """Test that broker can checkout multiple hosts using multiprocessing"""
-#     broker_inst = broker.VMBroker(nick="test_nick", _count=2)
-#     broker_inst.checkout()
-#     assert len(broker_inst._hosts) == 2
-#     broker_inst.checkin()
+def test_mp_checkout():
+    """Test that broker can checkout multiple hosts using multiprocessing"""
+    broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+    broker_inst.checkout()
+    assert len(broker_inst._hosts) == 2
+    broker_inst.checkin()

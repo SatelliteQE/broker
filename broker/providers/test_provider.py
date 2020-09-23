@@ -17,8 +17,25 @@ HOST_PROPERTIES = {
 
 class TestProvider(Provider):
     def __init__(self, **kwargs):
-        self.config = settings.TESTPROVIDER
+        # self.config = settings.TESTPROVIDER
+
+        # Enabling the line above leads to problems to pickle in
+        # tests/test_broker.py::test_mp_checkout
+        # that resulted in deadlock. This was quite hard to find problem as the tracebacks and
+        # errors I was getting were not helpful:
+        # Traceback (most recent call last):
+        #   File "/usr/lib64/python3.9/multiprocessing/queues.py", line 245, in _feed
+        #     obj = _ForkingPickler.dumps(obj)
+        #   File "/usr/lib64/python3.9/multiprocessing/reduction.py", line 51, in dumps
+        #     cls(buf, protocol).dump(obj)
+        # TypeError: cannot pickle 'module' object
+        #
+        # The root cause was tracked down with help of
+        # https://stackoverflow.com/a/59832602/1950100
+
+
         # self.__dict__.update(kwargs)
+        pass
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
