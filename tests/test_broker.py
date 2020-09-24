@@ -68,15 +68,16 @@ def test_mp_checkout_twice():
     cycle()
 
 
+class SomeException(Exception):
+    pass
+
+
 def test_mp_checkout_exc():
     broker_inst = broker.VMBroker(nick="test_nick", _count=2)
 
-    class SomeException(Exception):
-        pass
-
     # Note we are setting this on instance, not a class. There is no need to cleanup as the whole
     # broker is thrown away.
-    mock = broker_inst._act = MagicMock()
+    mock = broker.VMBroker._act = MagicMock()
     mock.side_effect = SomeException()
 
     with pytest.raises(SomeException):
