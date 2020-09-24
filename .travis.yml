@@ -5,7 +5,7 @@ python:
 install: pip install .[test]
 script:
     - cp broker_settings.yaml.example broker_settings.yaml
-    - pytest -v
+    - pytest -v tests
 deploy:
     provider: pypi
     user: jacobcallahan
