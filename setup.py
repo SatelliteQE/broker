@@ -4,14 +4,14 @@ from setuptools import setup, find_packages
 with open("README.md") as readme_file:
     readme = readme_file.read()
 
-with open("HISTORY.rst") as history_file:
+with open("HISTORY.md") as history_file:
     history = history_file.read()
 
 requirements = ["awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "ssh2-python"]
 
 setup(
     name="broker",
-    version="0.1.2",
+    version="0.1.3",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     long_description_content_type="text/markdown",
