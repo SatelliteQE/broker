@@ -4,7 +4,6 @@ from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
 from broker import helpers
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Type
 
 
 PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
@@ -39,10 +38,10 @@ class mp_decorator:
     MAX_WORKERS = 5
     EXECUTOR = ProcessPoolExecutor
 
-    def __init__(self, func: callable = None):
+    def __init__(self, func=None):
         self.func = func
 
-    def __get__(self, instance: 'VMBroker', owner: Type['VMBroker']):
+    def __get__(self, instance, owner):
         if not instance:
             return self.func
 
