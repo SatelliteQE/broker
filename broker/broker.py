@@ -1,19 +1,19 @@
 import multiprocessing
 from functools import wraps
 from logzero import logger
-from broker.providers.ansible_tower import AnsibleTower
-from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
 from broker import helpers
+from broker.registry import ActionRegistry
 
+import pkg_resources
 
-PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
-
-PROVIDER_ACTIONS = {
-    # action: (InterfaceClass, "method_name")
-    "workflow": (AnsibleTower, "exec_workflow"),
-    "test_action": (TestProvider, "test_action"),
+PROVIDERS = {
+    entry_point.name: entry_point.load()
+    for entry_point
+    in pkg_resources.iter_entry_points('broker.providers')
 }
+
+PROVIDER_ACTIONS = ActionRegistry.CALLABLES
 
 
 def mp_decorator(func):
@@ -53,7 +53,7 @@ class VMBroker:
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
         provider_inst = provider(**self._kwargs)
-        result = getattr(provider_inst, method)(**self._kwargs)
+        result = method(provider_inst, **self._kwargs)
         logger.debug(result)
         if result and checkout:
             return provider_inst.construct_host(

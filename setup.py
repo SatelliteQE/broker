@@ -19,7 +19,11 @@ setup(
     author_email="jacob.callahan05@gmail.com",
     url="https://github.com/SatelliteQE/broker",
     packages=find_packages(),
-    entry_points={"console_scripts": ["broker=broker.commands:cli"]},
+    entry_points={
+        "console_scripts": ["broker=broker.commands:cli"],
+        "broker.providers": ["AnsibleTower=broker.providers.ansible_tower:AnsibleTower",
+                             "TestProvider=broker.providers.test_provider:TestProvider"]
+    },
     include_package_data=True,
     install_requires=requirements,
     license="GNU General Public License v3",

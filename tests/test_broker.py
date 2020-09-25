@@ -24,7 +24,7 @@ def test_full_init():
     assert broker_inst._hosts == broker_hosts
     assert not broker_inst._kwargs.get("hosts")
     assert broker_inst._provider_actions == {
-        "test_action": (test_provider.TestProvider, "test_action")
+        "test_action": (test_provider.TestProvider, test_provider.TestProvider.test_action)
     }
     assert not broker_inst._kwargs.get("nick")
     assert broker_inst._kwargs["test_action"] == "blank"

@@ -5,6 +5,7 @@ from urllib import parse as url_parser
 from broker.settings import settings
 from logzero import logger
 from datetime import datetime
+from broker.registry import ActionRegistry
 
 try:
     import awxkit
@@ -194,6 +195,7 @@ class AnsibleTower(Provider):
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
+    @ActionRegistry('workflow')
     def exec_workflow(self, **kwargs):
         """Execute template job in Ansible Tower
 

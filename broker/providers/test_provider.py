@@ -1,6 +1,7 @@
 import inspect
 from broker.settings import settings
 from logzero import logger
+from broker.registry import ActionRegistry
 
 from broker.providers import Provider
 
@@ -13,7 +14,6 @@ HOST_PROPERTIES = {
         "host_type": "host",
     }
 }
-
 
 class TestProvider(Provider):
     def __init__(self, **kwargs):
@@ -42,6 +42,7 @@ class TestProvider(Provider):
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
+    @ActionRegistry('test_action')
     def test_action(self, **kwargs):
         action = kwargs.get("test_action")
         if action == "release":
