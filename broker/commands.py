@@ -1,3 +1,4 @@
+import broker
 import os
 import sys
 import click
@@ -5,7 +6,7 @@ import logging
 from logzero import logger
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, VMBroker
 from broker import logger as b_log
-from broker import helpers
+from broker import helpers, settings
 
 
 def update_log_level(ctx, param, value):
@@ -63,7 +64,7 @@ def populate_providers(click_group):
             )(provider_cmd)
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option(
     "--log-level",
     type=click.Choice(["info", "warning", "error", "critical", "debug", "silent"]),
@@ -72,8 +73,22 @@ def populate_providers(click_group):
     is_eager=True,
     expose_value=False,
 )
-def cli():
-    pass
+@click.option(
+    "--version",
+    is_flag=True,
+    help="Get broker system-level information",
+)
+def cli(version):
+    if version:
+        with open("setup.py") as setup_file:
+            for line in setup_file:
+                if "version" in line:
+                    click.echo(f"""Version: {line.split('"')[1]}""")
+        broker_directory = settings.BROKER_DIRECTORY.absolute()
+        click.echo(f"Broker Directory: {broker_directory}")
+        click.echo(f"Settings File: {settings.settings_path.absolute()}")
+        click.echo(f"Inventory File: {broker_directory}/inventory.yaml")
+        click.echo(f"Log File: {broker_directory}/logs/broker.log")
 
 
 @cli.command(
