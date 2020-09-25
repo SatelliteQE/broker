@@ -9,6 +9,12 @@ with open("HISTORY.md") as history_file:
 
 requirements = ["awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "ssh2-python"]
 
+test_requirements = ['pytest']
+
+extras = {
+    'test': test_requirements,
+}
+
 setup(
     name="broker",
     version="0.1.3",
@@ -22,6 +28,8 @@ setup(
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
     include_package_data=True,
     install_requires=requirements,
+    test_requirements=test_requirements,
+    extras_require=extras,
     license="GNU General Public License v3",
     zip_safe=False,
     keywords="broker",

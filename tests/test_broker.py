@@ -1,6 +1,5 @@
 from broker import broker
 from broker.providers import test_provider
-from unittest.mock import MagicMock
 import pytest
 
 
@@ -72,13 +71,20 @@ class SomeException(Exception):
     pass
 
 
-def test_mp_checkout_exc():
-    broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+class MyBroker:
+    @broker.mp_decorator
+    def workload(self):
+        return []
 
-    # Note we are setting this on instance, not a class. There is no need to cleanup as the whole
-    # broker is thrown away.
-    mock = broker.VMBroker._act = MagicMock()
-    mock.side_effect = SomeException()
+    @broker.mp_decorator
+    def failing_workload(self):
+        raise SomeException()
 
+
+def test_mp_decorator():
+    tested_broker = MyBroker()
+    tested_broker._kwargs = dict(_count=2)
+
+    tested_broker.workload()
     with pytest.raises(SomeException):
-        broker_inst.checkout()
+        tested_broker.failing_workload()
