@@ -17,6 +17,7 @@ HOST_PROPERTIES = {
 
 class TestProvider(Provider):
     def __init__(self, **kwargs):
+        super().__init__()
         self.config = settings.TESTPROVIDER.config_value
 
         # self.__dict__.update(kwargs)

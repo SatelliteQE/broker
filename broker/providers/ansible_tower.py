@@ -26,7 +26,7 @@ AT_TIMEOUT = settings.ANSIBLETOWER.workflow_timeout
 
 class AnsibleTower(Provider):
     def __init__(self, **kwargs):
-        self._construct_params = []
+        super().__init__()
         config = kwargs.get("config", awxkit.config)
         config.base_url = AT_URL
         # Prefer token if its set, otherwise use username/password
