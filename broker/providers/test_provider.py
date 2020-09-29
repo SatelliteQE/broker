@@ -37,6 +37,9 @@ class TestProvider(Provider):
             }
         )
 
+    def nick_help(self, **kwargs):
+        pass
+
     def construct_host(self, provider_params, host_classes, **kwargs):
         host_params = provider_params.copy()
         host_params.update(kwargs)
