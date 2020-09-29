@@ -45,9 +45,7 @@ class VMBroker:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
-        for key, action in PROVIDER_ACTIONS.items():
-            if key in kwargs:
-                self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs = kwargs
 
     def _act(self, provider, method, checkout=False):
@@ -79,6 +77,12 @@ class VMBroker:
             self._hosts.extend(result)
         return result
 
+    def _update_provider_actions(self, kwargs):
+        if not self._provider_actions:
+            for key, action in PROVIDER_ACTIONS.items():
+                if key in kwargs:
+                    self._provider_actions[key] = action
+
     @mp_decorator
     def checkout(self, connect=False, **kwargs):
         """checkout one or more VMs
@@ -104,10 +108,7 @@ class VMBroker:
 
         :return: Any The results given back by the provider
         """
-        if not self._provider_actions:
-            for key, action in PROVIDER_ACTIONS.items():
-                if key in kwargs:
-                    self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs.update(kwargs)
         for action, arg in self._provider_actions.items():
             provider, method = PROVIDER_ACTIONS[action]
