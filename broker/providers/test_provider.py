@@ -16,6 +16,8 @@ HOST_PROPERTIES = {
 }
 
 class TestProvider(Provider):
+    hidden = True
+
     def __init__(self, **kwargs):
         self.config = settings.TESTPROVIDER.config_value
 
