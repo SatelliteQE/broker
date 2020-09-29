@@ -120,11 +120,11 @@ class VMBroker:
             for action, arg in self._provider_actions.items():
                 provider, _ = PROVIDER_ACTIONS[action]
                 logger.info(f"Querying provider {provider.__name__}")
-                self._act(provider, "nick_help", checkout=False)
+                self._act(provider, provider.nick_help, checkout=False)
         elif self._kwargs.get("provider"):
             provider = PROVIDERS[self._kwargs["provider"]]
             logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, "nick_help", checkout=False)
+            self._act(provider, provider.nick_help, checkout=False)
 
     def checkin(self, host=None):
         """checkin one or more VMs

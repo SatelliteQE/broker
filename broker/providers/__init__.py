@@ -22,7 +22,7 @@ class Provider:
         self._set_attributes(host_inst, host_attrs)
         return host_inst
 
-    def nick_help(self):
+    def nick_help(self, **kwargs):
         raise NotImplementedError("nick_help has not been implemented")
 
     def get_inventory(self, **kwargs):
