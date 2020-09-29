@@ -64,16 +64,6 @@ class AnsibleTower(Provider):
         caller_host = inspect.stack()[1][0].f_locals["host"]
         self.release(caller_host.name)
 
-    def _set_attributes(self, host_inst, broker_args=None):
-        host_inst.__dict__.update(
-            {
-                "release": self._host_release,
-                "_at_inst": self,
-                "_broker_provider": "AnsibleTower",
-                "_broker_args": broker_args,
-            }
-        )
-
     def _merge_artifacts(self, at_object, strategy="merge", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children
 

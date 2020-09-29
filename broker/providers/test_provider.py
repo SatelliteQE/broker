@@ -26,25 +26,11 @@ class TestProvider(Provider):
         caller_host = inspect.stack()[1][0].f_locals["host"]
         self.release(caller_host)
 
-    def _set_attributes(self, host_inst, broker_args=None):
-        host_inst.__dict__.update(
-            {
-                "release": self._host_release,
-                "_test_inst": self,
-                "_broker_provider": "TestProvider",
-                "_broker_args": broker_args,
-            }
-        )
-
     def nick_help(self, **kwargs):
         pass
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        host_params = provider_params.copy()
-        host_params.update(kwargs)
-        host_inst = host_classes[host_params["host_type"]](**host_params)
-        self._set_attributes(host_inst, broker_args=kwargs)
-        return host_inst
+        return super().construct_host(provider_params, host_classes, **kwargs)
 
     def test_action(self, **kwargs):
         action = kwargs.get("test_action")
