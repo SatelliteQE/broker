@@ -35,7 +35,10 @@ class mp_decorator:
     # concurrent.futures. I got errors like:
     # _pickle.PicklingError: Can't pickle ... it's not the same object as ...
 
-    MAX_WORKERS = 5
+    MAX_WORKERS = None
+    """ If set to integer, the count of workers will be limited to that amount.
+     If set to None, the max workers count of the EXECUTOR will be matching the count of items."""
+
     EXECUTOR = ProcessPoolExecutor
 
     def __init__(self, func=None):
@@ -51,7 +54,8 @@ class mp_decorator:
                 return self.func(instance, *args, **kwargs)
 
             results = []
-            with self.EXECUTOR(max_workers=self.MAX_WORKERS) as workers:
+            max_workers_count = count if self.MAX_WORKERS is None else self.MAX_WORKERS
+            with self.EXECUTOR(max_workers=max_workers_count) as workers:
                 completed_futures = as_completed(workers.submit(self.func, instance, *args, **kwargs)
                                                  for _ in range(count))
                 for f in completed_futures:
