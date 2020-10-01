@@ -37,7 +37,7 @@ class mp_decorator:
 
     MAX_WORKERS = None
     """ If set to integer, the count of workers will be limited to that amount.
-     If set to None, the max workers count of the EXECUTOR will be matching the count of items."""
+     If set to None, the max workers count of the EXECUTOR will match the count of items."""
 
     EXECUTOR = ProcessPoolExecutor
 
@@ -54,7 +54,7 @@ class mp_decorator:
                 return self.func(instance, *args, **kwargs)
 
             results = []
-            max_workers_count = count if self.MAX_WORKERS is None else self.MAX_WORKERS
+            max_workers_count = self.MAX_WORKERS or count
             with self.EXECUTOR(max_workers=max_workers_count) as workers:
                 completed_futures = as_completed(workers.submit(self.func, instance, *args, **kwargs)
                                                  for _ in range(count))
