@@ -113,7 +113,6 @@ class VMBroker:
                     host.connect()
                 hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
-                helpers.update_inventory(add=host.to_dict())
         return hosts
 
     def checkout(self, connect=False):
@@ -125,6 +124,7 @@ class VMBroker:
         """
         hosts = self._checkout(connect=connect)
         self._hosts.extend(hosts)
+        helpers.update_inventory([host.to_dict() for host in hosts])
         return hosts if not len(hosts) == 1 else hosts[0]
 
     def execute(self, **kwargs):
