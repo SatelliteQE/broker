@@ -4,10 +4,10 @@ python:
     - "3.6"
     - "3.7"
     - "3.8"
-install: pip install tox-travis -r requirements.txt
+install: pip install tox -r requirements.txt
 script:
     - cp broker_settings.yaml.example broker_settings.yaml
-    - tox -- -v
+    - tox -epy -- -v
 deploy:
     provider: pypi
     user: jacobcallahan
