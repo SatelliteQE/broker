@@ -20,7 +20,6 @@ setup(
     url="https://github.com/SatelliteQE/broker",
     packages=find_packages(),
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
-    include_package_data=True,
     install_requires=requirements,
     license="GNU General Public License v3",
     zip_safe=False,
