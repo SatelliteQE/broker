@@ -7,7 +7,7 @@ python:
 install: pip install tox -r requirements.txt
 script:
     - cp broker_settings.yaml.example broker_settings.yaml
-    - tox -epy -- -v
+    - tox -epy
 deploy:
     provider: pypi
     user: jacobcallahan
