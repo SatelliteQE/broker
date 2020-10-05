@@ -107,7 +107,7 @@ class VMBroker:
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
             host = self._act(provider, method, checkout=True)
-            logger.debug(f"{host=} {connect=}")
+            logger.debug(f"host={host} connect={connect}")
             if host:
                 if connect:
                     host.connect()
