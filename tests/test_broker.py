@@ -46,9 +46,14 @@ def test_broker_e2e():
 
 def test_mp_checkout():
     """Test that broker can checkout multiple hosts using multiprocessing"""
-    broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+    VM_COUNT=50  # This is intentionaly made high to catch run condition that
+                 # was discovered when reviewing
+                 # https://github.com/SatelliteQE/broker/pull/53
+                 # With count like this, I've got reproducibility probability
+                 # arround 0.5
+    broker_inst = broker.VMBroker(nick="test_nick", _count=VM_COUNT)
     broker_inst.checkout()
-    assert len(broker_inst._hosts) == 2
+    assert len(broker_inst._hosts) == VM_COUNT
     broker_inst.checkin()
     assert len(broker_inst._hosts) == 0
 
