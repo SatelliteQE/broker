@@ -27,7 +27,7 @@ jobs:
       run: |
         cp broker_settings.yaml.example broker_settings.yaml
         python -m pip install --upgrade pip
-        pip install tox flake8
+        pip install flake8 .[test]
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 # Disabled until errors are fixed
 #    - name: Lint with flake8
@@ -38,4 +38,4 @@ jobs:
 #        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with tox
       run: |
-        tox -e py
+        py.test
