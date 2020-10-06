@@ -1,13 +1,11 @@
 sudo: true
 language: python
 python:
-    - "3.6"
-    - "3.7"
     - "3.8"
-install: pip install tox
+install: pip install .
 script:
     - cp broker_settings.yaml.example broker_settings.yaml
-    - tox -epy
+    - pytest -v
 deploy:
     provider: pypi
     user: jacobcallahan
