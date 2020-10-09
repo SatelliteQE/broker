@@ -1,11 +1,5 @@
 sudo: true
 language: python
-python:
-    - "3.8"
-install: pip install .
-script:
-    - cp broker_settings.yaml.example broker_settings.yaml
-    - pytest -v
 deploy:
     provider: pypi
     user: jacobcallahan
