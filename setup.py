@@ -7,7 +7,8 @@ with open("README.md") as readme_file:
 with open("HISTORY.md") as history_file:
     history = history_file.read()
 
-requirements = ["awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "ssh2-python"]
+requirements = [
+    "awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "setuptools", "ssh2-python"]
 
 test_requirements = ['pytest']
 
@@ -38,6 +39,7 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
 )
