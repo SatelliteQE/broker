@@ -28,7 +28,7 @@ setup(
     packages=find_packages(),
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
     install_requires=requirements,
-    test_requirements=test_requirements,
+    tests_require=test_requirements,
     extras_require=extras,
     license="GNU General Public License v3",
     zip_safe=False,
