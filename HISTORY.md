@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.4 (2020-10-12)
+------------------
+
++ --version flag added to main broker command
++ minor fixes
+
 0.1.3 (2020-09-24)
 ------------------
 
