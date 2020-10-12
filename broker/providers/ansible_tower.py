@@ -58,7 +58,7 @@ class AnsibleTower(Provider):
             my_username = UNAME
         self.v2 = versions.v2.get()
         self.username = my_username
-        
+
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -113,8 +113,9 @@ class AnsibleTower(Provider):
                 if child.type == "workflow_job_node":
                     logger.debug(child)
                     child_id = child.summary_fields.job.id
-                    child_obj = self.v2.jobs.get(id=child_id).results.pop()
+                    child_obj = self.v2.jobs.get(id=child_id).results
                     if child_obj:
+                        child_obj = child_obj.pop()
                         artifacts = (
                             self._merge_artifacts(child_obj, strategy, artifacts)
                             or artifacts
