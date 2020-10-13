@@ -14,7 +14,8 @@ HOST_PROPERTIES = {
 
 
 class TestProvider(Provider):
-    __test__ = False
+    __test__ = False  # don't use for testing
+    hidden = True  # hide from click command generation
 
     def __init__(self, **kwargs):
         self.config = settings.TESTPROVIDER.config_value

@@ -41,10 +41,10 @@ def populate_providers(click_group):
         --help           Show this message and exit.
     """
     for prov, prov_class in (
-        pairs for pairs in PROVIDERS.items() if pairs[0] != "TestProvider"
+        pairs for pairs in PROVIDERS.items()
     ):
 
-        @click_group.command(name=prov)
+        @click_group.command(name=prov, hidden=prov_class.hidden)
         def provider_cmd(*args, **kwargs):  # the actual subcommand
             """Get information about a provider's actions"""
             broker_inst = VMBroker(**kwargs)

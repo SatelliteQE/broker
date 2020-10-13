@@ -2,6 +2,8 @@ import inspect
 
 
 class Provider:
+    hidden = False
+
     def __init__(self):
         self._construct_params = []
 
