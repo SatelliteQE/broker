@@ -3,6 +3,7 @@ import json
 import sys
 from urllib import parse as url_parser
 from broker.settings import settings
+from broker.helpers import results_filter
 from logzero import logger
 from datetime import datetime
 
@@ -39,7 +40,9 @@ class AnsibleTower(Provider):
         if TOKEN:
             logger.info("Using token authentication")
             config.token = TOKEN
-            root.connection.login(username=None, password=None, token=TOKEN, auth_type='Bearer')
+            root.connection.login(
+                username=None, password=None, token=TOKEN, auth_type="Bearer"
+            )
             versions = root.get().available_versions
             try:
                 # lookup the user that authenticated with the token
@@ -47,7 +50,9 @@ class AnsibleTower(Provider):
                 my_username = UNAME or versions.v2.get().me.get().results[0].username
             except (IndexError, AttributeError):
                 # lookup failed for whatever reason
-                logger.error("Failed to lookup a username for the given token, please check credentials")
+                logger.error(
+                    "Failed to lookup a username for the given token, please check credentials"
+                )
                 sys.exit()
         else:  # dynaconf validators should have checked that either token or password was provided
             logger.info("Using username and password authentication")
@@ -59,6 +64,19 @@ class AnsibleTower(Provider):
         self.v2 = versions.v2.get()
         self.username = my_username
 
+    @staticmethod
+    def _pull_params(kwargs):
+        """Given a kwarg dict, separate AT-specific parameters from other kwargs
+        AT-specific params must stat with double underscores.
+        Example: __page_size
+        """
+        params, new_kwargs = {}, {}
+        for key, value in kwargs.items():
+            if key.startswith("__"):
+                params[key[2:]] = value
+            else:
+                new_kwargs[key] = value
+        return params, new_kwargs
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -128,7 +146,12 @@ class AnsibleTower(Provider):
 
     def _get_expire_date(self, host_id):
         try:
-            time_stamp = self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
+            time_stamp = (
+                self.v2.hosts.get(id=host_id)
+                .results[0]
+                .related.ansible_facts.get()
+                .expire_date
+            )
             return str(datetime.fromtimestamp(int(time_stamp)))
         except:
             return None
@@ -162,7 +185,7 @@ class AnsibleTower(Provider):
         return host_info
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        """ Constructs host to be read by Ansible Tower
+        """Constructs host to be read by Ansible Tower
 
         :param provider_params: dictionary of what the provider returns when initially
         creating the vm
@@ -212,11 +235,15 @@ class AnsibleTower(Provider):
         else:
             logger.error(f"Workflow not found by name: {workflow}")
             return
-        logger.debug(f"Launching workflow template: {url_parser.urljoin(AT_URL, str(wfjt.url))}")
+        logger.debug(
+            f"Launching workflow template: {url_parser.urljoin(AT_URL, str(wfjt.url))}"
+        )
         job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
         job_number = job.url.rstrip("/").split("/")[-1]
         job_ui_url = url_parser.urljoin(AT_URL, f"/#/workflows/{job_number}")
-        logger.info(f"Waiting for job: \nAPI: {url_parser.urljoin(AT_URL, str(job.url))}\nUI: {job_ui_url}")
+        logger.info(
+            f"Waiting for job: \nAPI: {url_parser.urljoin(AT_URL, str(job.url))}\nUI: {job_ui_url}"
+        )
         job.wait_until_completed(timeout=AT_TIMEOUT)
         if not job.status == "successful":
             logger.error(
@@ -250,16 +277,34 @@ class AnsibleTower(Provider):
 
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
-        workflow = kwargs.get("workflow")
-        if workflow:
+        results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
+        if (workflow := kwargs.get("workflow")) :
             wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
             logger.info(
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
             )
-        else:
-            workflows = self.v2.workflow_job_templates.get().results
-            workflows = "\n".join([workflow.name for workflow in workflows])
+        elif kwargs.get("workflows"):
+            workflows = [
+                workflow.name
+                for workflow in self.v2.workflow_job_templates.get().results
+            ]
+            if (res_filter := kwargs.get("results_filter")) :
+                workflows = results_filter(workflows, res_filter)
+            workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
+        elif kwargs.get("templates"):
+            templates = [
+                tmpl
+                for tmpl in self.exec_workflow(
+                    workflow="list-templates", artifacts="last"
+                )["data_out"]["list_templates"]
+            ]
+            if (res_filter := kwargs.get("results_filter")) :
+                templates = results_filter(templates, res_filter)
+            templates = "\n".join(templates[:results_limit])
+            logger.info(f"Available templates:\n{templates}")
+        else:
+            logger.warning("That action is not yet implemented.")
 
     def release(self, name):
         return self.exec_workflow(workflow=RELEASE_WORKFLOW, source_vm=name)

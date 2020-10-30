@@ -105,6 +105,22 @@ def inventory_filter(inventory, raw_filter):
     return matching
 
 
+def results_filter(results, raw_filter):
+    """Filter out a list of results depending on the filter provided"""
+    resolved_filter = classify_filter(raw_filter)
+    if not isinstance(resolved_filter, list):
+        resolved_filter = [resolved_filter]
+    matching = []
+    for res in results:
+        eval_list = [
+            eval(rf.test.format(haystack=res, needle=rf.needle))
+            for rf in resolved_filter
+        ]
+        if eval_list and all(eval_list):
+            matching.append(res)
+    return matching
+
+
 def resolve_nick(nick):
     """Checks if the nickname exists. Used to define broker arguments
 

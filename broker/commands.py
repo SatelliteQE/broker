@@ -62,6 +62,12 @@ def populate_providers(click_group):
             provider_cmd = click.option(
                 f"--{action}", type=str, help=f"Get information about a {action}"
             )(provider_cmd)
+            provider_cmd = click.option(
+                f"--results-limit", type=int, help=f"The maximum number of results to get back"
+            )(provider_cmd)
+            provider_cmd = click.option(
+                f"--results-filter", type=str, help=f"Apply a broker filter to returned results"
+            )(provider_cmd)
 
 
 @click.group(invoke_without_command=True)

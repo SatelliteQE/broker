@@ -14,6 +14,7 @@ AnsibleTower:
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     workflow_timeout: 3600
+    results_limit: 20
 TestProvider:
     config_value: "something"
 # You can set a nickname as a shortcut for arguments

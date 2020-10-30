@@ -23,12 +23,13 @@ validators = [
     Validator("ANSIBLETOWER.release_workflow", default="remove-vm"),
     Validator("ANSIBLETOWER.extend_workflow", default="extend-vm"),
     Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
+    Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
     Validator("HOST_USERNAME", default="root"),
     # Validator combination for username+password or token
     ((Validator("ANSIBLETOWER.username", must_exist=True) & Validator("ANSIBLETOWER.password", must_exist=True))
         | Validator("ANSIBLETOWER.token", must_exist=True))
 ]
-settings = Dynaconf(settings_file=str(settings_path), validators=validators,)
+settings = Dynaconf(settings_file=str(settings_path.absolute()), validators=validators,)
 
 try:
     settings.validators.validate()

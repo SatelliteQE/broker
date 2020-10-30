@@ -1,6 +1,14 @@
 History
 =======
 
+0.1.5 (2020-10-31)
+------------------
+
++ Added a list-templates ability for AnsibleTower provider
++ Added GNU license
++ minor fixes
+- removed Michael
+
 0.1.4 (2020-10-12)
 ------------------
 
