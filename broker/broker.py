@@ -11,6 +11,7 @@ PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
 PROVIDER_ACTIONS = {
     # action: (InterfaceClass, "method_name")
     "workflow": (AnsibleTower, "exec_workflow"),
+    "template": (AnsibleTower, None),  # needed for list-templates
     "test_action": (TestProvider, "test_action"),
 }
 
@@ -145,12 +146,7 @@ class VMBroker:
     def nick_help(self):
         """Use a provider's nick_help method to get argument information"""
         if self._provider_actions:
-            for action, arg in self._provider_actions.items():
-                provider, _ = PROVIDER_ACTIONS[action]
-                logger.info(f"Querying provider {provider.__name__}")
-                self._act(provider, "nick_help", checkout=False)
-        elif self._kwargs.get("provider"):
-            provider = PROVIDERS[self._kwargs["provider"]]
+            provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
             logger.info(f"Querying provider {provider.__name__}")
             self._act(provider, "nick_help", checkout=False)
 
@@ -174,7 +170,7 @@ class VMBroker:
             for _host in host[::-1]:
                 self.checkin(_host)
         elif host:
-            logger.info(f"Checking in {host.hostname}")
+            logger.info(f"Checking in {host.hostname or host.name}")
             host.close()
             host.release()
             self._hosts.remove(host)

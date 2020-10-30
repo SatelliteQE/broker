@@ -83,6 +83,7 @@ celerybeat-schedule
 venv_*
 ENV/
 .broker
+.vscode
 
 # Spyder project settings
 .spyderproject
