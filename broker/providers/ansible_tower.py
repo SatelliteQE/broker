@@ -205,7 +205,7 @@ class AnsibleTower(Provider):
             for key, value in job_attrs.items():
                 if key.endswith("fqdn") and not hostname:
                     hostname = value if not isinstance(value, list) else value[0]
-                if key == "vm_provisioned" and not name:
+                if key in ("name", "vm_provisioned") and not name:
                     name = value if not isinstance(value, list) else value[0]
                 if key.endswith("host_type"):
                     host_type = value if value in host_classes else host_type
@@ -293,12 +293,13 @@ class AnsibleTower(Provider):
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
         elif kwargs.get("templates"):
-            templates = [
+            templates = list({
                 tmpl
                 for tmpl in self.exec_workflow(
                     workflow="list-templates", artifacts="last"
                 )["data_out"]["list_templates"]
-            ]
+            })
+            templates.sort(reverse=True)
             if (res_filter := kwargs.get("results_filter")) :
                 templates = results_filter(templates, res_filter)
             templates = "\n".join(templates[:results_limit])
