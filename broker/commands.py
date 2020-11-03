@@ -62,12 +62,12 @@ def populate_providers(click_group):
             provider_cmd = click.option(
                 f"--{action}", type=str, help=f"Get information about a {action}"
             )(provider_cmd)
-            provider_cmd = click.option(
-                f"--results-limit", type=int, help=f"The maximum number of results to get back"
-            )(provider_cmd)
-            provider_cmd = click.option(
-                f"--results-filter", type=str, help=f"Apply a broker filter to returned results"
-            )(provider_cmd)
+        provider_cmd = click.option(
+            f"--results-limit", type=int, help=f"The maximum number of results to get back"
+        )(provider_cmd)
+        provider_cmd = click.option(
+            f"--results-filter", type=str, help=f"Apply a broker filter to returned results"
+        )(provider_cmd)
 
 
 @click.group(invoke_without_command=True)
@@ -86,10 +86,9 @@ def populate_providers(click_group):
 )
 def cli(version):
     if version:
-        with open("setup.py") as setup_file:
-            for line in setup_file:
-                if "version" in line:
-                    click.echo(f"""Version: {line.split('"')[1]}""")
+        import pkg_resources
+        broker_version = pkg_resources.get_distribution("broker").version
+        click.echo(f"Version: {broker_version}")
         broker_directory = settings.BROKER_DIRECTORY.absolute()
         click.echo(f"Broker Directory: {broker_directory}")
         click.echo(f"Settings File: {settings.settings_path.absolute()}")
