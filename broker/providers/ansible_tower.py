@@ -92,7 +92,7 @@ class AnsibleTower(Provider):
             }
         )
 
-    def _merge_artifacts(self, at_object, strategy="merge", artifacts=None):
+    def _merge_artifacts(self, at_object, strategy="last", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children
 
         :param at_object: object you want to merge
