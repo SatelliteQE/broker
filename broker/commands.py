@@ -183,7 +183,10 @@ def checkin(vm, background, all_, filter):
 @click.option(
     "--filter", type=str, help="Display only what matches the specified filter"
 )
-def inventory(details, sync, filter):
+@click.option(
+    "--oneline", is_flag=True, help="Display host inventory in shorter format "
+)
+def inventory(details, sync, filter, oneline):
     """Get a list of all VMs you've checked out showing hostname and local id
     hostname pulled from list of dictionaries
     """
@@ -192,10 +195,24 @@ def inventory(details, sync, filter):
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory(filter=filter)
     for num, host in enumerate(inventory):
-        if details:
-            logger.info(
-                f"{num}: {host['hostname'] or host['name']}, Details: {helpers.yaml_format(host)}"
-            )
+        if oneline:
+            if host['hostname']:
+                logger.info(
+                    f"{num}: {host['hostname']} | {host['name']} "
+                )
+            else:
+                logger.info(
+                    f"{num}: {host['name']} is shutdown "
+                )
+        elif details:
+            if host['hostname']:
+                logger.info(
+                    f"{num}: {host['hostname'] or host['name']}, Details: {helpers.yaml_format(host)}"
+                )
+            else:
+                logger.info(
+                    f"{num}: {host['name']} is shutdown "
+                )
         else:
             logger.info(f"{num}: {host['hostname'] or host['name']}")
 
