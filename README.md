@@ -1,4 +1,4 @@
-# Broker
+# Broker ![update_broker_image](https://github.com/SatelliteQE/broker/workflows/update_broker_image/badge.svg)
 The infrastrucure middleman
 
 # Description
