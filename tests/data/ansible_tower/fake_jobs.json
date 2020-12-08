@@ -7,7 +7,8 @@
         },
         "name": "deploy-base-rhel",
         "status": "successful",
-        "url": "/api/v2/workflow_jobs/1329/"
+        "url": "/api/v2/workflow_jobs/1329/",
+        "extra_vars": "{\"provider\": \"rhv\", \"host_type\": \"\"}"
     },
     {
         "id": 1337,
@@ -31,21 +32,19 @@
         },
         "name": "deploy-set-stats-for-jenkins",
         "artifacts": {
-            "JENKINS_EXPORT": {
-                "reported_devices": {
-                    "nics": [
-                        "lo",
-                        "eth0"
-                    ]
-                },
-                "host_type": "host",
-                "os_distribution_version": "7.8",
-                "fqdn": "fake.host.test.com",
-                "template": "",
-                "provider": "RHEV",
-                "os_distribution": "RedHat",
-                "name": "fake-physical-host"
-            }
+            "provider": "rhv",
+            "reported_devices": {
+                "nics": [
+                    "lo",
+                    "eth0"
+                ]
+            },
+            "host_type": "host",
+            "os_distribution_version": "7.8",
+            "fqdn": "fake.host.test.com",
+            "template": "",
+            "os_distribution": "RedHat",
+            "name": "fake-physical-host"
         }
     }
 ]

@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.6 (2020-12-08)
+------------------
+
++ Broker now poulates missing field values based on returned results from AnsibleTower
++ AnsibleTower's artifacts strategy has been changed from merge to latest by default
+
 0.1.5 (2020-10-31)
 ------------------
 

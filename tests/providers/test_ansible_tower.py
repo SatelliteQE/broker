@@ -97,6 +97,7 @@ def test_host_creation(tower_stub):
     host = tower_stub.construct_host(job, vmb.host_classes)
     assert isinstance(host, vmb.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
+    assert host._broker_args == {"provider": "rhv", "host_type": "host"}
 
 
 def test_workflow_lookup_failure(tower_stub):
