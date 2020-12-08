@@ -162,26 +162,26 @@ class AnsibleTower(Provider):
             "type": host.type,
             "hostname": host.variables["fqdn"],
             "_broker_provider": "AnsibleTower",
+            "_broker_args": getattr(host, "_broker_args", {})
         }
         expire_time = self._get_expire_date(host.id)
         if expire_time:
             host_info["expire_time"] = expire_time
         if "last_job" in host.related:
             job_vars = json.loads(host.get_related("last_job").extra_vars)
-            broker_args = {
+            host_info["_broker_args"].update({
                 arg: val
                 for arg, val in job_vars.items()
                 if val and isinstance(val, str)
-            }
+            })
             try:
-                broker_args["workflow"] = host.get_related(
+                host_info["_broker_args"]["workflow"] = host.get_related(
                     "last_job"
                 ).summary_fields.source_workflow_job.name
             except:
                 logger.warning(
                     f"Unable to determine workflow for {host_info['hostname']}"
                 )
-            host_info["_broker_args"] = broker_args
         return host_info
 
     def construct_host(self, provider_params, host_classes, **kwargs):
@@ -199,6 +199,12 @@ class AnsibleTower(Provider):
             job_attrs = self._merge_artifacts(
                 job, strategy=kwargs.get("strategy", "merge")
             )
+            # pull information about the job arguments
+            job_extra_vars = json.loads(job.extra_vars)
+            # and update them if they have resolved values
+            for key in job_extra_vars.keys():
+                job_extra_vars[key] = job_attrs.get(key)
+            kwargs.update({key: val for key, val in job_extra_vars.items() if val})
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
