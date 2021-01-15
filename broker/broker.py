@@ -10,7 +10,8 @@ PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
 
 PROVIDER_ACTIONS = {
     # action: (InterfaceClass, "method_name")
-    "workflow": (AnsibleTower, "exec_workflow"),
+    "workflow": (AnsibleTower, "execute"),
+    "job_template": (AnsibleTower, "execute"),
     "template": (AnsibleTower, None),  # needed for list-templates
     "test_action": (TestProvider, "test_action"),
 }

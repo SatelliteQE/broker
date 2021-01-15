@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.7 (2021-01-15)
+------------------
+
++ Added the ability for broker to execute and query AnsibleTower job templates
+
 0.1.6 (2020-12-08)
 ------------------
 

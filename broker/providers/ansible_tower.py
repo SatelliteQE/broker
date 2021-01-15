@@ -224,39 +224,45 @@ class AnsibleTower(Provider):
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
-    def exec_workflow(self, **kwargs):
-        """Execute template job in Ansible Tower
+    def execute(self, **kwargs):
+        """Execute workflow or job template in Ansible Tower
 
-        :param kwargs: workflow template name passed in a string
+        :param kwargs: workflow or job template name passed in a string
 
-        :return: dictionary containing all information about executed workflow
+        :return: dictionary containing all information about executed workflow/job template
         """
-        workflow = kwargs.get("workflow")
-        artifacts = False
-        if "artifacts" in kwargs:
-            artifacts = kwargs.pop("artifacts")
-        wfjts = self.v2.workflow_job_templates.get(name=workflow).results
-        if wfjts:
-            wfjt = wfjts.pop()
+        if (name := kwargs.get("workflow")):
+            subject = "workflow"
+            get_path = self.v2.workflow_job_templates
+        elif (name := kwargs.get("job_template")):
+            subject = "job_template"
+            get_path = self.v2.job_templates
         else:
-            logger.error(f"Workflow not found by name: {workflow}")
+            logger.error(f"No workflow or job template specified")
+            return
+        candidates = get_path.get(name=name).results
+        if candidates:
+            target = candidates.pop()
+        else:
+            logger.error(f"{subject.capitalize()} not found by name: {name}")
             return
         logger.debug(
-            f"Launching workflow template: {url_parser.urljoin(AT_URL, str(wfjt.url))}"
+            f"Launching {subject}: {url_parser.urljoin(AT_URL, str(target.url))}"
         )
-        job = wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
+        job = target.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
         job_number = job.url.rstrip("/").split("/")[-1]
-        job_ui_url = url_parser.urljoin(AT_URL, f"/#/workflows/{job_number}")
+        job_ui_url = url_parser.urljoin(AT_URL, f"/#/{subject}s/{job_number}")
         logger.info(
             f"Waiting for job: \nAPI: {url_parser.urljoin(AT_URL, str(job.url))}\nUI: {job_ui_url}"
         )
         job.wait_until_completed(timeout=AT_TIMEOUT)
         if not job.status == "successful":
             logger.error(
-                f"Workflow Status: {job.status}\nExplanation: {job.job_explanation}"
+                f"{subject.capitalize()} Status: {job.status}\nExplanation: {job.job_explanation}"
             )
             return
-        if artifacts:
+        if (artifacts := kwargs.get("artifacts")):
+            del kwargs["artifacts"]
             return self._merge_artifacts(job, strategy=artifacts)
         return job
 
@@ -298,6 +304,20 @@ class AnsibleTower(Provider):
                 workflows = results_filter(workflows, res_filter)
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
+        elif (job_template := kwargs.get("job_template")) :
+            jt = self.v2.job_templates.get(name=job_template).results.pop()
+            logger.info(
+                f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
+            )
+        elif kwargs.get("job_templates"):
+            job_templates = [
+                job_template.name
+                for job_template in self.v2.job_templates.get().results
+            ]
+            if (res_filter := kwargs.get("results_filter")) :
+                job_templates = results_filter(job_templates, res_filter)
+            job_templates = "\n".join(job_templates[:results_limit])
+            logger.info(f"Available job templates:\n{job_templates}")
         elif kwargs.get("templates"):
             templates = list({
                 tmpl

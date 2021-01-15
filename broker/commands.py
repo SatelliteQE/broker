@@ -56,6 +56,7 @@ def populate_providers(click_group):
             for action, prov_info in PROVIDER_ACTIONS.items()
             if prov_info[0] == prov_class
         ):
+            action = action.replace("_", "-")
             provider_cmd = click.option(
                 f"--{action}s", is_flag=True, help=f"Get available {action}s"
             )(provider_cmd)
@@ -279,6 +280,7 @@ def duplicate(vm, background, count, all_, filter):
 )
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--workflow", type=str)
+@click.option("--job-template", type=str)
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
     "--output-format", "-o", type=click.Choice(["log", "raw", "yaml"]), default="log"
@@ -289,7 +291,7 @@ def duplicate(vm, background, count, all_, filter):
     help="AnsibleTower: return artifacts associated with the execution.",
 )
 @click.pass_context
-def execute(ctx, background, workflow, nick, output_format, artifacts):
+def execute(ctx, background, workflow, job_template, nick, output_format, artifacts):
     """Execute an arbitrary provider action
     COMMAND: broker execute --workflow "workflow-name" --workflow-arg1 something
     or
@@ -300,6 +302,8 @@ def execute(ctx, background, workflow, nick, output_format, artifacts):
     :param background: run a new broker subprocess to carry out command
 
     :param workflow: workflow template stored in Ansible Tower, passed in as a string
+
+    :param job-template: job template stored in Ansible Tower, passed in as a string
 
     :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
 
@@ -312,6 +316,8 @@ def execute(ctx, background, workflow, nick, output_format, artifacts):
         broker_args["nick"] = nick
     if workflow:
         broker_args["workflow"] = workflow
+    if job_template:
+        broker_args["job_template"] = job_template
     if artifacts:
         broker_args["artifacts"] = artifacts
     # if additional arguments were passed, include them in the broker args

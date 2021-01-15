@@ -17,7 +17,7 @@ extras = {
 
 setup(
     name="broker",
-    version="0.1.6",
+    version="0.1.7",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     long_description_content_type="text/markdown",
@@ -39,8 +39,7 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
     ],
 )

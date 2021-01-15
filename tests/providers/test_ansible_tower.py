@@ -86,14 +86,14 @@ def tower_stub(api_stub, config_stub):
     yield AnsibleTower(root=api_stub, config=config_stub)
 
 
-def test_exec_workflow(tower_stub):
-    job = tower_stub.exec_workflow(workflow="deploy-base-rhel")
+def test_execute(tower_stub):
+    job = tower_stub.execute(workflow="deploy-base-rhel")
     assert "workflow_nodes" in job.related
 
 
 def test_host_creation(tower_stub):
     vmb = VMBroker()
-    job = tower_stub.exec_workflow(workflow="deploy-base-rhel")
+    job = tower_stub.execute(workflow="deploy-base-rhel")
     host = tower_stub.construct_host(job, vmb.host_classes)
     assert isinstance(host, vmb.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
@@ -101,5 +101,5 @@ def test_host_creation(tower_stub):
 
 
 def test_workflow_lookup_failure(tower_stub):
-    job = tower_stub.exec_workflow(workflow="this-does-not-exist")
+    job = tower_stub.execute(workflow="this-does-not-exist")
     assert job is None
