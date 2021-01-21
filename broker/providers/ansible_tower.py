@@ -285,7 +285,7 @@ class AnsibleTower(Provider):
 
         :param target_vm: This will likely be the vm name
         """
-        return self.exec_workflow(workflow=EXTEND_WORKFLOW, target_vm=target_vm)
+        return self.execute(workflow=EXTEND_WORKFLOW, target_vm=target_vm)
 
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
@@ -321,7 +321,7 @@ class AnsibleTower(Provider):
         elif kwargs.get("templates"):
             templates = list({
                 tmpl
-                for tmpl in self.exec_workflow(
+                for tmpl in self.execute(
                     workflow="list-templates", artifacts="last"
                 )["data_out"]["list_templates"]
             })
@@ -334,4 +334,4 @@ class AnsibleTower(Provider):
             logger.warning("That action is not yet implemented.")
 
     def release(self, name):
-        return self.exec_workflow(workflow=RELEASE_WORKFLOW, source_vm=name)
+        return self.execute(workflow=RELEASE_WORKFLOW, source_vm=name)
