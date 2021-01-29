@@ -6,16 +6,33 @@ host_username: "root"
 host_password: "<password>"
 # Provider settings
 AnsibleTower:
-    base_url: "https://<ansible tower host>/"
-    # Username AND password, OR an OAUTH token can be used for authentication
-    username: "<username>"
-    password: "<plain text password>"
-    # token: "<AT personal access token>"
+    instances:
+        - production:
+            base_url: "https://<ansible tower host>/"
+            # Username AND password, OR an OAUTH token can be used for authentication
+            username: "<username>"
+            password: "<plain text password>"
+            # token: "<AT personal access token>"
+            default: True
+        - testing:
+            base_url: "https://<ansible tower host>/"
+            # Username AND password, OR an OAUTH token can be used for authentication
+            username: "<username>"
+            password: "<plain text password>"
+            # token: "<AT personal access token>"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     workflow_timeout: 3600
-    results_limit: 20
+    results_limit: 50
 TestProvider:
+    instances:
+        - test1:
+            foo: "bar"
+            default: True
+        - test2:
+            foo: "baz"
+        - bad:
+            nothing: False
     config_value: "something"
 # You can set a nickname as a shortcut for arguments
 nicks:

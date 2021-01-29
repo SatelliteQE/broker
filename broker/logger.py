@@ -16,7 +16,9 @@ def setup_logzero(level="info", path="logs/broker.log", silent=False):
     )
     log_level = getattr(logging, level.upper(), logging.INFO)
 
-    formatter = logzero.LogFormatter(fmt=debug_fmt if log_level is logging.DEBUG else log_fmt)
+    formatter = logzero.LogFormatter(
+        fmt=debug_fmt if log_level is logging.DEBUG else log_fmt
+    )
     logzero.setup_default_logger(formatter=formatter, disableStderrLogger=silent)
     logzero.loglevel(log_level)
     logzero.logfile(

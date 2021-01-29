@@ -8,6 +8,7 @@ import yaml
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 
+
 def merge_dicts(dict1, dict2):
     """Merge two nested dictionaries together
 

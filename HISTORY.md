@@ -1,6 +1,13 @@
 History
 =======
 
+0.1.9 (2021-01-29)
+------------------
+
++ Refactored broker's settings and dynaconf validator patterns
++ Added the concept of instances
++ Broker now passes along a host's stored _broker_args during checkin
+
 0.1.8 (2021-01-21)
 ------------------
 
