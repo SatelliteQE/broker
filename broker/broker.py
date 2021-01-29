@@ -59,8 +59,10 @@ class mp_decorator:
             results = []
             max_workers_count = self.MAX_WORKERS or count
             with self.EXECUTOR(max_workers=max_workers_count) as workers:
-                completed_futures = as_completed(workers.submit(self.func, instance, *args, **kwargs)
-                                                 for _ in range(count))
+                completed_futures = as_completed(
+                    workers.submit(self.func, instance, *args, **kwargs)
+                    for _ in range(count)
+                )
                 for f in completed_futures:
                     results.extend(f.result())
             return results
@@ -207,11 +209,17 @@ class VMBroker:
     @staticmethod
     def sync_inventory(provider):
         """Acquire a list of hosts from a provider and update our inventory"""
-        additional_arg = None
+        additional_arg, instance = None, {}
+        if "::" in provider:
+            provider, instance = provider.split("::")
         if ":" in provider:
             provider, additional_arg = provider.split(":")
-        logger.info(f"Pulling remote inventory from {provider}")
-        prov_inventory = PROVIDERS[provider]().get_inventory(additional_arg)
+        logger.info(
+            f"Pulling remote inventory from {f'{instance } ' if instance else ''}{provider}"
+        )
+        if instance:
+            instance = {provider: instance}
+        prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
             host["hostname"] or host["name"] for host in helpers.load_inventory()
         ]
@@ -263,7 +271,10 @@ class VMBroker:
 
     def __enter__(self):
         try:
-            return self.checkout(connect=True)
+            hosts = self.checkout(connect=True)
+            if not hosts:
+                raise Exception("No hosts created during checkout")
+            return hosts
         except Exception as err:
             self.checkin()
             raise err

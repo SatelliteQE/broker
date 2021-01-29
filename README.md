@@ -24,6 +24,8 @@ DynaConf integration provides support for setting environment variables to overr
 
 An environment variable override would take the form of: `DYNACONF_AnsibleTower__base_url="https://my.ansibletower.instance.com"`. Note the use of double underscores to model nested maps in yaml.
 
+Broker allows for multiple instances of a provider to be in the configuration file. You can name an instance anything you want, then put instance-specfic settings nested under the instance name. One of your instances must have a setting `default: True`.
+
 For the AnsibleTower provider, authentication can be achieved either through setting a username and password, or through a token (Personal Access Token in Tower).
 
 A username can still be provided when using a token to authenticate. This user will be used for inventory sync (examples below). This may be helpful for AnsibleTower administrators who would like to use their own token to authenticate, but want to set a different user in configuration for checking inventory.
@@ -36,6 +38,10 @@ broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-
 You can pass in any arbitrary arguments you want. Broker can also checkout multiple VMs at once by specifying a count.
 ```
 broker checkout --nick rhel7 --count 3
+```
+To specify an instance a checkout should be performed against, pass a flag name matching your provider class and a value matching the instance name.
+```
+broker checkout --nick rhel7 --AnsibleTower testing
 ```
 
 **Nicks**
@@ -65,10 +71,19 @@ To sync your inventory from a supported provider, use the `--sync` option.
 ```
 broker inventory --sync AnsibleTower
 ```
-To sync inventory for a specific user, use the following syntax with `--sync`.
+To sync an inventory for a specific user, use the following syntax with `--sync`.
 ```
 broker inventory --sync AnsibleTower:<username>
 ```
+To sync an inventory for a specific instance, use the follow syntax with --sync.
+```
+broker inventory --sync AnsibleTower::<instance name>
+```
+This can also be combined with the user syntax above.
+```
+broker inventory --sync AnsibleTower:<username>::<instance name>
+```
+
 
 **Extending your VM lease time**
 

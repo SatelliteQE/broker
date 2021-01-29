@@ -1,4 +1,5 @@
 import inspect
+from dynaconf import Validator
 from broker.settings import settings
 from broker.providers import Provider
 
@@ -16,11 +17,13 @@ HOST_PROPERTIES = {
 class TestProvider(Provider):
     __test__ = False  # don't use for testing
     hidden = True  # hide from click command generation
+    _validators = [Validator("TestProvider.foo", must_exist=True)]
 
     def __init__(self, **kwargs):
+        self.instance_name = kwargs.pop("TestProvider", "default")
+        self._validate_settings(self.instance_name)
         self.config = settings.TESTPROVIDER.config_value
-
-        # self.__dict__.update(kwargs)
+        self.foo = settings.TESTPROVIDER.foo
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]

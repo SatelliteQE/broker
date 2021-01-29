@@ -40,9 +40,7 @@ def populate_providers(click_group):
         --workflow TEXT  Get information about a workflow
         --help           Show this message and exit.
     """
-    for prov, prov_class in (
-        pairs for pairs in PROVIDERS.items()
-    ):
+    for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
 
         @click_group.command(name=prov, hidden=prov_class.hidden)
         def provider_cmd(*args, **kwargs):  # the actual subcommand
@@ -65,10 +63,14 @@ def populate_providers(click_group):
                 f"--{action}", type=str, help=f"Get information about a {action}"
             )(provider_cmd)
         provider_cmd = click.option(
-            f"--results-limit", type=int, help=f"The maximum number of results to get back"
+            "--results-limit",
+            type=int,
+            help="The maximum number of results to get back",
         )(provider_cmd)
         provider_cmd = click.option(
-            f"--results-filter", type=str, help=f"Apply a broker filter to returned results"
+            "--results-filter",
+            type=str,
+            help="Apply a broker filter to returned results",
         )(provider_cmd)
 
 
@@ -89,6 +91,7 @@ def populate_providers(click_group):
 def cli(version):
     if version:
         import pkg_resources
+
         broker_version = pkg_resources.get_distribution("broker").version
         click.echo(f"Version: {broker_version}")
         broker_directory = settings.BROKER_DIRECTORY.absolute()
@@ -130,7 +133,13 @@ def checkout(ctx, background, workflow, nick, count):
     if count:
         broker_args["_count"] = count
     # if additional arguments were passed, include them in the broker args
-    broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
+    # strip leading -- characters
+    broker_args.update(
+        {
+            (key[2:] if key.startswith("--") else key): val
+            for key, val in zip(ctx.args[::2], ctx.args[1::2])
+        }
+    )
     if background:
         fork_broker()
     broker_inst = VMBroker(**broker_args)
@@ -322,7 +331,13 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
     if artifacts:
         broker_args["artifacts"] = artifacts
     # if additional arguments were passed, include them in the broker args
-    broker_args.update(dict(zip(ctx.args[::2], ctx.args[1::2])))
+    # strip leading -- characters
+    broker_args.update(
+        {
+            (key[2:] if key.startswith("--") else key): val
+            for key, val in zip(ctx.args[::2], ctx.args[1::2])
+        }
+    )
     if background:
         fork_broker()
     broker_inst = VMBroker(**broker_args)

@@ -17,7 +17,7 @@ extras = {
 
 setup(
     name="broker",
-    version="0.1.8",
+    version="0.1.9",
     description="The infrastructure middleman.",
     long_description=readme + "\n\n" + history,
     long_description_content_type="text/markdown",

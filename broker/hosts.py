@@ -2,6 +2,7 @@
 from broker.settings import settings
 from broker import session
 
+
 class Host:
     def __init__(self, hostname, name=None, from_dict=False, **kwargs):
         # Allow the class to construct itself from kwargs
@@ -18,14 +19,13 @@ class Host:
         username = username or self.username
         password = password or self.password
         self.session = session.Session(
-            hostname=self.hostname,
-            username=username,
-            password=password
+            hostname=self.hostname, username=username, password=password
         )
 
     def close(self):
         if isinstance(self.session, session.Session):
             self.session.session.disconnect()
+
     def release(self):
         raise NotImplementedError("release has not been implemented for this provider")
 
@@ -49,7 +49,7 @@ class Host:
             "name": getattr(self, "name", None),
             "_broker_provider": self._broker_provider,
             "type": "host",
-            "_broker_args": self._broker_args
+            "_broker_args": self._broker_args,
         }
 
     @classmethod

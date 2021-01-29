@@ -2,6 +2,7 @@ import inspect
 import json
 import sys
 from urllib import parse as url_parser
+from dynaconf import Validator
 from broker.settings import settings
 from broker.helpers import results_filter
 from logzero import logger
@@ -16,20 +17,41 @@ except:
 from broker.providers import Provider
 from broker import helpers
 
-AT_URL = settings.ANSIBLETOWER.base_url
-UNAME = settings.ANSIBLETOWER.get("username")
-PWORD = settings.ANSIBLETOWER.get("password")
-TOKEN = settings.ANSIBLETOWER.get("token")
-RELEASE_WORKFLOW = settings.ANSIBLETOWER.release_workflow
-EXTEND_WORKFLOW = settings.ANSIBLETOWER.extend_workflow
-AT_TIMEOUT = settings.ANSIBLETOWER.workflow_timeout
-
 
 class AnsibleTower(Provider):
+
+    _validators = [
+        Validator("ANSIBLETOWER.release_workflow", default="remove-vm"),
+        Validator("ANSIBLETOWER.extend_workflow", default="extend-vm"),
+        Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
+        Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
+        Validator("ANSIBLETOWER.base_url", must_exist=True),
+        Validator("HOST_USERNAME", default="root"),
+        # Validator combination for username+password or token
+        (
+            (
+                Validator("ANSIBLETOWER.username", must_exist=True)
+                & Validator("ANSIBLETOWER.password", must_exist=True)
+            )
+            | Validator("ANSIBLETOWER.token", must_exist=True)
+        ),
+    ]
+
     def __init__(self, **kwargs):
+        # Get the specified AT instance
+        logger.debug(f"AnsibleTower instantiated with {kwargs=}")
+        instance_name = kwargs.pop("AnsibleTower", None)
+        # Validate the AnsibleTower-specific settings
+        self._validate_settings(instance_name)
+        # get our instance settings
+        self.url = settings.ANSIBLETOWER.base_url
+        self.uname = settings.ANSIBLETOWER.get("username")
+        self.pword = settings.ANSIBLETOWER.get("password")
+        self.token = settings.ANSIBLETOWER.get("token")
+        # Init the class itself
         self._construct_params = []
         config = kwargs.get("config", awxkit.config)
-        config.base_url = AT_URL
+        config.base_url = self.url
         # Prefer token if its set, otherwise use username/password
         # auth paths for the API taken from:
         # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
@@ -37,17 +59,19 @@ class AnsibleTower(Provider):
         root = kwargs.get("root")
         if root is None:
             root = awxkit.api.Api()  # support mock stub for unit tests
-        if TOKEN:
+        if self.token:
             logger.info("Using token authentication")
-            config.token = TOKEN
+            config.token = self.token
             root.connection.login(
-                username=None, password=None, token=TOKEN, auth_type="Bearer"
+                username=None, password=None, token=self.token, auth_type="Bearer"
             )
             versions = root.get().available_versions
             try:
                 # lookup the user that authenticated with the token
                 # If a username was specified in config, use that instead
-                my_username = UNAME or versions.v2.get().me.get().results[0].username
+                my_username = (
+                    self.uname or versions.v2.get().me.get().results[0].username
+                )
             except (IndexError, AttributeError):
                 # lookup failed for whatever reason
                 logger.error(
@@ -56,11 +80,13 @@ class AnsibleTower(Provider):
                 sys.exit()
         else:  # dynaconf validators should have checked that either token or password was provided
             logger.info("Using username and password authentication")
-            config.credentials = {"default": {"username": UNAME, "password": PWORD}}
+            config.credentials = {
+                "default": {"username": self.uname, "password": self.pword}
+            }
             config.use_sessions = True
             root.load_session().get()
             versions = root.available_versions
-            my_username = UNAME
+            my_username = self.uname
         self.v2 = versions.v2.get()
         self.username = my_username
 
@@ -80,7 +106,10 @@ class AnsibleTower(Provider):
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
-        self.release(caller_host.name)
+        broker_args = getattr(caller_host, "_broker_args", {}).get("_broker_args", {})
+        # remove the workflow field since it will conflict with the release workflow
+        broker_args.pop("workflow", None)
+        AnsibleTower(**broker_args).release(caller_host.name, broker_args)
 
     def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
@@ -162,18 +191,20 @@ class AnsibleTower(Provider):
             "type": host.type,
             "hostname": host.variables["fqdn"],
             "_broker_provider": "AnsibleTower",
-            "_broker_args": getattr(host, "_broker_args", {})
+            "_broker_args": getattr(host, "_broker_args", {}),
         }
         expire_time = self._get_expire_date(host.id)
         if expire_time:
             host_info["expire_time"] = expire_time
         if "last_job" in host.related:
             job_vars = json.loads(host.get_related("last_job").extra_vars)
-            host_info["_broker_args"].update({
-                arg: val
-                for arg, val in job_vars.items()
-                if val and isinstance(val, str)
-            })
+            host_info["_broker_args"].update(
+                {
+                    arg: val
+                    for arg, val in job_vars.items()
+                    if val and isinstance(val, str)
+                }
+            )
             try:
                 host_info["_broker_args"]["workflow"] = host.get_related(
                     "last_job"
@@ -231,10 +262,10 @@ class AnsibleTower(Provider):
 
         :return: dictionary containing all information about executed workflow/job template
         """
-        if (name := kwargs.get("workflow")):
+        if (name := kwargs.get("workflow")) :
             subject = "workflow"
             get_path = self.v2.workflow_job_templates
-        elif (name := kwargs.get("job_template")):
+        elif (name := kwargs.get("job_template")) :
             subject = "job_template"
             get_path = self.v2.job_templates
         else:
@@ -247,17 +278,17 @@ class AnsibleTower(Provider):
             logger.error(f"{subject.capitalize()} not found by name: {name}")
             return
         logger.debug(
-            f"Launching {subject}: {url_parser.urljoin(AT_URL, str(target.url))}"
+            f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}"
         )
-        job = target.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
+        job = target.launch(payload={"extra_vars": str(kwargs)})
         job_number = job.url.rstrip("/").split("/")[-1]
-        job_ui_url = url_parser.urljoin(AT_URL, f"/#/{subject}s/{job_number}")
+        job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         logger.info(
             "Waiting for job: \n"
-            f"API: {url_parser.urljoin(AT_URL, str(job.url))}\n"
+            f"API: {url_parser.urljoin(self.url, str(job.url))}\n"
             f"UI: {job_ui_url}"
         )
-        job.wait_until_completed(timeout=AT_TIMEOUT)
+        job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
         if not job.status == "successful":
             logger.error(
                 f"{subject.capitalize()} Status: {job.status}\n"
@@ -265,7 +296,7 @@ class AnsibleTower(Provider):
                 f"UI: {job_ui_url}"
             )
             return
-        if (artifacts := kwargs.get("artifacts")):
+        if (artifacts := kwargs.get("artifacts")) :
             del kwargs["artifacts"]
             return self._merge_artifacts(job, strategy=artifacts)
         return job
@@ -289,7 +320,9 @@ class AnsibleTower(Provider):
 
         :param target_vm: This will likely be the vm name
         """
-        return self.execute(workflow=EXTEND_WORKFLOW, target_vm=target_vm)
+        return self.execute(
+            workflow=settings.ANSIBLETOWER.extend_workflow, target_vm=target_vm
+        )
 
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
@@ -338,12 +371,14 @@ class AnsibleTower(Provider):
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
         elif kwargs.get("templates"):
-            templates = list({
-                tmpl
-                for tmpl in self.execute(
-                    workflow="list-templates", artifacts="last"
-                )["data_out"]["list_templates"]
-            })
+            templates = list(
+                {
+                    tmpl
+                    for tmpl in self.execute(
+                        workflow="list-templates", artifacts="last"
+                    )["data_out"]["list_templates"]
+                }
+            )
             templates.sort(reverse=True)
             if (res_filter := kwargs.get("results_filter")) :
                 templates = results_filter(templates, res_filter)
@@ -352,5 +387,11 @@ class AnsibleTower(Provider):
         else:
             logger.warning("That action is not yet implemented.")
 
-    def release(self, name):
-        return self.execute(workflow=RELEASE_WORKFLOW, source_vm=name)
+    def release(self, name, broker_args=None):
+        if broker_args == None:
+            broker_args = {}
+        return self.execute(
+            workflow=settings.ANSIBLETOWER.release_workflow,
+            source_vm=name,
+            **broker_args,
+        )
