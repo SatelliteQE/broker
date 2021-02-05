@@ -57,8 +57,9 @@ def populate_providers(click_group):
             if prov_info[0] == prov_class
         ):
             action = action.replace("_", "-")
+            plural = action.replace('y', 'ies') if action.endswith('y') else f"{action}s"
             provider_cmd = click.option(
-                f"--{action}s", is_flag=True, help=f"Get available {action}s"
+                f"--{plural}", is_flag=True, help=f"Get available {plural}"
             )(provider_cmd)
             provider_cmd = click.option(
                 f"--{action}", type=str, help=f"Get information about a {action}"
