@@ -14,6 +14,7 @@ PROVIDER_ACTIONS = {
     "job_template": (AnsibleTower, "execute"),
     "template": (AnsibleTower, None),  # needed for list-templates
     "test_action": (TestProvider, "test_action"),
+    "inventory": (AnsibleTower, None)
 }
 
 
