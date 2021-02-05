@@ -253,12 +253,16 @@ class AnsibleTower(Provider):
         job_number = job.url.rstrip("/").split("/")[-1]
         job_ui_url = url_parser.urljoin(AT_URL, f"/#/{subject}s/{job_number}")
         logger.info(
-            f"Waiting for job: \nAPI: {url_parser.urljoin(AT_URL, str(job.url))}\nUI: {job_ui_url}"
+            "Waiting for job: \n"
+            f"API: {url_parser.urljoin(AT_URL, str(job.url))}\n"
+            f"UI: {job_ui_url}"
         )
         job.wait_until_completed(timeout=AT_TIMEOUT)
         if not job.status == "successful":
             logger.error(
-                f"{subject.capitalize()} Status: {job.status}\nExplanation: {job.job_explanation}"
+                f"{subject.capitalize()} Status: {job.status}\n"
+                f"Explanation: {job.job_explanation}\n"
+                f"UI: {job_ui_url}"
             )
             return
         if (artifacts := kwargs.get("artifacts")):
