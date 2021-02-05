@@ -308,10 +308,10 @@ class AnsibleTower(Provider):
                 workflows = results_filter(workflows, res_filter)
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
-        elif kwargs.get("inventory"):
+        elif (inventory := kwargs.get("inventory")):
             inv = [
-                {"Name": inv.name, "ID":inv.id, "Description":inv.description}
-                for inv in self.v2.inventory.get(kind="", page_size=1000).results
+                {"Name": inv.name, "ID": inv.id, "Description": inv.description}
+                for inv in self.v2.inventory.get(name=inventory, kind="").results
             ]
             logger.info(
                 f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}"
