@@ -128,7 +128,7 @@ def resolve_nick(nick):
 
     :return: a dictionary mapping argument names and values
     """
-    nick_names = settings.settings.get("NICKS", {})
+    nick_names = settings.settings.get("NICKS") or {}
     if nick in nick_names:
         return settings.settings.NICKS[nick].to_dict()
 
