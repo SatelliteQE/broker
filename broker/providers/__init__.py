@@ -30,7 +30,7 @@ class Provider:
             if instance_name in candidate:
                 instance = candidate
                 default = False
-            elif candidate.values()[0].get("default"):
+            elif candidate.values()[0].get("default") or len(fresh_settings.instances) == 1:
                 instance = candidate
                 default = True
         fresh_settings.update(instance.values()[0])
