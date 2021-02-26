@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.10 (2021-02-26)
+------------------
+
++ Added the ability to pass in complex data structures via files
+
 0.1.9 (2021-01-29)
 ------------------
 

@@ -1,10 +1,15 @@
 """Miscellaneous helpers live here"""
-from collections import namedtuple, UserDict
+import json
+import sys
+from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
 from copy import deepcopy
-from broker import settings
-import yaml
+from pathlib import Path
 
+import yaml
+from logzero import logger
+
+from broker import settings
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 
@@ -134,6 +139,51 @@ def resolve_nick(nick):
         return settings.settings.NICKS[nick].to_dict()
 
 
+def load_file(file):
+    """Verifies existence and loads data from json and yaml files"""
+    file = Path(file)
+    if not file.exists() or file.suffix not in (".json", ".yaml", ".yml"):
+        logger.warning(f"File {file.absolute()} is invalid or does not exist.")
+        return []
+    loader_args = {}
+    if file.suffix == ".json":
+        loader = json
+    elif file.suffix in (".yaml", ".yml"):
+        loader = yaml
+        loader_args = {"Loader": yaml.FullLoader}
+    with file.open() as f:
+        data = loader.load(f, **loader_args) or []
+    return data
+
+
+def resolve_file_args(broker_args):
+    """Check for files being passed in as values to arguments,
+    then attempt to resolve them. If not resolved, keep arg/value pair intact.
+    """
+    final_args = {}
+    for key, val in broker_args.items():
+        if isinstance(val, Path) or (
+            isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
+        ):
+            if (data := load_file(val)) :
+                if key == "args_file":
+                    if isinstance(data, dict):
+                        final_args.update(data)
+                    elif isinstance(data, list):
+                        for d in data:
+                            final_args.update(d)
+                else:
+                    final_args[key] = data
+            elif key == "args_file":
+                logger.error(f"No data loaded from {val}")
+                sys.exit(1)
+            else:
+                final_args[key] = val
+        else:
+            final_args[key] = val
+    return final_args
+
+
 def load_inventory(filter=None):
     """Loads all local hosts in inventory
 
@@ -142,11 +192,7 @@ def load_inventory(filter=None):
     inventory_file = settings.BROKER_DIRECTORY.joinpath(
         settings.settings.INVENTORY_FILE
     )
-    if not inventory_file.exists():
-        inv_data = []
-    else:
-        with inventory_file.open() as inv:
-            inv_data = yaml.load(inv, Loader=yaml.FullLoader) or []
+    inv_data = load_file(inventory_file)
     return inv_data if not filter else inventory_filter(inv_data, filter)
 
 
