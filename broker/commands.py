@@ -110,8 +110,9 @@ def cli(version):
 @click.option(
     "-c", "--count", type=int, help="Number of times broker repeats the checkout"
 )
+@click.option("--args-file", type=click.Path(exists=True), help="A json or yaml file mappng arguments to values")
 @click.pass_context
-def checkout(ctx, background, workflow, nick, count):
+def checkout(ctx, background, workflow, nick, count, args_file):
     """Checkout or "create" a Virtual Machine broker instance
     COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
     or
@@ -124,6 +125,8 @@ def checkout(ctx, background, workflow, nick, count):
     :param workflow: workflow template stored in Ansible Tower, passed in as a string
 
     :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
+
+    :param args_file: this broker argument wil be replaced with the contents of the file passed in
     """
     broker_args = {}
     if nick:
@@ -132,6 +135,8 @@ def checkout(ctx, background, workflow, nick, count):
         broker_args["workflow"] = workflow
     if count:
         broker_args["_count"] = count
+    if args_file:
+        broker_args["args_file"] = args_file
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
     broker_args.update(
@@ -140,6 +145,7 @@ def checkout(ctx, background, workflow, nick, count):
             for key, val in zip(ctx.args[::2], ctx.args[1::2])
         }
     )
+    broker_args = helpers.resolve_file_args(broker_args)
     if background:
         fork_broker()
     broker_inst = VMBroker(**broker_args)
@@ -300,8 +306,9 @@ def duplicate(vm, background, count, all_, filter):
     type=click.Choice(["merge", "last"]),
     help="AnsibleTower: return artifacts associated with the execution.",
 )
+@click.option("--args-file", type=click.Path(exists=True), help="A json or yaml file mappng arguments to values")
 @click.pass_context
-def execute(ctx, background, workflow, job_template, nick, output_format, artifacts):
+def execute(ctx, background, workflow, job_template, nick, output_format, artifacts, args_file):
     """Execute an arbitrary provider action
     COMMAND: broker execute --workflow "workflow-name" --workflow-arg1 something
     or
@@ -320,6 +327,8 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
     :param output_format: change the format of the output to one of the choice options
 
     :param artifacts: AnsibleTower provider specific option for choosing what to return
+
+    :param args_file: this broker argument wil be replaced with the contents of the file passed in
     """
     broker_args = {}
     if nick:
@@ -330,6 +339,8 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
         broker_args["job_template"] = job_template
     if artifacts:
         broker_args["artifacts"] = artifacts
+    if args_file:
+        broker_args["args_file"] = args_file
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
     broker_args.update(
@@ -338,6 +349,7 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
             for key, val in zip(ctx.args[::2], ctx.args[1::2])
         }
     )
+    broker_args = helpers.resolve_file_args(broker_args)
     if background:
         fork_broker()
     broker_inst = VMBroker(**broker_args)

@@ -43,6 +43,15 @@ To specify an instance a checkout should be performed against, pass a flag name 
 ```
 broker checkout --nick rhel7 --AnsibleTower testing
 ```
+If you have more complex data structures you need to pass in, you can do that in two ways.
+You can populate a json or yaml file where the top-level keys will become broker arguments and their nested data structures become values.
+```
+broker checkout --nick rhel7 --args-file tests/data/broker_args.json
+```
+You can also pass in a file for other arguments, where the contents will become the argument's value
+```
+broker checkout --nick rhel7 --extra tests/data/args_file.yaml
+```
 
 **Nicks**
 

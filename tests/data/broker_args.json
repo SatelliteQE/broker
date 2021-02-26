@@ -1,0 +1,13 @@
+{
+    "myarg": [
+        {
+            "baseurl": "http://my.mirror/rpm",
+            "name": "base"
+        },
+        {
+            "baseurl": "http://my.mirror/rpm",
+            "name": "optional"
+        }
+    ],
+    "my_second_arg": "foo"
+}
