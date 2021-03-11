@@ -100,10 +100,8 @@ class VMBroker:
             return result
 
     @mp_decorator
-    def _checkout(self, connect=False):
+    def _checkout(self):
         """checkout one or more VMs
-
-        :param connect: Boolean whether to establish host ssh connection
 
         :return: List of Host objects
         """
@@ -112,10 +110,8 @@ class VMBroker:
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
             host = self._act(provider, method, checkout=True)
-            logger.debug(f"host={host} connect={connect}")
+            logger.debug(f"host={host}")
             if host:
-                if connect:
-                    host.connect()
                 hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
         return hosts
@@ -127,7 +123,10 @@ class VMBroker:
 
         :return: Host obj or list of Host objects
         """
-        hosts = self._checkout(connect=connect)
+        hosts = self._checkout()
+        if connect:
+            for host in hosts:
+                host.connect()
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
         return hosts if not len(hosts) == 1 else hosts[0]
