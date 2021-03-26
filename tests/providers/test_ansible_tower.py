@@ -97,9 +97,10 @@ def test_host_creation(tower_stub):
     host = tower_stub.construct_host(job, vmb.host_classes)
     assert isinstance(host, vmb.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
-    assert host._broker_args == {"provider": "rhv", "host_type": "host"}
+    assert host._broker_args["os_distribution_version"] == "7.8"
 
 
 def test_workflow_lookup_failure(tower_stub):
-    job = tower_stub.execute(workflow="this-does-not-exist")
-    assert job is None
+    with pytest.raises(VMBroker.ProviderError) as err:
+        tower_stub.execute(workflow="this-does-not-exist")
+    assert "Workflow not found by name: this-does-not-exist" in err.value.message

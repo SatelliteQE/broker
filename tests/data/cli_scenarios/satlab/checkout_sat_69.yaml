@@ -1,0 +1,2 @@
+workflow: deploy-sat-jenkins
+deploy_sat_version: "6.9"

@@ -1,0 +1,2 @@
+workflow: deploy-base-rhel
+rhel_version: "7.9"

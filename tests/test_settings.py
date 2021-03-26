@@ -1,6 +1,7 @@
 import os
 import pytest
 from dynaconf import ValidationError
+from broker.exceptions import ConfigurationError
 from broker.providers.test_provider import TestProvider
 
 
@@ -17,9 +18,9 @@ def test_alternate_settings():
 
 
 def test_validator_trigger():
-    with pytest.raises(ValidationError) as error:
+    with pytest.raises(ConfigurationError) as err:
         TestProvider(TestProvider="bad")
-    assert error.value.args == ("TestProvider.foo is required in env main",)
+    assert isinstance(err.value.args[0], ValidationError)
 
 
 def test_nested_envar():

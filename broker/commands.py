@@ -1,31 +1,35 @@
-import broker
-import os
+import signal
 import sys
 import click
-import logging
 from logzero import logger
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, VMBroker
-from broker import logger as b_log
-from broker import helpers, settings
+from broker.providers import Provider
+from broker import exceptions, helpers, settings
 
 
-def update_log_level(ctx, param, value):
-    silent = False
-    if value == "silent":
-        silent = True
-        value = "info"
-    if getattr(logging, value.upper()) is not logger.getEffectiveLevel() or silent:
-        b_log.setup_logzero(level=value, silent=silent)
-        if not silent:
-            click.echo(f"Log level changed to [{value}]")
+signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
 
-def fork_broker():
-    pid = os.fork()
-    if pid:
-        logger.info(f"Running broker in the background with pid: {pid}")
-        sys.exit(0)
-    update_log_level(None, None, "silent")
+class ExceptionHandler(click.Group):
+    """Wraps click group to catch and handle raised exceptions"""
+
+    def __call__(self, *args, **kwargs):
+        try:
+            return self.main(*args, **kwargs)
+        except Exception as err:
+            if not isinstance(err, exceptions.BrokerError):
+                err = exceptions.BrokerError(err)
+            sys.exit(err.error_code)
+
+
+def provider_options(command):
+    """Applies provider-specific decorators to each command this decorates"""
+    for prov in Provider.__subclasses__():
+        if prov.hidden:
+            continue
+        for option in getattr(prov, f"_{command.__name__}_options"):
+            command = option(command)
+    return command
 
 
 def populate_providers(click_group):
@@ -55,7 +59,9 @@ def populate_providers(click_group):
             if prov_info[0] == prov_class
         ):
             action = action.replace("_", "-")
-            plural = action.replace('y', 'ies') if action.endswith('y') else f"{action}s"
+            plural = (
+                action.replace("y", "ies") if action.endswith("y") else f"{action}s"
+            )
             provider_cmd = click.option(
                 f"--{plural}", is_flag=True, help=f"Get available {plural}"
             )(provider_cmd)
@@ -74,12 +80,12 @@ def populate_providers(click_group):
         )(provider_cmd)
 
 
-@click.group(invoke_without_command=True)
+@click.group(cls=ExceptionHandler, invoke_without_command=True)
 @click.option(
     "--log-level",
     type=click.Choice(["info", "warning", "error", "critical", "debug", "silent"]),
     default="info",
-    callback=update_log_level,
+    callback=helpers.update_log_level,
     is_eager=True,
     expose_value=False,
 )
@@ -105,14 +111,18 @@ def cli(version):
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
-@click.option("--workflow", type=str)
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
     "-c", "--count", type=int, help="Number of times broker repeats the checkout"
 )
-@click.option("--args-file", type=click.Path(exists=True), help="A json or yaml file mappng arguments to values")
+@click.option(
+    "--args-file",
+    type=click.Path(exists=True),
+    help="A json or yaml file mappng arguments to values",
+)
+@provider_options
 @click.pass_context
-def checkout(ctx, background, workflow, nick, count, args_file):
+def checkout(ctx, background, nick, count, args_file, **kwargs):
     """Checkout or "create" a Virtual Machine broker instance
     COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
     or
@@ -122,17 +132,13 @@ def checkout(ctx, background, workflow, nick, count, args_file):
 
     :param background: run a new broker subprocess to carry out command
 
-    :param workflow: workflow template stored in Ansible Tower, passed in as a string
-
     :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
 
     :param args_file: this broker argument wil be replaced with the contents of the file passed in
     """
-    broker_args = {}
+    broker_args = helpers.clean_dict(kwargs)
     if nick:
         broker_args["nick"] = nick
-    if workflow:
-        broker_args["workflow"] = workflow
     if count:
         broker_args["_count"] = count
     if args_file:
@@ -147,12 +153,12 @@ def checkout(ctx, background, workflow, nick, count, args_file):
     )
     broker_args = helpers.resolve_file_args(broker_args)
     if background:
-        fork_broker()
+        helpers.fork_broker()
     broker_inst = VMBroker(**broker_args)
     broker_inst.checkout()
 
 
-@cli.group()
+@cli.group(cls=ExceptionHandler)
 def providers():
     """Get information about a provider and its actions"""
     pass
@@ -180,7 +186,7 @@ def checkin(vm, background, all_, filter):
     :param filter: a filter string matching broker's specification
     """
     if background:
-        fork_broker()
+        helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     to_remove = []
     for num, host in enumerate(inventory):
@@ -238,7 +244,7 @@ def extend(vm, background, all_, filter):
     :param filter: a filter string matching broker's specification
     """
     if background:
-        fork_broker()
+        helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     to_extend = []
     for num, host in enumerate(inventory):
@@ -274,7 +280,7 @@ def duplicate(vm, background, count, all_, filter):
     :param filter: a filter string matching broker's specification
     """
     if background:
-        fork_broker()
+        helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
@@ -295,8 +301,6 @@ def duplicate(vm, background, count, all_, filter):
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
-@click.option("--workflow", type=str)
-@click.option("--job-template", type=str)
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
     "--output-format", "-o", type=click.Choice(["log", "raw", "yaml"]), default="log"
@@ -306,9 +310,14 @@ def duplicate(vm, background, count, all_, filter):
     type=click.Choice(["merge", "last"]),
     help="AnsibleTower: return artifacts associated with the execution.",
 )
-@click.option("--args-file", type=click.Path(exists=True), help="A json or yaml file mappng arguments to values")
+@click.option(
+    "--args-file",
+    type=click.Path(exists=True),
+    help="A json or yaml file mappng arguments to values",
+)
+@provider_options
 @click.pass_context
-def execute(ctx, background, workflow, job_template, nick, output_format, artifacts, args_file):
+def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs):
     """Execute an arbitrary provider action
     COMMAND: broker execute --workflow "workflow-name" --workflow-arg1 something
     or
@@ -318,10 +327,6 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
 
     :param background: run a new broker subprocess to carry out command
 
-    :param workflow: workflow template stored in Ansible Tower, passed in as a string
-
-    :param job-template: job template stored in Ansible Tower, passed in as a string
-
     :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
 
     :param output_format: change the format of the output to one of the choice options
@@ -330,13 +335,9 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
 
     :param args_file: this broker argument wil be replaced with the contents of the file passed in
     """
-    broker_args = {}
+    broker_args = helpers.clean_dict(kwargs)
     if nick:
         broker_args["nick"] = nick
-    if workflow:
-        broker_args["workflow"] = workflow
-    if job_template:
-        broker_args["job_template"] = job_template
     if artifacts:
         broker_args["artifacts"] = artifacts
     if args_file:
@@ -351,7 +352,7 @@ def execute(ctx, background, workflow, job_template, nick, output_format, artifa
     )
     broker_args = helpers.resolve_file_args(broker_args)
     if background:
-        fork_broker()
+        helpers.fork_broker()
     broker_inst = VMBroker(**broker_args)
     result = broker_inst.execute()
     if output_format == "raw":

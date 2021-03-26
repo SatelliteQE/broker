@@ -1,0 +1,3 @@
+workflow: list-templates
+artifacts: last
+output-format: raw

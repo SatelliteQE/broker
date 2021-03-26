@@ -1,6 +1,14 @@
 History
 =======
 
+0.1.11 (2021-03-26)
+------------------
+
++ Broker now handles ansible tower inventories
++ New exception handling system
++ New dynamic cli options for providers
++ Minor refactor and improvements
+
 0.1.10 (2021-02-26)
 ------------------
 
