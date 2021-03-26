@@ -2,7 +2,7 @@ from logzero import logger
 from broker.providers.ansible_tower import AnsibleTower
 from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
-from broker import helpers
+from broker import exceptions, helpers
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
@@ -71,13 +71,23 @@ class mp_decorator:
 
 
 class VMBroker:
+    # map exceptions for easier access when used as a library
+    BrokerError = exceptions.BrokerError
+    AuthenticationError = exceptions.AuthenticationError
+    PermissionError = exceptions.PermissionError
+    ProviderError = exceptions.ProviderError
+    ConfigurationError = exceptions.ConfigurationError
+    NotImplementedError = exceptions.NotImplementedError
+
     def __init__(self, **kwargs):
         self._hosts = kwargs.pop("hosts", [])
         self.host_classes = {"host": Host}
         # if a nick was specified, pull in the resolved arguments
+        logger.debug(f"Broker instantiated with {kwargs=}")
         if "nick" in kwargs:
             nick = kwargs.pop("nick")
             kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick))
+            logger.debug(f"kwargs after nick resolution {kwargs=}")
         if "host_classes" in kwargs:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
@@ -201,7 +211,7 @@ class VMBroker:
         elif host:
             logger.info(f"Extending host {host.hostname}")
             provider = PROVIDERS[host._broker_provider]
-            self._kwargs["target_vm"] = host.name
+            self._kwargs["target_vm"] = host
             logger.debug(f"Executing extend with provider {provider.__name__}")
             self._act(provider, "extend_vm", checkout=False)
 

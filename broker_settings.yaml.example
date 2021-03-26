@@ -13,6 +13,7 @@ AnsibleTower:
             username: "<username>"
             password: "<plain text password>"
             # token: "<AT personal access token>"
+            inventory: "inventory name"
             default: True
         - testing:
             base_url: "https://<ansible tower host>/"
@@ -20,6 +21,7 @@ AnsibleTower:
             username: "<username>"
             password: "<plain text password>"
             # token: "<AT personal access token>"
+            inventory: "inventory name"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     workflow_timeout: 3600

@@ -1,5 +1,6 @@
-import inspect
+import dynaconf
 
+from broker import exceptions
 from broker.settings import settings
 
 
@@ -8,6 +9,10 @@ class Provider:
     _validators = []
     # Set to true if you don't want your provider shown in the CLI
     hidden = False
+    # Populate these to add your checkout and execute options to each command
+    # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
+    _checkout_options = []
+    _execute_options = []
 
     def __init__(self):
         self._construct_params = []
@@ -30,7 +35,10 @@ class Provider:
             if instance_name in candidate:
                 instance = candidate
                 default = False
-            elif candidate.values()[0].get("default") or len(fresh_settings.instances) == 1:
+            elif (
+                candidate.values()[0].get("default")
+                or len(fresh_settings.instances) == 1
+            ):
                 instance = candidate
                 default = True
         fresh_settings.update(instance.values()[0])
@@ -54,11 +62,14 @@ class Provider:
         current_validators = settings.validators[:]
         settings.validators.clear()
         settings.validators.extend(self._validators)
-        settings.validators.validate()
+        try:
+            settings.validators.validate()
+        except dynaconf.ValidationError as err:
+            raise exceptions.ConfigurationError(err)
         settings.validators.extend(current_validators)
 
     def _host_release(self):
-        raise NotImplementedError("_host_release has not been implemented")
+        raise exceptions.NotImplementedError("_host_release has not been implemented")
 
     def _set_attributes(self, obj, attrs):
         obj.__dict__.update(attrs)
@@ -67,7 +78,6 @@ class Provider:
         return {k: v for k, v in kwargs.items() if k in arg_list}
 
     def construct_host(self, host_cls, provider_params, **kwargs):
-        hostname = provider_params["hostname"]
         host_inst = host_cls(**provider_params, **kwargs)
         host_attrs = self._get_params(self._construct_params)
         host_attrs["release"] = self._host_release
@@ -75,13 +85,13 @@ class Provider:
         return host_inst
 
     def nick_help(self):
-        raise NotImplementedError("nick_help has not been implemented")
+        raise exceptions.NotImplementedError("nick_help has not been implemented")
 
     def get_inventory(self, **kwargs):
-        raise NotImplementedError("get_inventory has not been implemented")
+        raise exceptions.NotImplementedError("get_inventory has not been implemented")
 
     def extend(self):
-        raise NotImplementedError("extend has not been implemented")
+        raise exceptions.NotImplementedError("extend has not been implemented")
 
     def release(self, host_obj):
-        raise NotImplementedError("release has not been implemented")
+        raise exceptions.NotImplementedError("release has not been implemented")

@@ -1,18 +1,21 @@
+import click
 import inspect
 import json
-import sys
 from urllib import parse as url_parser
+from functools import cached_property
 from dynaconf import Validator
-from broker.settings import settings
+from broker import exceptions
 from broker.helpers import results_filter
+from broker.settings import settings
 from logzero import logger
 from datetime import datetime
 
 try:
     import awxkit
 except:
-    logger.error("Unable to import awxkit. Is it installed?")
-    raise Exception("Unable to import awxkit. Is it installed?")
+    raise exceptions.ProviderError(
+        provider="AnsibleTower", message="Unable to import awxkit. Is it installed?"
+    )
 
 from broker.providers import Provider
 from broker import helpers
@@ -26,7 +29,6 @@ class AnsibleTower(Provider):
         Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
         Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
         Validator("ANSIBLETOWER.base_url", must_exist=True),
-        Validator("HOST_USERNAME", default="root"),
         # Validator combination for username+password or token
         (
             (
@@ -34,6 +36,29 @@ class AnsibleTower(Provider):
                 & Validator("ANSIBLETOWER.password", must_exist=True)
             )
             | Validator("ANSIBLETOWER.token", must_exist=True)
+        ),
+        Validator("ANSIBLETOWER.inventory", must_exist=True),
+    ]
+
+    _checkout_options = [
+        click.option(
+            "--tower-inventory",
+            type=str,
+            help="AnsibleTower inventory to checkout a host on",
+        ),
+        click.option(
+            "--workflow", type=str, help="Name of a workflow used to checkout a host"
+        ),
+    ]
+    _execute_options = [
+        click.option(
+            "--tower-inventory",
+            type=str,
+            help="AnsibleTower inventory to execute against",
+        ),
+        click.option("--workflow", type=str, help="Name of a workflow to execute"),
+        click.option(
+            "--job-template", type=str, help="Name of a job template to execute"
         ),
     ]
 
@@ -48,23 +73,29 @@ class AnsibleTower(Provider):
         self.uname = settings.ANSIBLETOWER.get("username")
         self.pword = settings.ANSIBLETOWER.get("password")
         self.token = settings.ANSIBLETOWER.get("token")
+        self._inventory = (
+            kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
+        )
         # Init the class itself
         self._construct_params = []
         config = kwargs.get("config", awxkit.config)
         config.base_url = self.url
+        root = kwargs.get("root")
+        if root is None:
+            root = awxkit.api.Api()  # support mock stub for unit tests
         # Prefer token if its set, otherwise use username/password
         # auth paths for the API taken from:
         # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
         # unit test mock structure means the root API instance can't be loaded on the same line
-        root = kwargs.get("root")
-        if root is None:
-            root = awxkit.api.Api()  # support mock stub for unit tests
         if self.token:
             logger.info("Using token authentication")
             config.token = self.token
-            root.connection.login(
-                username=None, password=None, token=self.token, auth_type="Bearer"
-            )
+            try:
+                root.connection.login(
+                    username=None, password=None, token=self.token, auth_type="Bearer"
+                )
+            except awxkit.exceptions.Unauthorized as err:
+                raise exceptions.AuthenticationError(err.args[0])
             versions = root.get().available_versions
             try:
                 # lookup the user that authenticated with the token
@@ -74,10 +105,10 @@ class AnsibleTower(Provider):
                 )
             except (IndexError, AttributeError):
                 # lookup failed for whatever reason
-                logger.error(
-                    "Failed to lookup a username for the given token, please check credentials"
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message="Failed to lookup a username for the given token, please check credentials",
                 )
-                sys.exit()
         else:  # dynaconf validators should have checked that either token or password was provided
             logger.info("Using username and password authentication")
             config.credentials = {
@@ -109,7 +140,9 @@ class AnsibleTower(Provider):
         broker_args = getattr(caller_host, "_broker_args", {}).get("_broker_args", {})
         # remove the workflow field since it will conflict with the release workflow
         broker_args.pop("workflow", None)
-        AnsibleTower(**broker_args).release(caller_host.name, broker_args)
+        AnsibleTower(**broker_args).release(
+            broker_args.get("source_vm", caller_host.name), broker_args
+        )
 
     def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
@@ -189,7 +222,7 @@ class AnsibleTower(Provider):
         host_info = {
             "name": host.name,
             "type": host.type,
-            "hostname": host.variables["fqdn"],
+            "hostname": host.variables.get("fqdn"),
             "_broker_provider": "AnsibleTower",
             "_broker_args": getattr(host, "_broker_args", {}),
         }
@@ -215,6 +248,23 @@ class AnsibleTower(Provider):
                 )
         return host_info
 
+    @cached_property
+    def inventory(self):
+        if (inventory_info := self.v2.inventory.get(search=self._inventory)) :
+            if inventory_info.count > 1:
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message=f"Ambigious AnsibleTower inventory name {self._inventory}",
+                )
+            elif inventory_info.count == 1:
+                inv_struct = inventory_info.results.pop()
+                return inv_struct.id
+            else:
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message=f"Unknown AnsibleTower inventory {self._inventory}",
+                )
+
     def construct_host(self, provider_params, host_classes, **kwargs):
         """Constructs host to be read by Ansible Tower
 
@@ -228,7 +278,7 @@ class AnsibleTower(Provider):
         if provider_params:
             job = provider_params
             job_attrs = self._merge_artifacts(
-                job, strategy=kwargs.get("strategy", "merge")
+                job, strategy=kwargs.get("strategy", "last")
             )
             # pull information about the job arguments
             job_extra_vars = json.loads(job.extra_vars)
@@ -236,6 +286,7 @@ class AnsibleTower(Provider):
             for key in job_extra_vars.keys():
                 job_extra_vars[key] = job_attrs.get(key)
             kwargs.update({key: val for key, val in job_extra_vars.items() if val})
+            kwargs.update({key: val for key, val in job_attrs.items() if val})
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
@@ -249,7 +300,9 @@ class AnsibleTower(Provider):
             if not hostname:
                 raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
             logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
-            host_inst = host_classes[host_type](hostname=hostname, name=name, **kwargs)
+            host_inst = host_classes[host_type](
+                **{**kwargs, "hostname": hostname, "name": name}
+            )
         else:
             host_inst = host_classes[kwargs.get("type")](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs)
@@ -269,18 +322,26 @@ class AnsibleTower(Provider):
             subject = "job_template"
             get_path = self.v2.job_templates
         else:
-            logger.error(f"No workflow or job template specified")
-            return
-        candidates = get_path.get(name=name).results
+            raise exceptions.ProviderError(
+                provider="AnsibleTower", message="No workflow or job template specified"
+            )
+        try:
+            candidates = get_path.get(name=name).results
+        except awxkit.exceptions.Unauthorized as err:
+            raise exceptions.AuthenticationError(err.args[0])
         if candidates:
             target = candidates.pop()
         else:
-            logger.error(f"{subject.capitalize()} not found by name: {name}")
-            return
+            raise exceptions.ProviderError(
+                provider="AnsibleTower",
+                message=f"{subject.capitalize()} not found by name: {name}",
+            )
         logger.debug(
             f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}"
         )
-        job = target.launch(payload={"extra_vars": str(kwargs)})
+        job = target.launch(
+            payload={"extra_vars": str(kwargs), "inventory": self.inventory}
+        )
         job_number = job.url.rstrip("/").split("/")[-1]
         job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         logger.info(
@@ -290,12 +351,14 @@ class AnsibleTower(Provider):
         )
         job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
         if not job.status == "successful":
-            logger.error(
-                f"{subject.capitalize()} Status: {job.status}\n"
-                f"Explanation: {job.job_explanation}\n"
-                f"UI: {job_ui_url}"
+            raise exceptions.ProviderError(
+                provider="AnsibleTower",
+                message=(
+                    f"{subject.capitalize()} Status: {job.status}\n"
+                    f"Explanation: {job.job_explanation}\n"
+                    f"UI: {job_ui_url}"
+                ),
             )
-            return
         if (artifacts := kwargs.get("artifacts")) :
             del kwargs["artifacts"]
             return self._merge_artifacts(job, strategy=artifacts)
@@ -307,7 +370,7 @@ class AnsibleTower(Provider):
         invs = [
             inv
             for inv in self.v2.inventory.get(page_size=100).results
-            if user in inv.name
+            if user in inv.name or user == "@ll"
         ]
         hosts = []
         for inv in invs:
@@ -318,10 +381,15 @@ class AnsibleTower(Provider):
     def extend_vm(self, target_vm):
         """Run the extend workflow with defaults args
 
-        :param target_vm: This will likely be the vm name
+        :param target_vm: This should be a host object
         """
+        # check if an inventory was specified. if so overwrite the current inventory
+        if (new_inv := target_vm._broker_args.get("tower_inventory")) :
+            if new_inv != self._inventory:
+                self._inventory = new_inv
+                del self.inventory  # clear the cached value
         return self.execute(
-            workflow=settings.ANSIBLETOWER.extend_workflow, target_vm=target_vm
+            workflow=settings.ANSIBLETOWER.extend_workflow, target_vm=target_vm.name
         )
 
     def nick_help(self, **kwargs):
@@ -337,16 +405,14 @@ class AnsibleTower(Provider):
                 workflow.name
                 for workflow in self.v2.workflow_job_templates.get().results
             ]
-            if (res_filter := kwargs.get("results_filter")) :
+            if (res_filter := kwargs.get("results_filter")):
                 workflows = results_filter(workflows, res_filter)
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
-        elif (inventory := kwargs.get("inventory")):
+        elif (inventory := kwargs.get("inventory")) :
             inv = self.v2.inventory.get(name=inventory, kind="").results.pop()
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
-            logger.info(
-                f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}"
-            )
+            logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
         elif kwargs.get("inventories"):
             inv = [
                 inv.name

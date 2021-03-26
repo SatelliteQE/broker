@@ -1,5 +1,7 @@
 """Miscellaneous helpers live here"""
 import json
+import logging
+import os
 import sys
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
@@ -9,9 +11,15 @@ from pathlib import Path
 import yaml
 from logzero import logger
 
-from broker import settings
+from broker import exceptions, settings
+from broker import logger as b_log
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
+
+
+def clean_dict(in_dict):
+    """Remove entries from a dict where value is None"""
+    return {k: v for k, v in in_dict.items() if v is not None}
 
 
 def merge_dicts(dict1, dict2):
@@ -21,6 +29,8 @@ def merge_dicts(dict1, dict2):
     """
     if not isinstance(dict1, MutableMapping) or not isinstance(dict2, MutableMapping):
         return dict1
+    dict1 = clean_dict(dict1)
+    dict2 = clean_dict(dict2)
     merged = {}
     dupe_keys = dict1.keys() & dict2.keys()
     for key in dupe_keys:
@@ -175,8 +185,7 @@ def resolve_file_args(broker_args):
                 else:
                     final_args[key] = data
             elif key == "args_file":
-                logger.error(f"No data loaded from {val}")
-                sys.exit(1)
+                raise exceptions.BrokerError(f"No data loaded from {val}")
             else:
                 final_args[key] = val
         else:
@@ -273,3 +282,34 @@ class MockStub(UserDict):
 
     def __call__(self, *args, **kwargs):
         return self
+
+
+def update_log_level(ctx, param, value):
+    silent = False
+    if value == "silent":
+        silent = True
+        value = "info"
+    if getattr(logging, value.upper()) is not logger.getEffectiveLevel() or silent:
+        b_log.setup_logzero(level=value, silent=silent)
+        if not silent:
+            print(f"Log level changed to [{value}]")
+
+
+def fork_broker():
+    pid = os.fork()
+    if pid:
+        logger.info(f"Running broker in the background with pid: {pid}")
+        sys.exit(0)
+    update_log_level(None, None, "silent")
+
+
+def handle_keyboardinterrupt(*args):
+    choice = input(
+        "\nEnding Broker while running won't end processes being monitored.\n"
+        "Would you like to switch Broker to run in the background?\n"
+        "[y/n]: "
+    )
+    if choice.lower()[0] == "y":
+        fork_broker()
+    else:
+        raise exceptions.BrokerError("Broker killed by user.")
