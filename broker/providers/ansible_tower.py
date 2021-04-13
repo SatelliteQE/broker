@@ -1,6 +1,7 @@
 import click
 import inspect
 import json
+import yaml
 from urllib import parse as url_parser
 from functools import cached_property
 from dynaconf import Validator
@@ -287,6 +288,8 @@ class AnsibleTower(Provider):
                 job_extra_vars[key] = job_attrs.get(key)
             kwargs.update({key: val for key, val in job_extra_vars.items() if val})
             kwargs.update({key: val for key, val in job_attrs.items() if val})
+            if "tower_inventory" in job_attrs:
+                kwargs["tower_inventory"] = job_attrs["tower_inventory"]
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
@@ -405,7 +408,7 @@ class AnsibleTower(Provider):
                 workflow.name
                 for workflow in self.v2.workflow_job_templates.get().results
             ]
-            if (res_filter := kwargs.get("results_filter")):
+            if (res_filter := kwargs.get("results_filter")) :
                 workflows = results_filter(workflows, res_filter)
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
@@ -461,3 +464,11 @@ class AnsibleTower(Provider):
             source_vm=name,
             **broker_args,
         )
+
+
+def awxkit_representer(dumper, data):
+    """In order to resolve awxkit objects, a custom representer is needed"""
+    return dumper.represent_dict(dict(data))
+
+
+yaml.add_representer(awxkit.utils.PseudoNamespace, awxkit_representer)
