@@ -12,8 +12,8 @@ SCENARIO_DIR = Path("tests/data/cli_scenarios/satlab")
 def skip_if_not_configured():
     try:
         AnsibleTower()
-    except:
-        pytest.skip("AnsibleTower is not configured correctly")
+    except Exception as err:
+        pytest.skip(f"AnsibleTower is not configured correctly: {err}")
 
 
 @pytest.fixture(scope="module")
