@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.13 (2021-04-14)
+------------------
+
++ AnsibleTower provider no longer requires a inventory specified.
+
 0.1.12 (2021-04-13)
 ------------------
 
