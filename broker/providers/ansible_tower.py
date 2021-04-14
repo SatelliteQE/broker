@@ -38,7 +38,7 @@ class AnsibleTower(Provider):
             )
             | Validator("ANSIBLETOWER.token", must_exist=True)
         ),
-        Validator("ANSIBLETOWER.inventory", must_exist=True),
+        Validator("ANSIBLETOWER.inventory", default=None),
     ]
 
     _checkout_options = [
@@ -251,6 +251,8 @@ class AnsibleTower(Provider):
 
     @cached_property
     def inventory(self):
+        if not self._inventory:
+            return
         if (inventory_info := self.v2.inventory.get(search=self._inventory)) :
             if inventory_info.count > 1:
                 raise exceptions.ProviderError(
@@ -339,12 +341,16 @@ class AnsibleTower(Provider):
                 provider="AnsibleTower",
                 message=f"{subject.capitalize()} not found by name: {name}",
             )
+        payload={"extra_vars": str(kwargs)}
+        if self.inventory:
+            payload["inventory"] = self.inventory
+        else:
+            logger.info("No inventory specified, Ansible Tower will use a default.")
         logger.debug(
-            f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}"
+            f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n"
+            f"{payload=}"
         )
-        job = target.launch(
-            payload={"extra_vars": str(kwargs), "inventory": self.inventory}
-        )
+        job = target.launch(payload=payload)
         job_number = job.url.rstrip("/").split("/")[-1]
         job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         logger.info(
