@@ -231,7 +231,8 @@ class AnsibleTower(Provider):
         if expire_time:
             host_info["expire_time"] = expire_time
         if "last_job" in host.related:
-            job_vars = json.loads(host.get_related("last_job").extra_vars)
+            last_job = host.get_related("last_job")
+            job_vars = json.loads(last_job.extra_vars)
             host_info["_broker_args"].update(
                 {
                     arg: val
@@ -239,6 +240,7 @@ class AnsibleTower(Provider):
                     if val and isinstance(val, str)
                 }
             )
+            host_info["_broker_args"]["tower_inventory"] = last_job.inventory
             try:
                 host_info["_broker_args"]["workflow"] = host.get_related(
                     "last_job"
@@ -253,6 +255,9 @@ class AnsibleTower(Provider):
     def inventory(self):
         if not self._inventory:
             return
+        elif isinstance(self._inventory, int):
+            # inventory already resolved as id
+            return self._inventory
         if (inventory_info := self.v2.inventory.get(search=self._inventory)) :
             if inventory_info.count > 1:
                 raise exceptions.ProviderError(
@@ -341,7 +346,7 @@ class AnsibleTower(Provider):
                 provider="AnsibleTower",
                 message=f"{subject.capitalize()} not found by name: {name}",
             )
-        payload={"extra_vars": str(kwargs)}
+        payload = {"extra_vars": str(kwargs)}
         if self.inventory:
             payload["inventory"] = self.inventory
         else:
