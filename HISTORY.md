@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.14 (2021-04-15)
+------------------
+
++ Allow VMBroker to checkin hosts not in its inventory
++ Add tower_inventory field when gathering host info
+
 0.1.13 (2021-04-14)
 ------------------
 

@@ -186,7 +186,8 @@ class VMBroker:
             logger.info(f"Checking in {host.hostname or host.name}")
             host.close()
             host.release()
-            self._hosts.remove(host)
+            if host in self._hosts:
+                self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)
 
     def extend(self, host=None):
