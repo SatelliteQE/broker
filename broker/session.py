@@ -57,10 +57,11 @@ class Session:
             stderr=channel.read_stderr(),
         )
 
-    def run(self, command):
+    def run(self, command, timeout=0):
         """run a command on the host and return the results"""
+        self.session.set_timeout(timeout)
         channel = self.session.open_session()
-        channel.execute(command)
+        channel.execute(command, )
         results = self._read(channel)
         channel.close()
         return results
