@@ -1,6 +1,13 @@
 History
 =======
 
+0.1.15 (2021-04-23)
+------------------
+
++ Added some enhahncements to the default Host class
++ It is now possible to define setup and teardown behavior
++ HostErrors now how their own exception class
+
 0.1.14 (2021-04-15)
 ------------------
 

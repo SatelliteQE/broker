@@ -14,7 +14,7 @@ PROVIDER_ACTIONS = {
     "job_template": (AnsibleTower, "execute"),
     "template": (AnsibleTower, None),  # needed for list-templates
     "test_action": (TestProvider, "test_action"),
-    "inventory": (AnsibleTower, None)
+    "inventory": (AnsibleTower, None),
 }
 
 
@@ -284,10 +284,21 @@ class VMBroker:
             hosts = self.checkout(connect=True)
             if not hosts:
                 raise Exception("No hosts created during checkout")
+            [host.setup() for host in hosts]
             return hosts
         except Exception as err:
             self.checkin()
             raise err
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
+        last_exception = None
+        for host in self._hosts:
+            try:
+                host.teardown()
+            except Exception as err:
+                last_exception = exceptions.HostError(
+                    host, f"error during teardown:\n{err}"
+                )
         self.checkin()
+        if last_exception:
+            raise last_exception

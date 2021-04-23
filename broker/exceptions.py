@@ -34,3 +34,11 @@ class ConfigurationError(BrokerError):
 
 class NotImplementedError(BrokerError):
     error_code = 9
+
+
+class HostError(BrokerError):
+    error_code = 10
+
+    def __init__(self, host, message):
+        self.message = f"{host.hostname or host.name}: {message}"
+        super().__init__(message=self.message)
