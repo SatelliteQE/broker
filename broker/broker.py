@@ -136,18 +136,13 @@ class VMBroker:
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
         return hosts
 
-    def checkout(self, connect=False):
+    def checkout(self):
         """checkout one or more VMs
-
-        :param connect: Boolean whether to establish host ssh connection
 
         :return: Host obj or list of Host objects
         """
         hosts = self._checkout()
         helpers.emit(hosts=[host.to_dict() for host in hosts])
-        if connect:
-            for host in hosts:
-                host.connect()
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
         return hosts if not len(hosts) == 1 else hosts[0]
@@ -252,7 +247,7 @@ class VMBroker:
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
-    def reconstruct_host(self, host_export_data, connect=False):
+    def reconstruct_host(self, host_export_data):
         """reconstruct a host from export data"""
         logger.debug(f"reconstructing host with export: {host_export_data}")
         provider = PROVIDERS.get(host_export_data.get("_broker_provider"))
@@ -265,23 +260,19 @@ class VMBroker:
         host = provider_inst.construct_host(
             provider_params=None, host_classes=self.host_classes, **host_export_data
         )
-        if connect:
-            host.connect()
         return host
 
-    def from_inventory(self, connect=False, filter=None):
+    def from_inventory(self, filter=None):
         """Reconstruct one or more hosts from the local inventory
-
-        :param connect: Boolean - establish ssh connection
 
         :param filter: A broker-spec filter string
         """
         inv_hosts = helpers.load_inventory(filter=filter)
-        return [self.reconstruct_host(inv_host, connect) for inv_host in inv_hosts]
+        return [self.reconstruct_host(inv_host) for inv_host in inv_hosts]
 
     def __enter__(self):
         try:
-            hosts = self.checkout(connect=True)
+            hosts = self.checkout()
             if not hosts:
                 raise Exception("No hosts created during checkout")
             if isinstance(hosts, list):

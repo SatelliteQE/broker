@@ -105,7 +105,6 @@ class Session:
                 for size, data in download:
                     upload.write(data)
 
-
     def scp_write(self, source, destination=None):
         """scp write a local file to a remote destination"""
         if not destination:
