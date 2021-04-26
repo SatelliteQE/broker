@@ -17,32 +17,38 @@ class Host:
             self.hostname = hostname
             self.name = name
         self.username = kwargs.get("username", settings.HOST_USERNAME)
-        self.password = kwargs.get("pwassword", settings.HOST_PASSWORD)
-        self.session = None
+        self.password = kwargs.get("password", settings.HOST_PASSWORD)
+        self._session = None
+
+    def __del__(self):
+        """Try to close the connection on garbage collection of the host instance"""
+        self.close()
+        # object.__del__ DNE, so I don't have to call it here.
+        # If host inherits from a different class with __del__, it should get called through super
+
+    @property
+    def session(self):
+        if not isinstance(self._session, session.Session):
+            self.connect()
+        return self._session
 
     def __getstate__(self):
         """If a session is active, remove it for pickle compatability"""
-        if self.session:
-            self.__connected = True
-            self.session = None
+        self.close()
         return self.__dict__
-
-    def __setstate__(self, pickle_dict):
-        """If a session was active pre-pickle, reconnect post-pickle"""
-        self.__dict__ = pickle_dict
-        if self.__dict__.pop('__connected', False):
-            self.connect()
 
     def connect(self, username=None, password=None):
         username = username or self.username
         password = password or self.password
-        self.session = session.Session(
+        self.close()
+        self._session = session.Session(
             hostname=self.hostname, username=username, password=password
         )
 
     def close(self):
-        if isinstance(self.session, session.Session):
-            self.session.session.disconnect()
+        if isinstance(self._session, session.Session):
+            self._session.session.disconnect()
+            self._session = None
 
     def release(self):
         raise NotImplementedError("release has not been implemented for this provider")
