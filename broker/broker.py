@@ -119,7 +119,10 @@ class VMBroker:
         for action in self._provider_actions.keys():
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
-            host = self._act(provider, method, checkout=True)
+            try:
+                host = self._act(provider, method, checkout=True)
+            except exceptions.ProviderError:
+                host = None
             logger.debug(f"host={host}")
             if host:
                 hosts.append(host)

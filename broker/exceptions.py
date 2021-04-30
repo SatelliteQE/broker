@@ -23,7 +23,7 @@ class PermissionError(BrokerError):
 class ProviderError(BrokerError):
     error_code = 7
 
-    def __init__(self, provider, message):
+    def __init__(self, provider=None, message="Unspecified exception"):
         self.message = f"{provider} encountered the following error: {message}"
         super().__init__(message=self.message)
 
@@ -39,6 +39,7 @@ class NotImplementedError(BrokerError):
 class HostError(BrokerError):
     error_code = 10
 
-    def __init__(self, host, message):
-        self.message = f"{host.hostname or host.name}: {message}"
+    def __init__(self, host=None, message="Unspecified exception"):
+        if host:
+            self.message = f"{host.hostname or host.name}: {message}"
         super().__init__(message=self.message)
