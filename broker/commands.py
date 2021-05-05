@@ -230,7 +230,8 @@ def inventory(details, sync, filter):
 @click.option(
     "--filter", type=str, help="Extend only what matches the specified filter"
 )
-def extend(vm, background, all_, filter):
+@provider_options
+def extend(vm, background, all_, filter, **kwargs):
     """Extend a host's lease time
 
     COMMAND: broker extend <vm hostname>|<vm name>|<local id>
@@ -243,6 +244,7 @@ def extend(vm, background, all_, filter):
 
     :param filter: a filter string matching broker's specification
     """
+    broker_args = helpers.clean_dict(kwargs)
     if background:
         helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
@@ -250,7 +252,7 @@ def extend(vm, background, all_, filter):
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             to_extend.append(VMBroker().reconstruct_host(host))
-    broker_inst = VMBroker(hosts=to_extend)
+    broker_inst = VMBroker(hosts=to_extend, **broker_args)
     broker_inst.extend()
 
 
