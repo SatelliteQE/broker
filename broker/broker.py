@@ -287,7 +287,10 @@ class VMBroker:
             hosts = self.checkout(connect=True)
             if not hosts:
                 raise Exception("No hosts created during checkout")
-            [host.setup() for host in hosts]
+            if isinstance(hosts, list):
+                [host.setup() for host in hosts]
+            else:
+                hosts.setup()
             return hosts
         except Exception as err:
             self.checkin()

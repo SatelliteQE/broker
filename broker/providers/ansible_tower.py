@@ -27,6 +27,7 @@ class AnsibleTower(Provider):
     _validators = [
         Validator("ANSIBLETOWER.release_workflow", default="remove-vm"),
         Validator("ANSIBLETOWER.extend_workflow", default="extend-vm"),
+        Validator("ANSIBLETOWER.new_expire_time", default="+172800"),
         Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
         Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
         Validator("ANSIBLETOWER.base_url", must_exist=True),
@@ -60,6 +61,13 @@ class AnsibleTower(Provider):
         click.option("--workflow", type=str, help="Name of a workflow to execute"),
         click.option(
             "--job-template", type=str, help="Name of a job template to execute"
+        ),
+    ]
+    _extend_options = [
+        click.option(
+            "--new-expire-time",
+            type=str,
+            help="Time host should expire or time added to host reservation.",
         ),
     ]
 
@@ -392,7 +400,7 @@ class AnsibleTower(Provider):
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
 
-    def extend_vm(self, target_vm):
+    def extend_vm(self, target_vm, new_expire_time=None):
         """Run the extend workflow with defaults args
 
         :param target_vm: This should be a host object
@@ -403,7 +411,10 @@ class AnsibleTower(Provider):
                 self._inventory = new_inv
                 del self.inventory  # clear the cached value
         return self.execute(
-            workflow=settings.ANSIBLETOWER.extend_workflow, target_vm=target_vm.name
+            workflow=settings.ANSIBLETOWER.extend_workflow,
+            target_vm=target_vm.name,
+            new_expire_time=new_expire_time
+            or settings.ANSIBLETOWER.get("new_expire_time"),
         )
 
     def nick_help(self, **kwargs):

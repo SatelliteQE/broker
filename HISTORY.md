@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.16 (2021-05-05)
+------------------
+
++ AnsibleTower users can now specify a new expire vm time
++ minor fix to VMBroker context manager
+
 0.1.15 (2021-04-23)
 ------------------
 

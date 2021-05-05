@@ -24,6 +24,7 @@ AnsibleTower:
             inventory: "inventory name"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
+    new_expire_time: "+172800"
     workflow_timeout: 3600
     results_limit: 50
 TestProvider:
