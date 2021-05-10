@@ -88,12 +88,24 @@ class Session:
                 for data in local:
                     remote.write(data)
 
+    def remote_copy(self, source, dest_host):
+        """Copy a file from this host to another"""
+        sftp_down = self.session.sftp_init()
+        sftp_up = dest_host.session.session.sftp_init()
+        with sftp_down.open(
+            source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
+        ) as download:
+            with sftp_up.open(source, FILE_FLAGS, SFTP_MODE) as upload:
+                for size, data in download:
+                    upload.write(data)
+
+
     def scp_write(self, source, destination=None):
         """scp write a local file to a remote destination"""
         if not destination:
             destination = source
-        fileinfo = os.stat(args.source)
-        chan = s.scp_send64(
+        fileinfo = os.stat(source)
+        chan = self.session.scp_send64(
             destination,
             fileinfo.st_mode & 0o777,
             fileinfo.st_size,

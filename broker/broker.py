@@ -235,25 +235,9 @@ class VMBroker:
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
             host["hostname"] or host["name"] for host in helpers.load_inventory()
+            if host["_broker_provider"] == provider
         ]
-        new_hosts = []
-        remove_hosts = curr_inventory[:]
-        for n_host in prov_inventory:
-            name = n_host["hostname"] or n_host["name"]
-            if name in curr_inventory:
-                remove_hosts.remove(name)
-            else:
-                new_hosts.append(n_host)
-        if new_hosts:
-            msg = ", ".join([host["hostname"] or host["name"] for host in new_hosts])
-            logger.info(f"Adding new hosts: {msg}")
-            helpers.update_inventory(add=new_hosts)
-        else:
-            logger.info("No new hosts found")
-        if remove_hosts:
-            msg = ", ".join(remove_hosts)
-            logger.info(f"Removing old hosts: {msg}")
-            helpers.update_inventory(remove=remove_hosts)
+        helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
     def reconstruct_host(self, host_export_data, connect=False):
         """reconstruct a host from export data"""
