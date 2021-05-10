@@ -238,25 +238,33 @@ class AnsibleTower(Provider):
         expire_time = self._get_expire_date(host.id)
         if expire_time:
             host_info["expire_time"] = expire_time
-        if "last_job" in host.related:
-            last_job = host.get_related("last_job")
-            job_vars = json.loads(last_job.extra_vars)
-            host_info["_broker_args"].update(
-                {
-                    arg: val
-                    for arg, val in job_vars.items()
-                    if val and isinstance(val, str)
-                }
-            )
-            host_info["_broker_args"]["tower_inventory"] = last_job.inventory
-            try:
-                host_info["_broker_args"]["workflow"] = host.get_related(
-                    "last_job"
-                ).summary_fields.source_workflow_job.name
-            except:
-                logger.warning(
-                    f"Unable to determine workflow for {host_info['hostname']}"
-                )
+        try:
+            create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
+            create_job = create_job.results[0].get_related("source_workflow_job")
+            host_info["_broker_args"]["workflow"] = create_job.name
+        except IndexError:
+            if "last_job" in host.related:
+                # potentially not create job, but easier processing below
+                create_job = host.get_related("last_job")
+                try:
+                    host_info["_broker_args"]["workflow"] = host.get_related(
+                        "last_job"
+                    ).summary_fields.source_workflow_job.name
+                except:
+                    logger.warning(
+                        f"Unable to determine workflow for {host_info['hostname']}"
+                    )
+            else:
+                return host_info
+        create_vars = json.loads(create_job.extra_vars)
+        host_info["_broker_args"].update(
+            {
+                arg: val
+                for arg, val in create_vars.items()
+                if val and isinstance(val, str)
+            }
+        )
+        host_info["_broker_args"]["tower_inventory"] = create_job.inventory
         return host_info
 
     @cached_property

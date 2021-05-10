@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.17 (2021-05-10)
+------------------
+
++ Added remote_copy to the Host's session object
++ Enhanced sync behavior for VMBroker and AnsibleTower
+
 0.1.16 (2021-05-05)
 ------------------
 
