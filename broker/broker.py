@@ -116,6 +116,8 @@ class VMBroker:
         :return: List of Host objects
         """
         hosts = []
+        if not self._provider_actions:
+            raise self.BrokerError("Could not determine an appropriate provider")
         for action in self._provider_actions.keys():
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
@@ -156,6 +158,8 @@ class VMBroker:
         self._kwargs.update(kwargs)
         for action, arg in self._provider_actions.items():
             provider, method = PROVIDER_ACTIONS[action]
+        if not self._provider_actions:
+            raise self.BrokerError("Could not determine an appropriate provider")
         logger.info(f"Using provider {provider.__name__} for execution")
         return self._act(provider, method)
 
