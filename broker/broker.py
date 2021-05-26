@@ -156,10 +156,10 @@ class VMBroker:
                 if key in kwargs:
                     self._provider_actions[key] = action
         self._kwargs.update(kwargs)
-        for action, arg in self._provider_actions.items():
-            provider, method = PROVIDER_ACTIONS[action]
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
+        for action, arg in self._provider_actions.items():
+            provider, method = PROVIDER_ACTIONS[action]
         logger.info(f"Using provider {provider.__name__} for execution")
         return self._act(provider, method)
 
