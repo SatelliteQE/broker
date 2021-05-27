@@ -100,6 +100,11 @@ class VMBroker:
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
         provider_inst = provider(**self._kwargs)
+        helpers.emit({
+            "provider": provider_inst.__class__.__name__,
+            "action": method,
+            "arguments": self._kwargs
+        })
         result = getattr(provider_inst, method)(**self._kwargs)
         logger.debug(result)
         if result and checkout:
@@ -139,6 +144,7 @@ class VMBroker:
         :return: Host obj or list of Host objects
         """
         hosts = self._checkout()
+        helpers.emit(hosts=[host.to_dict() for host in hosts])
         if connect:
             for host in hosts:
                 host.connect()
@@ -192,7 +198,10 @@ class VMBroker:
         elif host:
             logger.info(f"Checking in {host.hostname or host.name}")
             host.close()
-            host.release()
+            try:
+                host.release()
+            except:
+                pass
             if host in self._hosts:
                 self._hosts.remove(host)
             helpers.update_inventory(remove=host.hostname)

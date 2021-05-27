@@ -135,6 +135,14 @@ broker execute -o raw --workflow my-awesome-workflow --additional-arg True
 broker execute -o raw --workflow my-awesome-workflow --additional-arg True --artifacts last
 ```
 
+**machine processable output**
+
+If running in a CI or other automated environment, Broker offers the choice to store important output information in an output file. This is json-formatted data. Please be aware that any existing file with the matching path and name will be erased.
+```
+broker --output-file output.json checkout --nick rhel7
+broker --output-file inventory.json inventory
+```
+
 **Run Broker in the background**
 
 Certain Broker actions can be run in the background, these currently are: checkout, checkin, duplicate, and execute. When running a command in this mode, it will spin up a new Broker process and no longer log to stderr. To check progress, you can still follow broker's log file.

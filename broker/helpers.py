@@ -249,6 +249,50 @@ def yaml_format(in_struct):
     return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
 
 
+class Emitter:
+    """This class provides a simple interface to emit messages to a
+    json-formatted file. This file also has an instance of this class
+    called "emit" that should be used instead of this class directly.
+
+    Usage examples:
+        helpers.emit(key=value, another=5)
+        helpers.emit({"key": "value", "another": 5})
+    """
+    def __init__(self, emit_file=None):
+        """Can empty init and set the file later"""
+        self.file = None
+        if emit_file:
+            self.file = self.set_file(emit_file)
+
+    def set_file(self, file_path):
+        if file_path:
+            self.file = Path(file_path)
+            self.file.parent.mkdir(exist_ok=True, parents=True)
+            if self.file.exists():
+                self.file.unlink()
+            self.file.touch()
+
+    def emit_to_file(self, *args, **kwargs):
+        if not self.file:
+            return
+        for arg in args:
+            if not isinstance(arg, dict):
+                raise exceptions.BrokerError(f"Received an invalid data emission {arg}")
+            kwargs.update(arg)
+        for key in kwargs.keys():
+            if getattr(kwargs[key], "json", None):
+                kwargs[key] = kwargs[key].json
+        curr_data = json.loads(self.file.read_text() or "{}")
+        curr_data.update(kwargs)
+        self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
+
+    def __call__(self, *args, **kwargs):
+        return self.emit_to_file(*args, **kwargs)
+
+
+emit = Emitter()
+
+
 class MockStub(UserDict):
     """Test helper class. Allows for both arbitrary mocking and stubbing"""
 
@@ -293,6 +337,11 @@ def update_log_level(ctx, param, value):
         b_log.setup_logzero(level=value, silent=silent)
         if not silent:
             print(f"Log level changed to [{value}]")
+
+
+def set_emit_file(ctx, param, value):
+    global emit
+    emit.set_file(value)
 
 
 def fork_broker():

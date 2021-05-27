@@ -1,5 +1,6 @@
 import os
 import socket
+from pathlib import Path
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
 
@@ -70,11 +71,16 @@ class Session:
         """read a remote file into a local destination"""
         if not destination:
             destination = source
+        # create the destination path if it doesn't exist
+        destination = Path(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.touch()
+        # initiate the sftp session, read data, write it to a local destination
         sftp = self.session.sftp_init()
         with sftp.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
         ) as remote:
-            with open(destination, "wb") as local:
+            with destination.open("wb") as local:
                 for size, data in remote:
                     local.write(data)
 

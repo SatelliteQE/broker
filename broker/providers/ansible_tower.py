@@ -30,6 +30,7 @@ class AnsibleTower(Provider):
         Validator("ANSIBLETOWER.new_expire_time", default="+172800"),
         Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
         Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
+        Validator("ANSIBLETOWER.error_scope", default="last"),
         Validator("ANSIBLETOWER.base_url", must_exist=True),
         # Validator combination for username+password or token
         (
@@ -97,6 +98,7 @@ class AnsibleTower(Provider):
         # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
         # unit test mock structure means the root API instance can't be loaded on the same line
         if self.token:
+            helpers.emit(auth_type="token")
             logger.info("Using token authentication")
             config.token = self.token
             try:
@@ -119,6 +121,7 @@ class AnsibleTower(Provider):
                     message="Failed to lookup a username for the given token, please check credentials",
                 )
         else:  # dynaconf validators should have checked that either token or password was provided
+            helpers.emit(auth_type="password")
             logger.info("Using username and password authentication")
             config.credentials = {
                 "default": {"username": self.uname, "password": self.pword}
@@ -214,6 +217,44 @@ class AnsibleTower(Provider):
                             f"Unable to pull information from child job with id {child_id}."
                         )
         return artifacts
+
+    def _get_failure_messages(self, workflow):
+        """Find all failure nodes and aggregate failure messages"""
+        failure_messages = []
+        # get all failed job nodes (iterate)
+        if "workflow_nodes" in workflow.related:
+            children = workflow.get_related("workflow_nodes").results
+            # filter out children with no associated job
+            children = list(
+                filter(
+                    lambda child: getattr(child.summary_fields, "job", None), children
+                )
+            )
+            # filter out children that didn't fail
+            children = list(
+                filter(
+                    lambda child: child.summary_fields.job.failed, children
+                )
+            )
+            children.sort(key=lambda child: child.summary_fields.job.id)
+            for child in children[::-1]:
+                if child.type == "workflow_job_node":
+                    logger.debug(child)
+                    child_id = child.summary_fields.job.id
+                    child_obj = self.v2.jobs.get(id=child_id).results
+                    if child_obj:
+                        child_obj = child_obj.pop()
+                        # get all failed job_events for each job (filter failed=true)
+                        failed_events = [ev for ev in child_obj.get_related("job_events", page_size=200).results if ev.failed]
+                        # find the one(s) with event_data['res']['msg']
+                        failure_messages.extend([
+                            {"job": child_obj.name, "task": ev.event_data["play"], "reason": ev.event_data["res"]["msg"]}
+                            for ev in failed_events if ev.event_data.get("res")
+                        ])
+        if settings.ANSIBLETOWER.error_scope == "last":
+            return failure_messages[0]
+        else:
+            return failure_messages
 
     def _get_expire_date(self, host_id):
         try:
@@ -373,21 +414,25 @@ class AnsibleTower(Provider):
         )
         job = target.launch(payload=payload)
         job_number = job.url.rstrip("/").split("/")[-1]
+        job_api_url = url_parser.urljoin(self.url, str(job.url))
         job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
+        helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info(
             "Waiting for job: \n"
-            f"API: {url_parser.urljoin(self.url, str(job.url))}\n"
+            f"API: {job_api_url}\n"
             f"UI: {job_ui_url}"
         )
         job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
         if not job.status == "successful":
+            message_data = {
+                f"{subject.capitalize()} Status": job.status,
+                "Reason(s)": self._get_failure_messages(job),
+                "URL": job_ui_url
+            }
+            helpers.emit(message_data)
             raise exceptions.ProviderError(
                 provider="AnsibleTower",
-                message=(
-                    f"{subject.capitalize()} Status: {job.status}\n"
-                    f"Explanation: {job.job_explanation}\n"
-                    f"UI: {job_ui_url}"
-                ),
+                message=message_data["Reason(s)"]
             )
         if (artifacts := kwargs.get("artifacts")) :
             del kwargs["artifacts"]
