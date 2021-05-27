@@ -1,6 +1,14 @@
 History
 =======
 
+0.1.18 (2021-05-27)
+------------------
+
++ Added the ability to store important output from cli
++ Added Emitter class and emit instance to helpers
++ Added a way to gain failure information for AnsibleTower
++ Misc fixes and tweaks
+
 0.1.17 (2021-05-10)
 ------------------
 

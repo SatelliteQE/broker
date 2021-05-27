@@ -1,3 +1,4 @@
+import json
 from broker import helpers
 
 BROKER_ARGS_DATA = {
@@ -35,3 +36,16 @@ def test_resolve_file_args():
     assert new_args["my_second_arg"] == "foo"
     assert new_args["complex_args"] == BROKER_ARGS_DATA["myarg"]
     assert new_args["test_arg"] == "test_val"
+
+
+def test_emitter(tmp_path):
+    out_file = tmp_path / "output.json"
+    assert not out_file.exists()
+    helpers.emit.set_file(out_file)
+    assert out_file.exists()
+    helpers.emit(test="value", another=5)
+    written = json.loads(out_file.read_text())
+    assert written == {"test": "value", "another": 5}
+    helpers.emit({"thing": 13})
+    written = json.loads(out_file.read_text())
+    assert written == {"test": "value", "another": 5, "thing": 13}

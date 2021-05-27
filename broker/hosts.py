@@ -20,6 +20,19 @@ class Host:
         self.password = kwargs.get("pwassword", settings.HOST_PASSWORD)
         self.session = None
 
+    def __getstate__(self):
+        """If a session is active, remove it for pickle compatability"""
+        if self.session:
+            self.__connected = True
+            self.session = None
+        return self.__dict__
+
+    def __setstate__(self, pickle_dict):
+        """If a session was active pre-pickle, reconnect post-pickle"""
+        self.__dict__ = pickle_dict
+        if self.__dict__.pop('__connected', False):
+            self.connect()
+
     def connect(self, username=None, password=None):
         username = username or self.username
         password = password or self.password

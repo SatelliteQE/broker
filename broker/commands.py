@@ -19,7 +19,9 @@ class ExceptionHandler(click.Group):
         except Exception as err:
             if not isinstance(err, exceptions.BrokerError):
                 err = exceptions.BrokerError(err)
+            helpers.emit(return_code=err.error_code, error_message=str(err.message))
             sys.exit(err.error_code)
+        helpers.emit(return_code=0)
 
 
 def provider_options(command):
@@ -88,6 +90,14 @@ def populate_providers(click_group):
     callback=helpers.update_log_level,
     is_eager=True,
     expose_value=False,
+)
+@click.option(
+    "--output-file",
+    type=click.Path(dir_okay=False),
+    callback=helpers.set_emit_file,
+    is_eager=True,
+    expose_value=False,
+    help="Path to file where emitted json values should be stored"
 )
 @click.option(
     "--version",
@@ -214,14 +224,16 @@ def inventory(details, sync, filter):
         VMBroker.sync_inventory(provider=sync)
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory(filter=filter)
+    emit_data = []
     for num, host in enumerate(inventory):
+        emit_data.append(host)
         if details:
             logger.info(
                 f"{num}: {host['hostname'] or host['name']}, Details: {helpers.yaml_format(host)}"
             )
         else:
             logger.info(f"{num}: {host['hostname'] or host['name']}")
-
+    helpers.emit({"inventory": emit_data})
 
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)
@@ -357,6 +369,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
         helpers.fork_broker()
     broker_inst = VMBroker(**broker_args)
     result = broker_inst.execute()
+    helpers.emit({"output": result})
     if output_format == "raw":
         print(result)
     elif output_format == "log":
