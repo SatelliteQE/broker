@@ -1,9 +1,7 @@
 import os
-import sys
 from pathlib import Path
 from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
-from logzero import logger
 from broker.exceptions import ConfigurationError
 
 settings_file = "broker_settings.yaml"

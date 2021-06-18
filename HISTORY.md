@@ -1,6 +1,13 @@
 History
 =======
 
+0.1.19 (2021-06-18)
+------------------
+
++ Host session objects are now a property
++ AnsibleTower will only display workflow and job templates
+  a user had permission to start
+
 0.1.18 (2021-05-27)
 ------------------
 
