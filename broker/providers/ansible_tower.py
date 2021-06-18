@@ -482,6 +482,7 @@ class AnsibleTower(Provider):
             workflows = [
                 workflow.name
                 for workflow in self.v2.workflow_job_templates.get().results
+                if workflow.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :
                 workflows = results_filter(workflows, res_filter)
@@ -509,6 +510,7 @@ class AnsibleTower(Provider):
             job_templates = [
                 job_template.name
                 for job_template in self.v2.job_templates.get().results
+                if job_template.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :
                 job_templates = results_filter(job_templates, res_filter)
