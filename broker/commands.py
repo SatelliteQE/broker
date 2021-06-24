@@ -181,10 +181,11 @@ populate_providers(providers)
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
+@click.option("--sequential", is_flag=True, default=False, help="Run checkins sequentially")
 @click.option(
     "--filter", type=str, help="Checkin only what matches the specified filter"
 )
-def checkin(vm, background, all_, filter):
+def checkin(vm, background, all_, sequential, filter):
     """Checkin or "remove" a VM or series of VM broker instances
 
     COMMAND: broker checkin <vm hostname>|<local id>|all
@@ -192,6 +193,10 @@ def checkin(vm, background, all_, filter):
     :param vm: Hostname or local id of host
 
     :param background: run a new broker subprocess to carry out command
+
+    :param all_: Flag for whether to checkin everything
+
+    :param sequential: Flag for whether to run checkins sequentially
 
     :param filter: a filter string matching broker's specification
     """
@@ -203,7 +208,7 @@ def checkin(vm, background, all_, filter):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             to_remove.append(VMBroker().reconstruct_host(host))
     broker_inst = VMBroker(hosts=to_remove)
-    broker_inst.checkin()
+    broker_inst.checkin(sequential=sequential)
 
 
 @cli.command()
