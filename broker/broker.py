@@ -171,7 +171,19 @@ class VMBroker:
             logger.info(f"Querying provider {provider.__name__}")
             self._act(provider, "nick_help", checkout=False)
 
-    def checkin(self, host=None):
+    def _checkin(self, host):
+        logger.info(f"Checking in {host.hostname or host.name}")
+        host.close()
+        try:
+            host.release()
+        except Exception:
+            pass
+        if host in self._hosts:
+            self._hosts.remove(host)
+        helpers.update_inventory(remove=host.hostname)
+        return host
+
+    def checkin(self, sequential=False, host=None):
         """checkin one or more VMs
 
         :param host: can be one of:
@@ -179,27 +191,28 @@ class VMBroker:
             A single host object
             A list of host objects
             A dictionary mapping host types to one or more host objects
+
+        :param sequential: boolean whether to run checkins sequentially
         """
-        if host is None:
-            host = self._hosts
-        logger.debug(host)
-        if isinstance(host, dict):
-            for _host in host.values():
-                self.checkin(_host)
-        elif isinstance(host, list):
-            # reversing over a copy of the list to avoid skipping
-            for _host in host[::-1]:
-                self.checkin(_host)
-        elif host:
-            logger.info(f"Checking in {host.hostname or host.name}")
-            host.close()
-            try:
-                host.release()
-            except:
-                pass
-            if host in self._hosts:
-                self._hosts.remove(host)
-            helpers.update_inventory(remove=host.hostname)
+        # default to hosts listed on the instance
+        hosts = host or self._hosts
+        logger.debug(f'Checkin called with: {hosts}, '
+                     f'running {"sequential" if sequential else "concurrent"}')
+        # normalize the type since the function accepts multiple types
+        if isinstance(hosts, dict):
+            # flatten the lists of hosts from the values of the dict
+            hosts = [host for host_list in hosts.values() for host in host_list]
+        if not isinstance(hosts, list):
+            hosts = [hosts]
+        with ProcessPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
+            completed_checkins = as_completed(
+                # reversing over a copy of the list to avoid skipping
+                workers.submit(self._checkin, _host)
+                for _host in hosts[::-1]
+            )
+            for completed in completed_checkins:
+                _host = completed.result()
+                logger.debug(f'Completed checkin process for {_host.hostname or _host.name}')
 
     def extend(self, host=None):
         """extend one or more VMs
