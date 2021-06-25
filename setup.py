@@ -11,8 +11,11 @@ requirements = ["awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "ssh2
 
 test_requirements = ['pytest']
 
+setup_requirements = ['setuptools', 'wheel']
+
 extras = {
     'test': test_requirements,
+    'setup': setup_requirements,
 }
 
 setup(
@@ -28,8 +31,9 @@ setup(
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
     include_package_data=True,
     install_requires=requirements,
-    test_requirements=test_requirements,
+    tests_require=test_requirements,
     extras_require=extras,
+    setup_requires=setup_requirements,
     license="GNU General Public License v3",
     zip_safe=False,
     keywords="broker",
