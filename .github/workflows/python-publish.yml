@@ -1,31 +1,37 @@
-# This workflows will upload a Python Package using Twine when a release is created
-# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
-
-name: Upload Python Package
+name: Build and Deploy to PyPi
 
 on:
-  release:
-    types: [created]
+  push:
+    branches: [master]
+    paths: ['HISTORY.md']
 
 jobs:
   publish:
-
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # build/push in lowest support python version
+        python-version: [ 3.8 ]
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
       with:
-        python-version: '3.x'
-    - name: Install dependencies
+        path: "broker"
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Setup and Build
       run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel twine
-    - name: Build and publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
+        pip install -U pip
+        pip install .[setup]
         python setup.py sdist bdist_wheel
-        twine upload dist/*
+        python -m twine check dist/*
+
+    - name: Build and publish
+      uses: pypa/gh-action-pypi-publish
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_TOKEN }}
+        skip_existing: true

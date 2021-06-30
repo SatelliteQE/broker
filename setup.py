@@ -11,9 +11,7 @@ requirements = [
     "awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "setuptools", "ssh2-python"]
 
 test_requirements = ['pytest']
-
-<<<<<<< HEAD
-setup_requirements = ['setuptools', 'wheel']
+setup_requirements = ['setuptools', 'wheel', 'twine']
 
 extras = {
     'test': test_requirements,
@@ -44,7 +42,6 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Natural Language :: English",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
