@@ -1,4 +1,5 @@
 # from functools import cached_property
+import pickle
 from logzero import logger
 from broker import session
 from broker.exceptions import NotImplementedError
@@ -28,14 +29,23 @@ class Host:
 
     @property
     def session(self):
-        if not isinstance(self._session, session.Session):
+        if not isinstance(getattr(self, "_session", None), session.Session):
             self.connect()
         return self._session
 
     def __getstate__(self):
         """If a session is active, remove it for pickle compatability"""
         self.close()
+        self._purify()
         return self.__dict__
+
+    def _purify(self):
+        """Strip all unpickleable attributes from a Host before pickling"""
+        for key, obj in self.__dict__.items():
+            try:
+                pickle.dumps(obj)
+            except pickle.PicklingError:
+                self.__dict__[key] = None
 
     def connect(self, username=None, password=None):
         username = username or self.username
@@ -46,7 +56,7 @@ class Host:
         )
 
     def close(self):
-        if isinstance(self._session, session.Session):
+        if isinstance(getattr(self, "_session", None), session.Session):
             self._session.session.disconnect()
             self._session = None
 
