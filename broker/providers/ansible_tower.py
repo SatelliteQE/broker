@@ -152,7 +152,7 @@ class AnsibleTower(Provider):
         broker_args = getattr(caller_host, "_broker_args", {}).get("_broker_args", {})
         # remove the workflow field since it will conflict with the release workflow
         broker_args.pop("workflow", None)
-        AnsibleTower(**broker_args).release(
+        caller_host._prov_inst.release(
             broker_args.get("source_vm", caller_host.name), broker_args
         )
 
@@ -160,7 +160,7 @@ class AnsibleTower(Provider):
         host_inst.__dict__.update(
             {
                 "release": self._host_release,
-                "_at_inst": self,
+                "_prov_inst": self,
                 "_broker_provider": "AnsibleTower",
                 "_broker_args": broker_args,
             }
@@ -232,9 +232,7 @@ class AnsibleTower(Provider):
             )
             # filter out children that didn't fail
             children = list(
-                filter(
-                    lambda child: child.summary_fields.job.failed, children
-                )
+                filter(lambda child: child.summary_fields.job.failed, children)
             )
             children.sort(key=lambda child: child.summary_fields.job.id)
             for child in children[::-1]:
@@ -245,12 +243,25 @@ class AnsibleTower(Provider):
                     if child_obj:
                         child_obj = child_obj.pop()
                         # get all failed job_events for each job (filter failed=true)
-                        failed_events = [ev for ev in child_obj.get_related("job_events", page_size=200).results if ev.failed]
+                        failed_events = [
+                            ev
+                            for ev in child_obj.get_related(
+                                "job_events", page_size=200
+                            ).results
+                            if ev.failed
+                        ]
                         # find the one(s) with event_data['res']['msg']
-                        failure_messages.extend([
-                            {"job": child_obj.name, "task": ev.event_data["play"], "reason": ev.event_data["res"]["msg"]}
-                            for ev in failed_events if ev.event_data.get("res")
-                        ])
+                        failure_messages.extend(
+                            [
+                                {
+                                    "job": child_obj.name,
+                                    "task": ev.event_data["play"],
+                                    "reason": ev.event_data["res"]["msg"],
+                                }
+                                for ev in failed_events
+                                if ev.event_data.get("res")
+                            ]
+                        )
         if settings.ANSIBLETOWER.error_scope == "last":
             return failure_messages[0]
         else:
@@ -280,7 +291,9 @@ class AnsibleTower(Provider):
         if expire_time:
             host_info["expire_time"] = expire_time
         try:
-            create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
+            create_job = self.v2.jobs.get(
+                id=host.get_related("job_events").results[0].job
+            )
             create_job = create_job.results[0].get_related("source_workflow_job")
             host_info["_broker_args"]["workflow"] = create_job.name
         except IndexError:
@@ -417,22 +430,17 @@ class AnsibleTower(Provider):
         job_api_url = url_parser.urljoin(self.url, str(job.url))
         job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
-        logger.info(
-            "Waiting for job: \n"
-            f"API: {job_api_url}\n"
-            f"UI: {job_ui_url}"
-        )
+        logger.info("Waiting for job: \n" f"API: {job_api_url}\n" f"UI: {job_ui_url}")
         job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
         if not job.status == "successful":
             message_data = {
                 f"{subject.capitalize()} Status": job.status,
                 "Reason(s)": self._get_failure_messages(job),
-                "URL": job_ui_url
+                "URL": job_ui_url,
             }
             helpers.emit(message_data)
             raise exceptions.ProviderError(
-                provider="AnsibleTower",
-                message=message_data["Reason(s)"]
+                provider="AnsibleTower", message=message_data["Reason(s)"]
             )
         if (artifacts := kwargs.get("artifacts")) :
             del kwargs["artifacts"]
@@ -481,7 +489,9 @@ class AnsibleTower(Provider):
         elif kwargs.get("workflows"):
             workflows = [
                 workflow.name
-                for workflow in self.v2.workflow_job_templates.get().results
+                for workflow in self.v2.workflow_job_templates.get(
+                    page_size=1000
+                ).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :
@@ -509,7 +519,7 @@ class AnsibleTower(Provider):
         elif kwargs.get("job_templates"):
             job_templates = [
                 job_template.name
-                for job_template in self.v2.job_templates.get().results
+                for job_template in self.v2.job_templates.get(page_size=1000).results
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :

@@ -100,11 +100,13 @@ class VMBroker:
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
         provider_inst = provider(**self._kwargs)
-        helpers.emit({
-            "provider": provider_inst.__class__.__name__,
-            "action": method,
-            "arguments": self._kwargs
-        })
+        helpers.emit(
+            {
+                "provider": provider_inst.__class__.__name__,
+                "action": method,
+                "arguments": self._kwargs,
+            }
+        )
         result = getattr(provider_inst, method)(**self._kwargs)
         logger.debug(result)
         if result and checkout:
@@ -178,8 +180,6 @@ class VMBroker:
             host.release()
         except Exception:
             pass
-        if host in self._hosts:
-            self._hosts.remove(host)
         return host
 
     def checkin(self, sequential=False, host=None):
@@ -195,15 +195,19 @@ class VMBroker:
         """
         # default to hosts listed on the instance
         hosts = host or self._hosts
-        logger.debug(f'Checkin called with: {hosts}, '
-                     f'running {"sequential" if sequential else "concurrent"}')
+        logger.debug(
+            f"Checkin called with: {hosts}, "
+            f'running {"sequential" if sequential else "concurrent"}'
+        )
         # normalize the type since the function accepts multiple types
         if isinstance(hosts, dict):
             # flatten the lists of hosts from the values of the dict
             hosts = [host for host_list in hosts.values() for host in host_list]
         if not isinstance(hosts, list):
             hosts = [hosts]
-        with ProcessPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
+        with ProcessPoolExecutor(
+            max_workers=1 if sequential else len(hosts)
+        ) as workers:
             completed_checkins = as_completed(
                 # reversing over a copy of the list to avoid skipping
                 workers.submit(self._checkin, _host)
@@ -211,7 +215,12 @@ class VMBroker:
             )
             for completed in completed_checkins:
                 _host = completed.result()
-                logger.debug(f'Completed checkin process for {_host.hostname or _host.name}')
+                self._hosts = [
+                    h for h in self._hosts if not (h.to_dict() == _host.to_dict())
+                ]
+                logger.debug(
+                    f"Completed checkin process for {_host.hostname or _host.name}"
+                )
         helpers.update_inventory(remove=[h.hostname for h in hosts])
 
     def extend(self, host=None):
@@ -255,7 +264,8 @@ class VMBroker:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
-            host["hostname"] or host["name"] for host in helpers.load_inventory()
+            host["hostname"] or host["name"]
+            for host in helpers.load_inventory()
             if host["_broker_provider"] == provider
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)

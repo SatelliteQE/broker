@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.21 (2021-07-01)
+------------------
+
++ Improved concurrent checkin resilience
++ Increased AnsibleTower page size for workflows and job templates
+
 0.1.20 (2021-06-25)
 ------------------
 
