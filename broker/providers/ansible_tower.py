@@ -481,7 +481,7 @@ class AnsibleTower(Provider):
         elif kwargs.get("workflows"):
             workflows = [
                 workflow.name
-                for workflow in self.v2.workflow_job_templates.get().results
+                for workflow in self.v2.workflow_job_templates.get(page_size=1000).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :
@@ -509,7 +509,7 @@ class AnsibleTower(Provider):
         elif kwargs.get("job_templates"):
             job_templates = [
                 job_template.name
-                for job_template in self.v2.job_templates.get().results
+                for job_template in self.v2.job_templates.get(page_size=1000).results
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
             if (res_filter := kwargs.get("results_filter")) :

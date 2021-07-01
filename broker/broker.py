@@ -1,3 +1,4 @@
+from pickle import PicklingError
 from logzero import logger
 from broker.providers.ansible_tower import AnsibleTower
 from broker.providers.test_provider import TestProvider
@@ -204,15 +205,23 @@ class VMBroker:
             hosts = [host for host_list in hosts.values() for host in host_list]
         if not isinstance(hosts, list):
             hosts = [hosts]
-        with ProcessPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
-            completed_checkins = as_completed(
-                # reversing over a copy of the list to avoid skipping
-                workers.submit(self._checkin, _host)
-                for _host in hosts[::-1]
+        try:
+            with ProcessPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
+                completed_checkins = as_completed(
+                    # reversing over a copy of the list to avoid skipping
+                    workers.submit(self._checkin, _host)
+                    for _host in hosts[::-1]
+                )
+                for completed in completed_checkins:
+                    _host = completed.result()
+                    logger.debug(f'Completed checkin process for {_host.hostname or _host.name}')
+        except PicklingError as err:
+            logger.error(
+                f"Encountered pickling error while attempting multiprocess checkin:\n{err}\n"
+                "Attempting to checkin sequentially"
             )
-            for completed in completed_checkins:
-                _host = completed.result()
-                logger.debug(f'Completed checkin process for {_host.hostname or _host.name}')
+            for host in hosts:
+                self._checkin(host)
 
     def extend(self, host=None):
         """extend one or more VMs
