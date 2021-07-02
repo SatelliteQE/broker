@@ -180,7 +180,6 @@ class VMBroker:
             pass
         if host in self._hosts:
             self._hosts.remove(host)
-        helpers.update_inventory(remove=host.hostname)
         return host
 
     def checkin(self, sequential=False, host=None):
@@ -213,6 +212,7 @@ class VMBroker:
             for completed in completed_checkins:
                 _host = completed.result()
                 logger.debug(f'Completed checkin process for {_host.hostname or _host.name}')
+        helpers.update_inventory(remove=[h.hostname for h in hosts])
 
     def extend(self, host=None):
         """extend one or more VMs
