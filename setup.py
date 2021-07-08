@@ -7,11 +7,11 @@ with open("README.md") as readme_file:
 with open("HISTORY.md") as history_file:
     history = history_file.read()
 
-requirements = ["awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "ssh2-python"]
+requirements = [
+    "awxkit", "click", "dynaconf>=3.1.0", "logzero", "pyyaml", "setuptools", "ssh2-python"]
 
 test_requirements = ['pytest']
-
-setup_requirements = ['setuptools', 'wheel']
+setup_requirements = ['setuptools', 'wheel', 'twine']
 
 extras = {
     'test': test_requirements,
@@ -29,7 +29,6 @@ setup(
     url="https://github.com/SatelliteQE/broker",
     packages=find_packages(),
     entry_points={"console_scripts": ["broker=broker.commands:cli"]},
-    include_package_data=True,
     install_requires=requirements,
     tests_require=test_requirements,
     extras_require=extras,

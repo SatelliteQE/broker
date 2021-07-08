@@ -1,0 +1,37 @@
+name: Build and Deploy to PyPi
+
+on:
+  push:
+    branches: [master]
+    paths: ['HISTORY.md']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # build/push in lowest support python version
+        python-version: [ 3.8 ]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: "broker"
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Setup and Build
+      run: |
+        pip install -U pip
+        pip install .[setup]
+        python setup.py sdist bdist_wheel
+        python -m twine check dist/*
+
+    - name: Build and publish
+      uses: pypa/gh-action-pypi-publish
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_TOKEN }}
+        skip_existing: true

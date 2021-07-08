@@ -1,6 +1,8 @@
 name: update_broker_image
 
-on: [push]
+on:
+  push:
+    branches: [master]
 
 jobs:
   broker_container:
@@ -10,16 +12,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          path: "broker"
 
-      - name: Get image tag
-        id: image_tag
-        run: |
-          echo -n ::set-output name=IMAGE_TAG::
-          TAG="${GITHUB_REF##*/}"
-          if [ "${TAG}" == "master" ]; then
-              TAG="latest"
-          fi
-          echo "${TAG}"
+#      - name: Get image tag
+#        id: image_tag
+#        run: |
+#          echo -n ::set-output name=IMAGE_TAG::
+#          TAG="${GITHUB_REF##*/}"
+#          if [ "${TAG}" == "master" ]; then
+#              TAG="latest"
+#          fi
+#          echo "${TAG}"
+# to reference this tag: ${{ steps.image_tag.outputs.IMAGE_TAG }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -40,4 +45,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.QUAY_SERVER }}/${{ secrets.QUAY_NAMESPACE }}/broker:${{ steps.image_tag.outputs.IMAGE_TAG }}
+          tags: ${{ secrets.QUAY_SERVER }}/${{ secrets.QUAY_NAMESPACE }}/broker:latest
