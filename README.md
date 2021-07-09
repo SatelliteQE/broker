@@ -1,5 +1,9 @@
-# Broker ![update_broker_image](https://github.com/SatelliteQE/broker/workflows/update_broker_image/badge.svg)
+[![PythonPackage](https://github.com/SatelliteQE/broker/actions/workflows/python-publish.yml/badge.svg)](https://github.com/SatelliteQE/broker/actions/workflows/python-publish.yml)
+[![ContainerImage](https://github.com/SatelliteQE/broker/actions/workflows/update_broker_image.yml/badge.svg)](https://github.com/SatelliteQE/broker/actions/workflows/update_broker_image.yml)
+[![CodeQL](https://github.com/SatelliteQE/broker/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/SatelliteQE/broker/actions/workflows/codeql-analysis.yml)
+# Broker
 The infrastrucure middleman
+
 
 # Description
 Broker is a tool designed to provide a common interface between one or many services that provision virtual machines. It is an abstraction layer that allows you to ignore (most) of the implementation details and just get what you need.
