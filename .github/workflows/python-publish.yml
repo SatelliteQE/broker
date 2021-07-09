@@ -1,4 +1,4 @@
-name: Build and Deploy to PyPi
+name: PythonPackage
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 
 jobs:
   publish:
+    name: Build and Deploy to PyPi
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -15,8 +16,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-      with:
-        path: "broker"
 
     - uses: actions/setup-python@v2
       with:

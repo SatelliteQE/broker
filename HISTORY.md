@@ -6,6 +6,7 @@ History
 
 + Improved concurrent checkin resilience
 + Increased AnsibleTower page size for workflows and job templates
++ GHA Updates
 
 0.1.20 (2021-06-25)
 ------------------
