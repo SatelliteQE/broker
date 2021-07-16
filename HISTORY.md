@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.22 (2021-07-16)
+------------------
+
++ Handle checkin on instance with no hosts
++ Handle Pickle raising an AttributeError
+
 0.1.21 (2021-07-01)
 ------------------
 
