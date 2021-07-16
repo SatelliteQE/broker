@@ -44,6 +44,13 @@ def test_broker_e2e():
     assert len(broker_inst._hosts) == 0
 
 
+def test_broker_empty_checkin():
+    """Try to checkin with no hosts on the instance"""
+    broker_inst = broker.VMBroker(nick="test_nick")
+    assert not broker_inst._hosts
+    broker_inst.checkin()
+
+
 def test_mp_checkout():
     """Test that broker can checkout multiple hosts using multiprocessing"""
     VM_COUNT=50  # This is intentionaly made high to catch run condition that
