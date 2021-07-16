@@ -44,7 +44,7 @@ class Host:
         for key, obj in self.__dict__.items():
             try:
                 pickle.dumps(obj)
-            except pickle.PicklingError:
+            except (pickle.PicklingError, AttributeError):
                 self.__dict__[key] = None
 
     def connect(self, username=None, password=None):
