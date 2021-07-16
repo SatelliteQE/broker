@@ -205,6 +205,11 @@ class VMBroker:
             hosts = [host for host_list in hosts.values() for host in host_list]
         if not isinstance(hosts, list):
             hosts = [hosts]
+
+        if not hosts:
+            logger.debug('Checkin called with no hosts, taking no action')
+            return
+
         with ProcessPoolExecutor(
             max_workers=1 if sequential else len(hosts)
         ) as workers:
