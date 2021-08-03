@@ -156,7 +156,7 @@ class VMBroker:
     def execute(self, **kwargs):
         """execute a provider action
 
-        :return: Any The results given back by the provider
+        :return: Any results given back by the provider
         """
         self._update_provider_actions(kwargs)
         self._kwargs.update(kwargs)
