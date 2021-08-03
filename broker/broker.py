@@ -92,9 +92,7 @@ class VMBroker:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
-        for key, action in PROVIDER_ACTIONS.items():
-            if key in kwargs:
-                self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs = kwargs
 
     def _act(self, provider, method, checkout=False):
@@ -115,6 +113,12 @@ class VMBroker:
             )
         else:
             return result
+
+    def _update_provider_actions(self, kwargs):
+        if not self._provider_actions:
+            for key, action in PROVIDER_ACTIONS.items():
+                if key in kwargs:
+                    self._provider_actions[key] = action
 
     @mp_decorator
     def _checkout(self):
@@ -154,10 +158,7 @@ class VMBroker:
 
         :return: Any The results given back by the provider
         """
-        if not self._provider_actions:
-            for key, action in PROVIDER_ACTIONS.items():
-                if key in kwargs:
-                    self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs.update(kwargs)
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
