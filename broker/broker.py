@@ -172,7 +172,7 @@ class VMBroker:
         if self._provider_actions:
             provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
             logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, "nick_help", checkout=False)
+            self._act(provider, provider.nick_help, checkout=False)
 
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
