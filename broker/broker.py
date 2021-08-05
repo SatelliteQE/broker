@@ -97,6 +97,7 @@ class VMBroker:
 
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
+        logger.debug(f"Resolving action {method} on provider {provider}.")
         provider_inst = provider(**self._kwargs)
         helpers.emit(
             {
@@ -105,8 +106,10 @@ class VMBroker:
                 "arguments": self._kwargs,
             }
         )
-        result = getattr(provider_inst, method)(**self._kwargs)
-        logger.debug(result)
+        method_obj = getattr(provider_inst, method)
+        logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
+        result = method_obj(**self._kwargs)
+        logger.debug(logger.debug(f"Action {result=}"))
         if result and checkout:
             return provider_inst.construct_host(
                 provider_params=result, host_classes=self.host_classes, **self._kwargs
@@ -127,6 +130,7 @@ class VMBroker:
         :return: List of Host objects
         """
         hosts = []
+        logger.debug(f"Doing _checkout(): {self._provider_actions=}")
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
         for action in self._provider_actions.keys():
