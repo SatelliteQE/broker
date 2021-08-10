@@ -4,22 +4,22 @@ import pytest
 
 
 def test_empty_init():
-    """VMBroker should be able to init without any arguments"""
-    broker_inst = broker.VMBroker()
-    assert isinstance(broker_inst, broker.VMBroker)
+    """Broker should be able to init without any arguments"""
+    broker_inst = broker.Broker()
+    assert isinstance(broker_inst, broker.Broker)
 
 
 def test_kwarg_assignment():
-    """VMBroker should copy all kwargs into its _kwargs attribute"""
+    """Broker should copy all kwargs into its _kwargs attribute"""
     broker_kwargs = {"test": "value", "another": 17}
-    broker_inst = broker.VMBroker(**broker_kwargs)
+    broker_inst = broker.Broker(**broker_kwargs)
     assert broker_inst._kwargs == broker_kwargs
 
 
 def test_full_init():
     """Make sure all init checks and assignments work"""
     broker_hosts = ["test1.example.com", "test2.example.com", "test3.example.com"]
-    broker_inst = broker.VMBroker(
+    broker_inst = broker.Broker(
         hosts=broker_hosts, test_action="blank", nick="test_nick"
     )
     assert broker_inst._hosts == broker_hosts
@@ -33,7 +33,7 @@ def test_full_init():
 
 def test_broker_e2e():
     """Run through the base functionality of broker"""
-    broker_inst = broker.VMBroker(nick="test_nick")
+    broker_inst = broker.Broker(nick="test_nick")
     broker_inst.checkout()
     assert len(broker_inst._hosts) == 1
     broker_host = broker_inst._hosts[0]
@@ -46,19 +46,19 @@ def test_broker_e2e():
 
 def test_broker_empty_checkin():
     """Try to checkin with no hosts on the instance"""
-    broker_inst = broker.VMBroker(nick="test_nick")
+    broker_inst = broker.Broker(nick="test_nick")
     assert not broker_inst._hosts
     broker_inst.checkin()
 
 
 def test_mp_checkout():
     """Test that broker can checkout multiple hosts using multiprocessing"""
-    VM_COUNT=50  # This is intentionaly made high to catch run condition that
-                 # was discovered when reviewing
-                 # https://github.com/SatelliteQE/broker/pull/53
-                 # With count like this, I've got reproducibility probability
-                 # arround 0.5
-    broker_inst = broker.VMBroker(nick="test_nick", _count=VM_COUNT)
+    VM_COUNT = 50  # This is intentionaly made high to catch run condition that
+    # was discovered when reviewing
+    # https://github.com/SatelliteQE/broker/pull/53
+    # With count like this, I've got reproducibility probability
+    # arround 0.5
+    broker_inst = broker.Broker(nick="test_nick", _count=VM_COUNT)
     broker_inst.checkout()
     assert len(broker_inst._hosts) == VM_COUNT
     broker_inst.checkin()
@@ -66,7 +66,7 @@ def test_mp_checkout():
 
 
 def test_mp_checkout_twice():
-    broker_inst = broker.VMBroker(nick="test_nick", _count=2)
+    broker_inst = broker.Broker(nick="test_nick", _count=2)
 
     def cycle():
         assert len(broker_inst.checkout()) == 2

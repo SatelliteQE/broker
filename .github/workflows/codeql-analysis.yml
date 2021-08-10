@@ -38,4 +38,4 @@ jobs:
         pip install -U pip
         pip install -U .[test]
         cp broker_settings.yaml.example broker_settings.yaml
-        pytest -v tests/ --ignore tests/cli_scenarios
+        pytest -v tests/ --ignore tests/functional

@@ -1,25 +1,32 @@
 from logzero import logger
 from broker.providers.ansible_tower import AnsibleTower
+from broker.providers.container import Container
 from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
 from broker import exceptions, helpers
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-PROVIDERS = {"AnsibleTower": AnsibleTower, "TestProvider": TestProvider}
+PROVIDERS = {
+    "AnsibleTower": AnsibleTower,
+    "Container": Container,
+    "TestProvider": TestProvider,
+}
 
 PROVIDER_ACTIONS = {
     # action: (InterfaceClass, "method_name")
     "workflow": (AnsibleTower, "execute"),
     "job_template": (AnsibleTower, "execute"),
     "template": (AnsibleTower, None),  # needed for list-templates
-    "test_action": (TestProvider, "test_action"),
     "inventory": (AnsibleTower, None),
+    "container_host": (Container, "run_container"),
+    "container_app": (Container, "execute"),
+    "test_action": (TestProvider, "test_action"),
 }
 
 
 class mp_decorator:
-    """This decorator wraps VMBroker methods to enable multiprocessing
+    """This decorator wraps Broker methods to enable multiprocessing
 
     The decorated method is expected to return an itearable.
     """
@@ -70,7 +77,7 @@ class mp_decorator:
         return mp_split
 
 
-class VMBroker:
+class Broker:
     # map exceptions for easier access when used as a library
     BrokerError = exceptions.BrokerError
     AuthenticationError = exceptions.AuthenticationError
@@ -81,10 +88,10 @@ class VMBroker:
 
     def __init__(self, **kwargs):
         kwargs = helpers.resolve_file_args(kwargs)
+        logger.debug(f"Broker instantiated with {kwargs=}")
         self._hosts = kwargs.pop("hosts", [])
         self.host_classes = {"host": Host}
         # if a nick was specified, pull in the resolved arguments
-        logger.debug(f"Broker instantiated with {kwargs=}")
         if "nick" in kwargs:
             nick = kwargs.pop("nick")
             kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick))
@@ -131,7 +138,6 @@ class VMBroker:
             logger.info(f"Using provider {provider.__name__} to checkout")
             try:
                 host = self._act(provider, method, checkout=True)
-                logger.debug(f"host={host}")
             except exceptions.ProviderError as err:
                 host = err
             if host and not isinstance(host, exceptions.ProviderError):
@@ -188,8 +194,10 @@ class VMBroker:
         host.close()
         try:
             host.release()
-        except Exception:
-            pass
+        except Exception as err:
+            logger.warning(f"Encountered exception during checkin: {err}")
+            raise
+            # pass
         return host
 
     def checkin(self, sequential=False, host=None):
@@ -299,7 +307,7 @@ class VMBroker:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
-            host["hostname"] or host["name"]
+            host.get("hostname", host.get("name"))
             for host in helpers.load_inventory()
             if host["_broker_provider"] == provider
         ]
@@ -327,6 +335,14 @@ class VMBroker:
         """
         inv_hosts = helpers.load_inventory(filter=filter)
         return [self.reconstruct_host(inv_host) for inv_host in inv_hosts]
+
+    def __repr__(self):
+        inner = ", ".join(
+            f"{k}={v}"
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and not callable(v)
+        )
+        return f"{self.__class__.__name__}({inner})"
 
     def __enter__(self):
         try:

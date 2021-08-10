@@ -322,11 +322,12 @@ class MockStub(UserDict):
         return self
 
     def __getitem__(self, key):
-        item = getattr(self, key, self)
+        if isinstance(key, str):
+            item = getattr(self, key, self)
         try:
             item = super().__getitem__(key)
         except KeyError:
-            pass
+            item = self
         return item
 
     def __call__(self, *args, **kwargs):
@@ -446,3 +447,45 @@ class FileLock:
 
     def __exit__(self, *tb_info):
         self.return_file()
+
+
+class Result:
+    """Dummy result class for presenting results in dot access"""
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __repr__(self):
+        return getattr(self, "stdout")
+
+    @classmethod
+    def from_ssh(cls, stdout, channel):
+        return cls(
+            stdout=stdout,
+            status=channel.get_exit_status(),
+            stderr=channel.read_stderr(),
+        )
+
+    @classmethod
+    def from_duplexed_exec(cls, duplex_exec):
+        if duplex_exec.output[0]:
+            stdout = duplex_exec.output[0].decode("utf-8")
+        else:
+            stdout = ""
+        if duplex_exec.output[1]:
+            stderr = duplex_exec.output[1].decode("utf-8")
+        else:
+            stderr = ""
+        return cls(
+            status=duplex_exec.exit_code,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+    @classmethod
+    def from_nonduplexed_exec(cls, nonduplex_exec):
+        return cls(
+            status=nonduplex_exec.exit_code,
+            stdout=nonduplex_exec.output.decode("utf-8"),
+            stderr="",
+        )

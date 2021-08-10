@@ -1,6 +1,6 @@
 import json
 import pytest
-from broker.broker import VMBroker
+from broker.broker import Broker
 from broker.providers.ansible_tower import AnsibleTower
 from broker.helpers import MockStub
 
@@ -94,7 +94,7 @@ def test_execute(tower_stub):
 
 
 def test_host_creation(tower_stub):
-    vmb = VMBroker()
+    vmb = Broker()
     job = tower_stub.execute(workflow="deploy-base-rhel")
     host = tower_stub.construct_host(job, vmb.host_classes)
     assert isinstance(host, vmb.host_classes["host"])
@@ -103,6 +103,6 @@ def test_host_creation(tower_stub):
 
 
 def test_workflow_lookup_failure(tower_stub):
-    with pytest.raises(VMBroker.ProviderError) as err:
+    with pytest.raises(Broker.ProviderError) as err:
         tower_stub.execute(workflow="this-does-not-exist")
     assert "Workflow not found by name: this-does-not-exist" in err.value.message

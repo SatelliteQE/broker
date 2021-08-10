@@ -1,0 +1,2 @@
+container_app: ch-d:ubi8
+command: "ls -lah"

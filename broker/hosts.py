@@ -50,17 +50,23 @@ class Host:
                 pickle.dumps(obj)
             except (pickle.PicklingError, AttributeError):
                 self.__dict__[key] = None
+            except RecursionError:
+                logger.warning(f"Recursion limit reached on {obj=}")
 
     def connect(self, username=None, password=None, timeout=None):
         username = username or self.username
         password = password or self.password
         timeout = timeout or self.timeout
+        _hostname, _port = self.hostname, 22
+        if ":" in self.hostname:
+            _hostname, port = self.hostname.split(":")
+            _port = int(port)
         self.close()
         self._session = Session(
-            hostname=self.hostname,
+            hostname=_hostname,
             username=username,
             password=password,
-            timeout=timeout,
+            port=_port,
         )
 
     def close(self):
@@ -100,12 +106,20 @@ class Host:
         }
 
     def setup(self):
-        """Automatically ran when entering a VMBroker context manager"""
+        """Automatically ran when entering a Broker context manager"""
         pass
 
     def teardown(self):
-        """Automatically ran when exiting a VMBroker context manager"""
+        """Automatically ran when exiting a Broker context manager"""
         pass
+
+    def __repr__(self):
+        inner = ", ".join(
+            f"{k}={v}"
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and not callable(v)
+        )
+        return f"{self.__class__.__name__}({inner})"
 
     @classmethod
     def from_dict(cls, arg_dict):

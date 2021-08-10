@@ -27,6 +27,23 @@ AnsibleTower:
     new_expire_time: "+172800"
     workflow_timeout: 3600
     results_limit: 50
+Container:
+    instances:
+        - docker:
+            host_username: "<username>"
+            host_password: "<plain text password>"
+            host_port: None
+            default: True
+        - remote:
+            host: "<remote hostname>"
+            host_username: "<username>"
+            host_password: "<plain text password>"
+    runtime: 'docker'
+    # name used to prefix container names, used to distinguish yourself
+    # if not set, then your local username will be used
+    # name_prefix: test
+    results_limit: 50
+    auto_map_ports: False
 TestProvider:
     instances:
         - test1:
