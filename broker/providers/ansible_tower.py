@@ -575,6 +575,14 @@ class AnsibleTower(Provider):
             **broker_args,
         )
 
+    def __repr__(self):
+        inner = ", ".join(
+            f"{k}={v}"
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and not callable(v)
+        )
+        return f"{self.__class__.__name__}({inner})"
+
 
 def awxkit_representer(dumper, data):
     """In order to resolve awxkit objects, a custom representer is needed"""

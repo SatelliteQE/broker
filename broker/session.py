@@ -4,7 +4,7 @@ from pathlib import Path
 from logzero import logger
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
-from broker.helpers import simple_retry, translate_timeout
+from broker.helpers import simple_retry, translate_timeout, Result
 
 SESSIONS = {}
 
@@ -19,16 +19,6 @@ FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
 
 class AuthException(Exception):
     pass
-
-
-class Result:
-    """Dummy result class for presenting results in dot access"""
-
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        return getattr(self, "stdout")
 
 
 class Session:
@@ -59,10 +49,9 @@ class Session:
             except UnicodeDecodeError as err:
                 logger.error(f"Skipping data chunk due to {err}\nReceived: {data}")
             size, data = channel.read()
-        return Result(
+        return Result.from_ssh(
             stdout=results,
-            status=channel.get_exit_status(),
-            stderr=channel.read_stderr(),
+            channel=channel,
         )
 
     def run(self, command, timeout=0):

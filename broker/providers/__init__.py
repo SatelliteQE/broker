@@ -1,7 +1,9 @@
+import pickle
 import dynaconf
 
 from broker import exceptions
 from broker.settings import settings
+from logzero import logger
 
 
 class Provider:
@@ -95,3 +97,26 @@ class Provider:
 
     def release(self, host_obj):
         raise exceptions.NotImplementedError("release has not been implemented")
+
+    def __repr__(self):
+        inner = ", ".join(
+            f"{k}={v}"
+            for k, v in self.__dict__.items()
+            if not k.startswith("_") and not callable(v)
+        )
+        return f"{self.__class__.__name__}({inner})"
+
+    def __getstate__(self):
+        """If a session is active, remove it for pickle compatability"""
+        self._purify()
+        return self.__dict__
+
+    def _purify(self):
+        """Strip all unpickleable attributes from a Host before pickling"""
+        for key, obj in self.__dict__.items():
+            try:
+                pickle.dumps(obj)
+            except (pickle.PicklingError, AttributeError):
+                self.__dict__[key] = None
+            except RecursionError:
+                logger.warning(f"Recursion limit reached on {obj=}")

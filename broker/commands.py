@@ -2,7 +2,7 @@ import signal
 import sys
 import click
 from logzero import logger
-from broker.broker import PROVIDERS, PROVIDER_ACTIONS, VMBroker
+from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
 from broker.providers import Provider
 from broker import exceptions, helpers, settings
 
@@ -53,7 +53,7 @@ def populate_providers(click_group):
         @click_group.command(name=prov, hidden=prov_class.hidden)
         def provider_cmd(*args, **kwargs):  # the actual subcommand
             """Get information about a provider's actions"""
-            broker_inst = VMBroker(**kwargs)
+            broker_inst = Broker(**kwargs)
             broker_inst.nick_help()
 
         # iterate through available actions and populate options from them
@@ -165,7 +165,7 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
     )
     if background:
         helpers.fork_broker()
-    broker_inst = VMBroker(**broker_args)
+    broker_inst = Broker(**broker_args)
     broker_inst.checkout()
 
 
@@ -206,9 +206,14 @@ def checkin(vm, background, all_, sequential, filter):
     inventory = helpers.load_inventory(filter=filter)
     to_remove = []
     for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
-            to_remove.append(VMBroker().reconstruct_host(host))
-    broker_inst = VMBroker(hosts=to_remove)
+        if (
+            str(num) in vm
+            or host.get("hostname") in vm
+            or host.get("name") in vm
+            or all_
+        ):
+            to_remove.append(Broker().reconstruct_host(host))
+    broker_inst = Broker(hosts=to_remove)
     broker_inst.checkin(sequential=sequential)
 
 
@@ -227,7 +232,7 @@ def inventory(details, sync, filter):
     hostname pulled from list of dictionaries
     """
     if sync:
-        VMBroker.sync_inventory(provider=sync)
+        Broker.sync_inventory(provider=sync)
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory(filter=filter)
     emit_data = []
@@ -235,10 +240,10 @@ def inventory(details, sync, filter):
         emit_data.append(host)
         if details:
             logger.info(
-                f"{num}: {host['hostname'] or host['name']}, Details: {helpers.yaml_format(host)}"
+                f"{num}: {host.get('hostname', host.get('name'))}, Details: {helpers.yaml_format(host)}"
             )
         else:
-            logger.info(f"{num}: {host['hostname'] or host['name']}")
+            logger.info(f"{num}: {host.get('hostname', host.get('name'))}")
     helpers.emit({"inventory": emit_data})
 
 
@@ -273,8 +278,8 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     to_extend = []
     for num, host in enumerate(inventory):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
-            to_extend.append(VMBroker().reconstruct_host(host))
-    broker_inst = VMBroker(hosts=to_extend, **broker_args)
+            to_extend.append(Broker().reconstruct_host(host))
+    broker_inst = Broker(hosts=to_extend, **broker_args)
     broker_inst.extend(sequential=sequential)
 
 
@@ -313,7 +318,7 @@ def duplicate(vm, background, count, all_, filter):
                 if count:
                     broker_args["_count"] = count
                 logger.info(f"Duplicating: {host['hostname']}")
-                broker_inst = VMBroker(**broker_args)
+                broker_inst = Broker(**broker_args)
                 broker_inst.checkout()
             else:
                 logger.warning(
@@ -376,7 +381,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
     )
     if background:
         helpers.fork_broker()
-    broker_inst = VMBroker(**broker_args)
+    broker_inst = Broker(**broker_args)
     result = broker_inst.execute()
     helpers.emit({"output": result})
     if output_format == "raw":

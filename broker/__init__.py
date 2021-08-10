@@ -1,1 +1,3 @@
-from broker.broker import VMBroker
+from broker.broker import Broker
+
+VMBroker = Broker

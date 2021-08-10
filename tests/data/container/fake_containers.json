@@ -1,0 +1,57 @@
+[
+    {
+        "Id": "f37d3058317f006e91db56682487ecbd915dc063474c6644ae9d1e6ace4f0a89",
+        "Created": "2022-02-28T22:18:29.399266035Z",
+        "Path": "/bin/sh",
+        "Args": [
+            "-c",
+            "/tmp/startup.sh"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false
+        },
+        "Image": "sha256:960c4adb67cc3bc49b67391c5ac562db46d84b0432ad3edf964cf85f0ef63d2d",
+        "Name": "/jake_06c92962",
+        "Platform": "linux",
+        "HostConfig": {
+            "Binds": null,
+            "NetworkMode": "default",
+            "PortBindings": null
+        },
+        "GraphDriver": {
+            "Data": null,
+            "Name": "btrfs"
+        },
+        "Mounts": [],
+        "Config": {
+            "Hostname": "f37d3058317f",
+            "Domainname": "",
+            "User": "",
+            "ExposedPorts": {
+                "22/tcp": {}
+            },
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "container=oci",
+                "HOME=/root"
+            ],
+            "Cmd": [
+                "/bin/sh",
+                "-c",
+                "/tmp/startup.sh"
+            ],
+            "Image": "ch-d:ubi8",
+            "Volumes": null,
+            "WorkingDir": "/root",
+            "Entrypoint": null,
+            "Labels": {
+                "architecture": "x86_64",
+                "broker_compatible": "True",
+                "name": "ubi8",
+                "version": "8.5"
+            }
+        }
+    }
+]

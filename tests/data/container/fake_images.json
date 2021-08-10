@@ -1,0 +1,51 @@
+[
+    {
+        "Id": "sha256:960c4adb67cc3bc49b67391c5ac562db46d84b0432ad3edf964cf85f0ef63d2d",
+        "RepoTags": [
+            "ch-d:ubi8"
+        ],
+        "RepoDigests": [],
+        "Parent": "sha256:fea6edb8ca1a4cbdec9bef9e822d38620b93624b24a09c9d1af240fcfd569ccb",
+        "Author": "https://github.com/JacobCallahan",
+        "Config": {
+            "Hostname": "f27f3e2c9f57",
+            "ExposedPorts": {
+                "22/tcp": {}
+            },
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "container=oci",
+                "HOME=/root"
+            ],
+            "Cmd": [
+                "/bin/sh",
+                "-c",
+                "/tmp/startup.sh"
+            ],
+            "Image": "sha256:fea6edb8ca1a4cbdec9bef9e822d38620b93624b24a09c9d1af240fcfd569ccb",
+            "Volumes": null,
+            "WorkingDir": "/root",
+            "Entrypoint": null,
+            "Labels": {
+                "architecture": "x86_64",
+                "broker_compatible": "True",
+                "name": "ubi8",
+                "version": "8.5"
+            }
+        },
+        "Architecture": "amd64",
+        "Os": "linux",
+        "Size": 237849999,
+        "VirtualSize": 237849999,
+        "RootFS": {
+            "Type": "layers",
+            "Layers": [
+                "sha256:a9820c2af00a34f160836f6ef2044d88e6019ca19b3c15ec22f34afe9d73f41c",
+                "sha256:3d5ecee9360ea8711f32d2af0cab1eae4d53140496f961ca1a634b5e2e817412"
+            ]
+        },
+        "Metadata": {
+            "LastTagTime": "2022-02-18T16:22:59.134232153-05:00"
+        }
+    }
+]
