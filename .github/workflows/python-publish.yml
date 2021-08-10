@@ -3,7 +3,7 @@ name: PythonPackage
 on:
   push:
     branches: [master]
-    paths: ['HISTORY.md']
+    tags: ["*"]
 
 jobs:
   publish:
