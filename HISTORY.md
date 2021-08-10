@@ -6,6 +6,7 @@ History
 
 + Handle checkin on instance with no hosts
 + Handle Pickle raising an AttributeError
++ Better error handling for AnsibleTower
 
 0.1.21 (2021-07-01)
 ------------------
