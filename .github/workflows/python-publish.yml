@@ -2,8 +2,8 @@ name: PythonPackage
 
 on:
   push:
-    branches: [master]
-    tags: ["*"]
+    tags: 
+      - "*"
 
 jobs:
   publish:
