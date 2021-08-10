@@ -45,6 +45,8 @@ def populate_providers(click_group):
         --workflows      Get available workflows
         --workflow TEXT  Get information about a workflow
         --help           Show this message and exit.
+
+    Note: This currently only works for the default instance for each provider
     """
     for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
 

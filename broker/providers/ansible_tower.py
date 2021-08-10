@@ -242,26 +242,42 @@ class AnsibleTower(Provider):
                     child_obj = self.v2.jobs.get(id=child_id).results
                     if child_obj:
                         child_obj = child_obj.pop()
-                        # get all failed job_events for each job (filter failed=true)
-                        failed_events = [
-                            ev
-                            for ev in child_obj.get_related(
-                                "job_events", page_size=200
-                            ).results
-                            if ev.failed
-                        ]
-                        # find the one(s) with event_data['res']['msg']
-                        failure_messages.extend(
-                            [
+                        if child_obj.status == "error":
+                            failure_messages.append(
                                 {
                                     "job": child_obj.name,
-                                    "task": ev.event_data["play"],
-                                    "reason": ev.event_data["res"]["msg"],
+                                    "reason": getattr(
+                                        child_obj,
+                                        "result_traceback",
+                                        child_obj.job_explanation,
+                                    ),
                                 }
-                                for ev in failed_events
-                                if ev.event_data.get("res")
+                            )
+                        else:
+                            # get all failed job_events for each job (filter failed=true)
+                            failed_events = [
+                                ev
+                                for ev in child_obj.get_related(
+                                    "job_events", page_size=200
+                                ).results
+                                if ev.failed
                             ]
-                        )
+                            # find the one(s) with event_data['res']['msg']
+                            failure_messages.extend(
+                                [
+                                    {
+                                        "job": child_obj.name,
+                                        "task": ev.event_data["play"],
+                                        "reason": ev.event_data["res"]["msg"],
+                                    }
+                                    for ev in failed_events
+                                    if ev.event_data.get("res")
+                                ]
+                            )
+        if not failure_messages:
+            return {
+                "reason": f"Unable to determine failure cause for {workflow.name} ar {workflow.url}"
+            }
         if settings.ANSIBLETOWER.error_scope == "last":
             return failure_messages[0]
         else:
@@ -328,7 +344,7 @@ class AnsibleTower(Provider):
         elif isinstance(self._inventory, int):
             # inventory already resolved as id
             return self._inventory
-        if (inventory_info := self.v2.inventory.get(search=self._inventory)) :
+        if inventory_info := self.v2.inventory.get(search=self._inventory):
             if inventory_info.count > 1:
                 raise exceptions.ProviderError(
                     provider="AnsibleTower",
@@ -395,10 +411,10 @@ class AnsibleTower(Provider):
 
         :return: dictionary containing all information about executed workflow/job template
         """
-        if (name := kwargs.get("workflow")) :
+        if name := kwargs.get("workflow"):
             subject = "workflow"
             get_path = self.v2.workflow_job_templates
-        elif (name := kwargs.get("job_template")) :
+        elif name := kwargs.get("job_template"):
             subject = "job_template"
             get_path = self.v2.job_templates
         else:
@@ -442,7 +458,7 @@ class AnsibleTower(Provider):
             raise exceptions.ProviderError(
                 provider="AnsibleTower", message=message_data["Reason(s)"]
             )
-        if (artifacts := kwargs.get("artifacts")) :
+        if artifacts := kwargs.get("artifacts"):
             del kwargs["artifacts"]
             return self._merge_artifacts(job, strategy=artifacts)
         return job
@@ -467,7 +483,7 @@ class AnsibleTower(Provider):
         :param target_vm: This should be a host object
         """
         # check if an inventory was specified. if so overwrite the current inventory
-        if (new_inv := target_vm._broker_args.get("tower_inventory")) :
+        if new_inv := target_vm._broker_args.get("tower_inventory"):
             if new_inv != self._inventory:
                 self._inventory = new_inv
                 del self.inventory  # clear the cached value
@@ -481,7 +497,7 @@ class AnsibleTower(Provider):
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
-        if (workflow := kwargs.get("workflow")) :
+        if workflow := kwargs.get("workflow"):
             wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
             logger.info(
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
@@ -494,11 +510,11 @@ class AnsibleTower(Provider):
                 ).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
-            if (res_filter := kwargs.get("results_filter")) :
+            if res_filter := kwargs.get("results_filter"):
                 workflows = results_filter(workflows, res_filter)
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
-        elif (inventory := kwargs.get("inventory")) :
+        elif inventory := kwargs.get("inventory"):
             inv = self.v2.inventory.get(name=inventory, kind="").results.pop()
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
@@ -507,11 +523,11 @@ class AnsibleTower(Provider):
                 inv.name
                 for inv in self.v2.inventory.get(kind="", page_size=1000).results
             ]
-            if (res_filter := kwargs.get("results_filter")) :
+            if res_filter := kwargs.get("results_filter"):
                 inv = results_filter(inv, res_filter)
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
-        elif (job_template := kwargs.get("job_template")) :
+        elif job_template := kwargs.get("job_template"):
             jt = self.v2.job_templates.get(name=job_template).results.pop()
             logger.info(
                 f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
@@ -522,7 +538,7 @@ class AnsibleTower(Provider):
                 for job_template in self.v2.job_templates.get(page_size=1000).results
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
-            if (res_filter := kwargs.get("results_filter")) :
+            if res_filter := kwargs.get("results_filter"):
                 job_templates = results_filter(job_templates, res_filter)
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
@@ -536,7 +552,7 @@ class AnsibleTower(Provider):
                 }
             )
             templates.sort(reverse=True)
-            if (res_filter := kwargs.get("results_filter")) :
+            if res_filter := kwargs.get("results_filter"):
                 templates = results_filter(templates, res_filter)
             templates = "\n".join(templates[:results_limit])
             logger.info(f"Available templates:\n{templates}")
