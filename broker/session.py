@@ -45,7 +45,8 @@ class Session:
         else:
             raise AuthException("No password or key file provided.")
 
-    def _read(self, channel):
+    @staticmethod
+    def _read(channel):
         """read the contents of a channel"""
         size, data = channel.read()
         results = ""
@@ -62,10 +63,17 @@ class Session:
         """run a command on the host and return the results"""
         self.session.set_timeout(timeout)
         channel = self.session.open_session()
-        channel.execute(command, )
+        channel.execute(
+            command,
+        )
         results = self._read(channel)
         channel.close()
         return results
+
+    def shell(self, pty=False):
+        """Create and return an interactive shell instance"""
+        channel = self.session.open_session()
+        return InteractiveShell(channel, pty)
 
     def sftp_read(self, source, destination=None):
         """read a remote file into a local destination"""
@@ -126,3 +134,57 @@ class Session:
 
     def __exit__(self, *args):
         self.session.disconnect()
+
+
+class InteractiveShell:
+    """A helper class that provides an interactive shell interface
+
+    Preferred use of this class is via its context manager
+
+    with InteractiveShell(channel=my_channel) as shell:
+        shell.send("some-command --argument")
+        shell.send("another-command")
+        time.sleep(5)  # give time for things to complete
+    assert "expected text" in shell.result.stdout
+
+    """
+
+    def __init__(self, channel, pty=False):
+        self._chan = channel
+        if pty:
+            self._chan.pty()
+        self._chan.shell()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_args):
+        """Close the channel and read stdout/stderr and status"""
+        self._chan.close()
+        self.result = Session._read(self._chan)
+
+    def __getattribute__(self, name):
+        """Expose non-duplicate attributes from the channel"""
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            return getattr(self._chan, name)
+
+    def send(self, cmd):
+        """Send a command to the channel, ensuring a newline character"""
+        if not cmd.endswith("\n"):
+            cmd += "\n"
+        self._chan.write(cmd)
+
+    def stdout(self):
+        """read the contents of a channel's stdout"""
+        if not self._chan.eof():
+            _, data = self._chan.read(65535)
+            results = data.decode("utf-8")
+        else:
+            results = None
+            size, data = self._chan.read()
+            while size > 0:
+                results += data.decode("utf-8")
+                size, data = self._chan.read()
+        return results
