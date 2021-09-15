@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.23 (2021-09-10)
+------------------
+
++ Added interactive shell functionality to sessions
++ Small fix for closing sessions
+
 0.1.22 (2021-07-16)
 ------------------
 

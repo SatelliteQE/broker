@@ -1,8 +1,8 @@
 # from functools import cached_property
 import pickle
 from logzero import logger
-from broker import session
 from broker.exceptions import NotImplementedError
+from broker.session import Session
 from broker.settings import settings
 
 
@@ -29,7 +29,7 @@ class Host:
 
     @property
     def session(self):
-        if not isinstance(getattr(self, "_session", None), session.Session):
+        if not isinstance(self._session, Session):
             self.connect()
         return self._session
 
@@ -51,12 +51,12 @@ class Host:
         username = username or self.username
         password = password or self.password
         self.close()
-        self._session = session.Session(
+        self._session = Session(
             hostname=self.hostname, username=username, password=password
         )
 
     def close(self):
-        if isinstance(getattr(self, "_session", None), session.Session):
+        if isinstance(self._session, Session):
             self._session.session.disconnect()
             self._session = None
 
