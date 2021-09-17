@@ -29,7 +29,8 @@ class Host:
 
     @property
     def session(self):
-        if not isinstance(self._session, Session):
+        # This attribute may be missing after pickling
+        if not isinstance(getattr(self, "_session", None), Session):
             self.connect()
         return self._session
 
@@ -56,7 +57,8 @@ class Host:
         )
 
     def close(self):
-        if isinstance(self._session, Session):
+        # This attribute may be missing after pickling
+        if isinstance(getattr(self, "_session", None), Session):
             self._session.session.disconnect()
             self._session = None
 
