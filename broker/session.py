@@ -3,6 +3,7 @@ import socket
 from pathlib import Path
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
+from broker.helpers import translate_timeout
 
 SESSIONS = {}
 
@@ -61,7 +62,7 @@ class Session:
 
     def run(self, command, timeout=0):
         """run a command on the host and return the results"""
-        self.session.set_timeout(timeout)
+        self.session.set_timeout(translate_timeout(timeout))
         channel = self.session.open_session()
         channel.execute(
             command,

@@ -207,7 +207,7 @@ class VMBroker:
             hosts = [hosts]
 
         if not hosts:
-            logger.debug('Checkin called with no hosts, taking no action')
+            logger.debug("Checkin called with no hosts, taking no action")
             return
 
         with ProcessPoolExecutor(
@@ -228,7 +228,15 @@ class VMBroker:
                 )
         helpers.update_inventory(remove=[h.hostname for h in hosts])
 
-    def extend(self, host=None):
+    def _extend(self, host):
+        """extend a single VM"""
+        logger.info(f"Extending host {host.hostname}")
+        provider = PROVIDERS[host._broker_provider]
+        self._kwargs["target_vm"] = host
+        self._act(provider, "extend_vm", checkout=False)
+        return host
+
+    def extend(self, sequential=False, host=None):
         """extend one or more VMs
 
         :param host: can be one of:
@@ -236,23 +244,35 @@ class VMBroker:
             A single host object
             A list of host objects
             A dictionary mapping host types to one or more host objects
+
+        :param sequential: boolean whether to run checkins sequentially
         """
-        if host is None:
-            host = self._hosts
-        logger.debug(host)
-        if isinstance(host, dict):
-            for _host in host.values():
-                self.extend(_host)
-        elif isinstance(host, list):
-            # reversing over a copy of the list to avoid skipping
-            for _host in host[::-1]:
-                self.extend(_host)
-        elif host:
-            logger.info(f"Extending host {host.hostname}")
-            provider = PROVIDERS[host._broker_provider]
-            self._kwargs["target_vm"] = host
-            logger.debug(f"Executing extend with provider {provider.__name__}")
-            self._act(provider, "extend_vm", checkout=False)
+        # default to hosts listed on the instance
+        hosts = host or self._hosts
+        logger.debug(
+            f"Extend called with: {hosts}, "
+            f'running {"sequential" if sequential else "concurrent"}'
+        )
+        # normalize the type since the function accepts multiple types
+        if isinstance(hosts, dict):
+            # flatten the lists of hosts from the values of the dict
+            hosts = [host for host_list in hosts.values() for host in host_list]
+        if not isinstance(hosts, list):
+            hosts = [hosts]
+
+        if not hosts:
+            logger.debug("Extend called with no hosts, taking no action")
+            return
+
+        with ProcessPoolExecutor(
+            max_workers=1 if sequential else len(hosts)
+        ) as workers:
+            completed_extends = as_completed(
+                workers.submit(self._extend, _host) for _host in hosts
+            )
+            for completed in completed_extends:
+                _host = completed.result()
+                logger.info(f"Completed extend for {_host.hostname or _host.name}")
 
     @staticmethod
     def sync_inventory(provider):

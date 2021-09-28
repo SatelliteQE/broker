@@ -1,9 +1,8 @@
 # -*- encoding: utf-8 -*-
 """Module handling internal and dependency logging."""
 import logging
-from pathlib import Path
 import logzero
-from broker.settings import BROKER_DIRECTORY
+from broker.settings import BROKER_DIRECTORY, settings
 
 
 def setup_logzero(level="info", path="logs/broker.log", silent=False):
@@ -15,15 +14,19 @@ def setup_logzero(level="info", path="logs/broker.log", silent=False):
         "%(end_color)s %(message)s"
     )
     log_level = getattr(logging, level.upper(), logging.INFO)
-
+    # formatter for terminal
     formatter = logzero.LogFormatter(
         fmt=debug_fmt if log_level is logging.DEBUG else log_fmt
     )
     logzero.setup_default_logger(formatter=formatter, disableStderrLogger=silent)
     logzero.loglevel(log_level)
+    # formatter for file
+    formatter = logzero.LogFormatter(
+        fmt=debug_fmt if log_level is logging.DEBUG else log_fmt, color=False
+    )
     logzero.logfile(
         path, loglevel=log_level, maxBytes=1e9, backupCount=3, formatter=formatter
     )
 
 
-setup_logzero()
+setup_logzero(level="debug" if settings.debug else "info")

@@ -175,7 +175,7 @@ def resolve_file_args(broker_args):
         if isinstance(val, Path) or (
             isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
         ):
-            if (data := load_file(val)) :
+            if (data := load_file(val)):
                 if key == "args_file":
                     if isinstance(data, dict):
                         final_args.update(data)
@@ -362,3 +362,25 @@ def handle_keyboardinterrupt(*args):
         fork_broker()
     else:
         raise exceptions.BrokerError("Broker killed by user.")
+
+
+def translate_timeout(timeout):
+    """Allows for flexible timeout definitions, converts other units to ms
+
+    acceptable units are (s)econds, (m)inutes, (h)ours, (d)ays
+
+    """
+    if isinstance(timeout, str):
+        timeout, unit = int(timeout[:-1]), timeout[-1]
+        if unit == "d":
+            timeout *= 24
+            unit = "h"
+        if unit == "h":
+            timeout *= 60
+            unit = "m"
+        if unit == "m":
+            timeout *= 60
+            unit = "s"
+        if unit == "s":
+            timeout *= 1000
+    return timeout if isinstance(timeout, int) else 0

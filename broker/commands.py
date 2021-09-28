@@ -88,7 +88,7 @@ def populate_providers(click_group):
 @click.option(
     "--log-level",
     type=click.Choice(["info", "warning", "error", "critical", "debug", "silent"]),
-    default="info",
+    default="debug" if settings.settings.debug else "info",
     callback=helpers.update_log_level,
     is_eager=True,
     expose_value=False,
@@ -183,7 +183,7 @@ populate_providers(providers)
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-@click.option("--sequential", is_flag=True, default=False, help="Run checkins sequentially")
+@click.option("--sequential", is_flag=True, help="Run checkins sequentially")
 @click.option(
     "--filter", type=str, help="Checkin only what matches the specified filter"
 )
@@ -246,11 +246,13 @@ def inventory(details, sync, filter):
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
+
+@click.option("--sequential", is_flag=True, help="Run extends sequentially")
 @click.option(
     "--filter", type=str, help="Extend only what matches the specified filter"
 )
 @provider_options
-def extend(vm, background, all_, filter, **kwargs):
+def extend(vm, background, all_, sequential, filter, **kwargs):
     """Extend a host's lease time
 
     COMMAND: broker extend <vm hostname>|<vm name>|<local id>
@@ -260,6 +262,8 @@ def extend(vm, background, all_, filter, **kwargs):
     :param background: run a new broker subprocess to carry out command
 
     :param all_: Click option all
+
+    :param sequential: Flag for whether to run extends sequentially
 
     :param filter: a filter string matching broker's specification
     """
@@ -272,7 +276,7 @@ def extend(vm, background, all_, filter, **kwargs):
         if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
             to_extend.append(VMBroker().reconstruct_host(host))
     broker_inst = VMBroker(hosts=to_extend, **broker_args)
-    broker_inst.extend()
+    broker_inst.extend(sequential=sequential)
 
 
 @cli.command()
