@@ -1,6 +1,14 @@
 History
 =======
 
+0.1.25 (2021-09-30)
+------------------
+
++ Extends are now concurrent by default
++ Color codes are stripped from log files
++ Broker now respects its own debug setting
++ Session command timeouts are now flexible
+
 0.1.24 (2021-09-16)
 ------------------
 
