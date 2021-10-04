@@ -1,9 +1,10 @@
 import os
 import socket
 from pathlib import Path
+from logzero import logger
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
-from broker.helpers import translate_timeout
+from broker.helpers import simple_retry, translate_timeout
 
 SESSIONS = {}
 
@@ -36,7 +37,7 @@ class Session:
         host = kwargs.get("hostname", "localhost")
         user = kwargs.get("username", "root")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, kwargs.get("port", 22)))
+        simple_retry(sock.connect, [(host, kwargs.get("port", 22))])
         self.session = ssh2_Session()
         self.session.handshake(sock)
         if kwargs.get("password"):
@@ -52,7 +53,10 @@ class Session:
         size, data = channel.read()
         results = ""
         while size > 0:
-            results += data.decode("utf-8")
+            try:
+                results += data.decode("utf-8")
+            except UnicodeDecodeError as err:
+                logger.error(f"Skipping data chunk due to {err}\nReceived: {data}")
             size, data = channel.read()
         return Result(
             stdout=results,

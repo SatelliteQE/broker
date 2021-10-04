@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import time
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
 from copy import deepcopy
@@ -175,7 +176,7 @@ def resolve_file_args(broker_args):
         if isinstance(val, Path) or (
             isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
         ):
-            if (data := load_file(val)):
+            if (data := load_file(val)) :
                 if key == "args_file":
                     if isinstance(data, dict):
                         final_args.update(data)
@@ -258,6 +259,7 @@ class Emitter:
         helpers.emit(key=value, another=5)
         helpers.emit({"key": "value", "another": 5})
     """
+
     def __init__(self, emit_file=None):
         """Can empty init and set the file later"""
         self.file = None
@@ -384,3 +386,21 @@ def translate_timeout(timeout):
         if unit == "s":
             timeout *= 1000
     return timeout if isinstance(timeout, int) else 0
+
+
+def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeout=1):
+    """Re(Try) a function given its args and kwargs up until a max timeout"""
+    cmd_args = cmd_args if cmd_args else []
+    cmd_kwargs = cmd_kwargs if cmd_kwargs else {}
+    try:
+        return cmd(*cmd_args, **cmd_kwargs)
+    except Exception as err:
+        new_wait = _cur_timeout * 2
+        if new_wait > max_timeout:
+            raise err
+        logger.warning(
+            f"Tried {cmd=} with {cmd_args=}, {cmd_kwargs=} but received {err=}"
+            f"\nTrying again in {_cur_timeout} seconds."
+        )
+        time.sleep(_cur_timeout)
+        simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait)
