@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.26 (2021-10-05)
+------------------
+
++ Added retries to socket.connect
++ Added some better error handling when decoding stdout data
+
 0.1.25 (2021-09-30)
 ------------------
 
