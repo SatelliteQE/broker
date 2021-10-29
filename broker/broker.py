@@ -130,9 +130,9 @@ class VMBroker:
             logger.info(f"Using provider {provider.__name__} to checkout")
             try:
                 host = self._act(provider, method, checkout=True)
-            except exceptions.ProviderError:
-                host = None
-            logger.debug(f"host={host}")
+                logger.debug(f"host={host}")
+            except exceptions.ProviderError as err:
+                host = err
             if host:
                 hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
@@ -144,9 +144,18 @@ class VMBroker:
         :return: Host obj or list of Host objects
         """
         hosts = self._checkout()
+        err, to_emit = None, []
+        for host in hosts:
+            if not isinstance(host, exceptions.ProviderError):
+                to_emit.append(host.to_dict())
+            else:
+                err = host
+                hosts.remove(host)
         helpers.emit(hosts=[host.to_dict() for host in hosts])
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
+        if err:
+            raise err
         return hosts if not len(hosts) == 1 else hosts[0]
 
     def execute(self, **kwargs):
