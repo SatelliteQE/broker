@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.27 (2021-10-29)
+------------------
+
++ Made CLI checkouts properly raise exceptions
+
 0.1.26 (2021-10-05)
 ------------------
 
