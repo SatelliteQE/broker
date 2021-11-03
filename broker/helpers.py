@@ -150,11 +150,12 @@ def resolve_nick(nick):
         return settings.settings.NICKS[nick].to_dict()
 
 
-def load_file(file):
+def load_file(file, warn=True):
     """Verifies existence and loads data from json and yaml files"""
     file = Path(file)
     if not file.exists() or file.suffix not in (".json", ".yaml", ".yml"):
-        logger.warning(f"File {file.absolute()} is invalid or does not exist.")
+        if warn:
+            logger.warning(f"File {file.absolute()} is invalid or does not exist.")
         return []
     loader_args = {}
     if file.suffix == ".json":
@@ -202,7 +203,7 @@ def load_inventory(filter=None):
     inventory_file = settings.BROKER_DIRECTORY.joinpath(
         settings.settings.INVENTORY_FILE
     )
-    inv_data = load_file(inventory_file)
+    inv_data = load_file(inventory_file, warn=False)
     return inv_data if not filter else inventory_filter(inv_data, filter)
 
 
