@@ -1,6 +1,12 @@
 History
 =======
 
+0.1.28 (2021-11-03)
+------------------
+
++ Suppress warnings on inventory load
++ Move file arg evaluation to VMBroker's init
+
 0.1.27 (2021-10-29)
 ------------------
 

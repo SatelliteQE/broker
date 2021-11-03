@@ -163,7 +163,6 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
             for key, val in zip(ctx.args[::2], ctx.args[1::2])
         }
     )
-    broker_args = helpers.resolve_file_args(broker_args)
     if background:
         helpers.fork_broker()
     broker_inst = VMBroker(**broker_args)
@@ -375,7 +374,6 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
             for key, val in zip(ctx.args[::2], ctx.args[1::2])
         }
     )
-    broker_args = helpers.resolve_file_args(broker_args)
     if background:
         helpers.fork_broker()
     broker_inst = VMBroker(**broker_args)
