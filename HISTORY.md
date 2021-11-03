@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.29 (2021-11-03)
+------------------
+
++ Actually include a line that was supposed to be in 0.1.28
+
 0.1.28 (2021-11-03)
 ------------------
 

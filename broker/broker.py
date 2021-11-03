@@ -80,6 +80,7 @@ class VMBroker:
     NotImplementedError = exceptions.NotImplementedError
 
     def __init__(self, **kwargs):
+        kwargs = helpers.resolve_file_args(kwargs)
         self._hosts = kwargs.pop("hosts", [])
         self.host_classes = {"host": Host}
         # if a nick was specified, pull in the resolved arguments
