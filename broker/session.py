@@ -101,11 +101,10 @@ class Session:
         """sftp write a local file to a remote destination"""
         if not destination:
             destination = source
+        data = Path(source).read_bytes()
         sftp = self.session.sftp_init()
-        with open(source, "rb") as local:
-            with sftp.open(destination, FILE_FLAGS, SFTP_MODE) as remote:
-                for data in local:
-                    remote.write(data)
+        with sftp.open(destination, FILE_FLAGS, SFTP_MODE) as remote:
+            remote.write(data)
 
     def remote_copy(self, source, dest_host):
         """Copy a file from this host to another"""
