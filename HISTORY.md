@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.31 (2021-11-11)
+------------------
+
++ Added a locking mechanism to actions that modify files
+
 0.1.30 (2021-11-05)
 ------------------
 

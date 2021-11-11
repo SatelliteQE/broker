@@ -177,7 +177,7 @@ def resolve_file_args(broker_args):
         if isinstance(val, Path) or (
             isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
         ):
-            if (data := load_file(val)) :
+            if data := load_file(val):
                 if key == "args_file":
                     if isinstance(data, dict):
                         final_args.update(data)
@@ -223,20 +223,21 @@ def update_inventory(add=None, remove=None):
         add = [add]
     if remove and not isinstance(remove, list):
         remove = [remove]
-    inv_data = load_inventory()
-    if inv_data:
-        inventory_file.unlink()
+    with FileLock(inventory_file):
+        inv_data = load_inventory()
+        if inv_data:
+            inventory_file.unlink()
 
-    if remove:
-        for host in inv_data[::-1]:
-            if host["hostname"] in remove or host["name"] in remove:
-                inv_data.remove(host)
-    if add:
-        inv_data.extend(add)
+        if remove:
+            for host in inv_data[::-1]:
+                if host["hostname"] in remove or host["name"] in remove:
+                    inv_data.remove(host)
+        if add:
+            inv_data.extend(add)
 
-    inventory_file.touch()
-    with inventory_file.open("w") as inv_file:
-        yaml.dump(inv_data, inv_file)
+        inventory_file.touch()
+        with inventory_file.open("w") as inv_file:
+            yaml.dump(inv_data, inv_file)
 
 
 def yaml_format(in_struct):
@@ -285,9 +286,10 @@ class Emitter:
         for key in kwargs.keys():
             if getattr(kwargs[key], "json", None):
                 kwargs[key] = kwargs[key].json
-        curr_data = json.loads(self.file.read_text() or "{}")
-        curr_data.update(kwargs)
-        self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
+        with FileLock(self.file):
+            curr_data = json.loads(self.file.read_text() or "{}")
+            curr_data.update(kwargs)
+            self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
 
     def __call__(self, *args, **kwargs):
         return self.emit_to_file(*args, **kwargs)
@@ -405,3 +407,42 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
         )
         time.sleep(_cur_timeout)
         simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait)
+
+
+class FileLock:
+    """Basic file locking class that acquires and releases locks
+    recommended usage is the context manager which will handle everythign for you
+
+    with FileLock("basic_file.txt") as basic_file:
+        basic_file.write("some text")
+
+    basic_file is a Path object of the desired file
+    If a lock is already in place, FileLock will wait up to <timeout> seconds
+    """
+
+    def __init__(self, file_name, timeout=10):
+        self.file = Path(file_name)
+        self.lock = Path(f"{self.file}.lock")
+        self.timeout = timeout
+
+    def wait_file(self):
+        start = time.time()
+        while self.lock.exists():
+            if (time.time() - start) < self.timeout:
+                time.sleep(1)
+                continue
+            else:
+                raise exceptions.BrokerError(
+                    f"Timeout while attempting to open {self.file.absolute()}"
+                )
+        self.lock.touch()
+        return self.file
+
+    def return_file(self):
+        self.lock.unlink()
+
+    def __enter__(self):
+        return self.wait_file()
+
+    def __exit__(self, *tb_info):
+        self.return_file()
