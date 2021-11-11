@@ -1,5 +1,8 @@
+from pathlib import Path
 import json
+import pytest
 from broker import helpers
+from broker import exceptions
 
 BROKER_ARGS_DATA = {
     "myarg": [
@@ -8,6 +11,11 @@ BROKER_ARGS_DATA = {
     ],
     "my_second_arg": "foo",
 }
+
+
+@pytest.fixture
+def tmp_file(tmp_path):
+    return tmp_path / "test.json"
 
 
 def test_load_json_file():
@@ -29,7 +37,7 @@ def test_resolve_file_args():
     broker_args = {
         "test_arg": "test_val",
         "args_file": "tests/data/broker_args.json",
-        "complex_args": "tests/data/args_file.yaml"
+        "complex_args": "tests/data/args_file.yaml",
     }
     new_args = helpers.resolve_file_args(broker_args)
     assert "args_file" not in new_args
@@ -38,14 +46,28 @@ def test_resolve_file_args():
     assert new_args["test_arg"] == "test_val"
 
 
-def test_emitter(tmp_path):
-    out_file = tmp_path / "output.json"
-    assert not out_file.exists()
-    helpers.emit.set_file(out_file)
-    assert out_file.exists()
+def test_emitter(tmp_file):
+    assert not tmp_file.exists()
+    helpers.emit.set_file(tmp_file)
+    assert tmp_file.exists()
     helpers.emit(test="value", another=5)
-    written = json.loads(out_file.read_text())
+    written = json.loads(tmp_file.read_text())
     assert written == {"test": "value", "another": 5}
     helpers.emit({"thing": 13})
-    written = json.loads(out_file.read_text())
+    written = json.loads(tmp_file.read_text())
     assert written == {"test": "value", "another": 5, "thing": 13}
+
+
+def test_lock_file_created(tmp_file):
+    with helpers.FileLock(tmp_file) as tf:
+        assert isinstance(tf, Path)
+        assert Path(f"{tf}.lock").exists()
+
+
+def test_lock_timeout(tmp_file):
+    tmp_lock = Path(f"{tmp_file}.lock")
+    tmp_lock.touch()
+    with pytest.raises(exceptions.BrokerError) as exc:
+        with helpers.FileLock(tmp_file, timeout=1):
+            pass
+    assert str(exc.value).startswith("Timeout while attempting to open")
