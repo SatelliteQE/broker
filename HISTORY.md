@@ -1,6 +1,11 @@
 History
 =======
 
+0.1.32 (2021-12-07)
+------------------
+
++ Added configurable ssh connection timeout
+
 0.1.31 (2021-11-11)
 ------------------
 
