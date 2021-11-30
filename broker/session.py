@@ -37,6 +37,7 @@ class Session:
         host = kwargs.get("hostname", "localhost")
         user = kwargs.get("username", "root")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(kwargs.get("timeout"))
         simple_retry(sock.connect, [(host, kwargs.get("port", 22))])
         self.session = ssh2_Session()
         self.session.handshake(sock)

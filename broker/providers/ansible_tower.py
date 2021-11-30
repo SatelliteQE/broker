@@ -271,7 +271,7 @@ class AnsibleTower(Provider):
                                         "reason": ev.event_data["res"]["msg"],
                                     }
                                     for ev in failed_events
-                                    if ev.event_data.get("res")
+                                    if ev.event_data.get("res", {}).get("msg")
                                 ]
                             )
         if not failure_messages:

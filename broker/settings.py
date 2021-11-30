@@ -18,6 +18,7 @@ inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 validators = [
     Validator("HOST_USERNAME", default="root"),
     Validator("HOST_PASSWORD", must_exist=True),
+    Validator("HOST_CONNECTION_TIMEOUT", default=None),
 ]
 settings = Dynaconf(
     settings_file=str(settings_path.absolute()),
