@@ -134,7 +134,7 @@ class VMBroker:
                 logger.debug(f"host={host}")
             except exceptions.ProviderError as err:
                 host = err
-            if host:
+            if host and not isinstance(host, exceptions.ProviderError):
                 hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
         return hosts
