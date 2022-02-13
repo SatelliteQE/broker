@@ -72,8 +72,10 @@ class Session:
         channel.execute(
             command,
         )
-        results = self._read(channel)
+        channel.wait_eof()
         channel.close()
+        channel.wait_closed()
+        results = self._read(channel)
         return results
 
     def shell(self, pty=False):
