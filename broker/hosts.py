@@ -19,7 +19,9 @@ class Host:
             self.name = name
         self.username = kwargs.get("username", settings.HOST_USERNAME)
         self.password = kwargs.get("password", settings.HOST_PASSWORD)
-        self.timeout = kwargs.get("connection_timeout", settings.HOST_CONNECTION_TIMEOUT)
+        self.timeout = kwargs.get(
+            "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
+        )
         self._session = None
 
     def __del__(self):
@@ -55,7 +57,10 @@ class Host:
         timeout = timeout or self.timeout
         self.close()
         self._session = Session(
-            hostname=self.hostname, username=username, password=password, timeout=timeout
+            hostname=self.hostname,
+            username=username,
+            password=password,
+            timeout=timeout,
         )
 
     def close(self):

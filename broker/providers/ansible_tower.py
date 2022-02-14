@@ -131,6 +131,8 @@ class AnsibleTower(Provider):
             versions = root.available_versions
             my_username = self.uname
         self.v2 = versions.v2.get()
+        # Check to see if we're running AAP (ver 4.0+)
+        self._is_aap = False if self.v2.ping.get().version[0] == "3" else True
         self.username = my_username
 
     @staticmethod
@@ -444,7 +446,12 @@ class AnsibleTower(Provider):
         job = target.launch(payload=payload)
         job_number = job.url.rstrip("/").split("/")[-1]
         job_api_url = url_parser.urljoin(self.url, str(job.url))
-        job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
+        if self._is_aap:
+            job_ui_url = url_parser.urljoin(
+                self.url, f"/#/jobs/{subject}/{job_number}/output"
+            )
+        else:
+            job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info("Waiting for job: \n" f"API: {job_api_url}\n" f"UI: {job_ui_url}")
         job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
