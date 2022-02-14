@@ -11,6 +11,7 @@ class AwxkitApiStub(MockStub):
     stubbing for:
      - root.load_session.get()
      - root.available_versions.v2.get()
+     - v2.ping.get().version
      - v2.jobs.get(id=child_id).results.pop()
      - v2.workflow_job_templates.get(name=workflow).results.pop()
      - v2.workflow_job_templates.get(name=workflow).results.pop()
@@ -29,6 +30,7 @@ class AwxkitApiStub(MockStub):
             super().__init__(self._load_workflow(kwargs.pop("name")))
         else:
             super().__init__()
+        self.version = "3.7.1"
 
     @staticmethod
     def _load_job(job_id):

@@ -99,7 +99,7 @@ def populate_providers(click_group):
     callback=helpers.set_emit_file,
     is_eager=True,
     expose_value=False,
-    help="Path to file where emitted json values should be stored"
+    help="Path to file where emitted json values should be stored",
 )
 @click.option(
     "--version",
@@ -241,11 +241,11 @@ def inventory(details, sync, filter):
             logger.info(f"{num}: {host['hostname'] or host['name']}")
     helpers.emit({"inventory": emit_data})
 
+
 @cli.command()
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-
 @click.option("--sequential", is_flag=True, help="Run extends sequentially")
 @click.option(
     "--filter", type=str, help="Extend only what matches the specified filter"

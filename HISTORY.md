@@ -1,6 +1,22 @@
 History
 =======
 
+0.1.35 (2022-02-14)
+------------------
+
++ Added basic support for AAP
++ Silenced urllib3 warnings for users who make questionable decisions
+
+0.1.34 (2022-02-13)
+------------------
+
++ Improved the reliability of Session.run
+
+0.1.33 (2021-12-16)
+------------------
+
++ Improved the resiliency of multiprocessing checkouts
+
 0.1.32 (2021-12-07)
 ------------------
 

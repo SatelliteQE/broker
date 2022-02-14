@@ -2,6 +2,7 @@
 """Module handling internal and dependency logging."""
 import logging
 import logzero
+import urllib3
 from broker.settings import BROKER_DIRECTORY, settings
 
 
@@ -29,4 +30,5 @@ def setup_logzero(level="info", path="logs/broker.log", silent=False):
     )
 
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 setup_logzero(level="debug" if settings.debug else "info")
