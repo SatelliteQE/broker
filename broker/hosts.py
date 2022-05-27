@@ -22,6 +22,7 @@ class Host:
         self.timeout = kwargs.get(
             "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
         )
+        self.port = kwargs.get("port", settings.PORT)
         self._session = None
 
     def __del__(self):
@@ -53,11 +54,12 @@ class Host:
             except RecursionError:
                 logger.warning(f"Recursion limit reached on {obj=}")
 
-    def connect(self, username=None, password=None, timeout=None):
+    def connect(self, username=None, password=None, timeout=None, port=22):
         username = username or self.username
         password = password or self.password
         timeout = timeout or self.timeout
-        _hostname, _port = self.hostname, 22
+        _hostname = self.hostname
+        _port = self.port or port
         if ":" in self.hostname:
             _hostname, port = self.hostname.split(":")
             _port = int(port)

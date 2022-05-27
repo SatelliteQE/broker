@@ -28,7 +28,8 @@ class Session:
         user = kwargs.get("username", "root")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(kwargs.get("timeout"))
-        simple_retry(sock.connect, [(host, kwargs.get("port", 22))])
+        port = kwargs.get("port", "port") or 22
+        simple_retry(sock.connect, [(host, kwargs.get("port", port))])
         self.session = ssh2_Session()
         self.session.handshake(sock)
         if kwargs.get("password"):
