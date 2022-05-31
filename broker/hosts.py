@@ -22,7 +22,7 @@ class Host:
         self.timeout = kwargs.get(
             "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
         )
-        self.port = kwargs.get("port", settings.PORT)
+        self.port = kwargs.get("port", settings.HOST_SSH_PORT)
         self._session = None
 
     def __del__(self):
