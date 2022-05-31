@@ -19,7 +19,7 @@ validators = [
     Validator("HOST_USERNAME", default="root"),
     Validator("HOST_PASSWORD", must_exist=True),
     Validator("HOST_CONNECTION_TIMEOUT", default=None),
-    Validator("PORT", default=22),
+    Validator("HOST_SSH_PORT", default=22),
 ]
 settings = Dynaconf(
     settings_file=str(settings_path.absolute()),
