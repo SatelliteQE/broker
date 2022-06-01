@@ -4,7 +4,7 @@ inventory_file: "inventory.yaml"
 # Host Settings
 host_username: "root"
 host_password: "<password>"
-host_port: "<port>"
+host_ssh_port: "<port>"
 # Provider settings
 AnsibleTower:
     instances:
