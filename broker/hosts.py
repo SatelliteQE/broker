@@ -41,18 +41,23 @@ class Host:
     def __getstate__(self):
         """If a session is active, remove it for pickle compatability"""
         self.close()
-        self._purify()
+        try:
+            self._purify()
+        except RecursionError:
+                logger.warning(f"Recursion limit reached on {self._purify_target}")
+                self.__dict__[self._purify_target] = None
+                self.__getstate__()
+        del self.__dict__["_purify_target"]
         return self.__dict__
 
     def _purify(self):
         """Strip all unpickleable attributes from a Host before pickling"""
-        for key, obj in self.__dict__.items():
+        for name in list(self.__dict__):
+            self._purify_target = name
             try:
-                pickle.dumps(obj)
+                pickle.dumps(self.__dict__[name])
             except (pickle.PicklingError, AttributeError):
-                self.__dict__[key] = None
-            except RecursionError:
-                logger.warning(f"Recursion limit reached on {obj=}")
+                self.__dict__[name] = None
 
     def connect(self, username=None, password=None, timeout=None, port=22):
         username = username or self.username
