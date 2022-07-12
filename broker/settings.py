@@ -25,8 +25,6 @@ settings = Dynaconf(
     settings_file=str(settings_path.absolute()),
     ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
     validators=validators,
-    load_dotenv=True,
-    ignore_unknown_envvars=True,
 )
 
 try:
