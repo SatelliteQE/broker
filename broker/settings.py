@@ -21,13 +21,19 @@ validators = [
     Validator("HOST_CONNECTION_TIMEOUT", default=None),
     Validator("HOST_SSH_PORT", default=22),
 ]
+
+# temportary fix for dynaconf #751
+vault_vars = {k: v for k, v in os.environ.items() if "VAULT_" in k}
+for k in vault_vars:
+    del os.environ[k]
+
 settings = Dynaconf(
     settings_file=str(settings_path.absolute()),
     ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
     validators=validators,
-    load_dotenv=True,
-    ignore_unknown_envvars=True,
 )
+# to make doubly sure, remove the vault loader if set somehow
+settings._loaders = [loader for loader in settings._loaders if not "vault" in loader]
 
 try:
     settings.validators.validate()
@@ -35,3 +41,5 @@ except ValidationError as err:
     raise ConfigurationError(
         f"Configuration error in {settings_path.absolute()}: {err.args[0]}"
     )
+
+os.environ.update(vault_vars)
