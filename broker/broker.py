@@ -25,6 +25,15 @@ PROVIDER_ACTIONS = {
 }
 
 
+def _try_teardown(host_obj):
+    """Try a host's teardown method and return an exception message if needed"""
+    try:
+        host_obj.teardown()
+    except Exception as err:
+        return exceptions.HostError(host_obj, f"error during teardown:\n{err}")
+
+
+
 class mp_decorator:
     """This decorator wraps Broker methods to enable multiprocessing
 
@@ -355,18 +364,15 @@ class Broker:
                 hosts.setup()
             return hosts
         except Exception as err:
+            for host in self._hosts:
+                _try_teardown(host)
             self.checkin()
             raise err
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         last_exception = None
         for host in self._hosts:
-            try:
-                host.teardown()
-            except Exception as err:
-                last_exception = exceptions.HostError(
-                    host, f"error during teardown:\n{err}"
-                )
+            last_exception = _try_teardown(host)
         self.checkin()
         if last_exception:
             raise last_exception
