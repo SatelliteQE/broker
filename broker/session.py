@@ -32,10 +32,10 @@ class Session:
         simple_retry(sock.connect, [(host, port)])
         self.session = ssh2_Session()
         self.session.handshake(sock)
-        if kwargs.get("password"):
-            self.session.userauth_password(user, kwargs["password"])
-        elif kwargs.get("key_filename"):
+        if kwargs.get("key_filename"):
             self.session.userauth_publickey_fromfile(user, kwargs["key_filename"])
+        elif kwargs.get("password"):
+            self.session.userauth_password(user, kwargs["password"])
         else:
             raise AuthException("No password or key file provided.")
 

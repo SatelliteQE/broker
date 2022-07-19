@@ -23,6 +23,7 @@ class Host:
             "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
         )
         self.port = kwargs.get("port", settings.HOST_SSH_PORT)
+        self.key_filename = kwargs.get("key_filename", settings.HOST_SSH_KEY_FILENAME)
         self._session = None
 
     def __del__(self):
@@ -59,12 +60,13 @@ class Host:
             except (pickle.PicklingError, AttributeError):
                 self.__dict__[name] = None
 
-    def connect(self, username=None, password=None, timeout=None, port=22):
+    def connect(self, username=None, password=None, timeout=None, port=22, key_filename=None):
         username = username or self.username
         password = password or self.password
         timeout = timeout or self.timeout
         _hostname = self.hostname
         _port = self.port or port
+        key_filename = key_filename or self.key_filename
         if ":" in self.hostname:
             _hostname, port = self.hostname.split(":")
             _port = int(port)
@@ -74,6 +76,7 @@ class Host:
             username=username,
             password=password,
             port=_port,
+            key_filename=key_filename,
         )
 
     def close(self):
