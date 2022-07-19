@@ -60,7 +60,9 @@ class Host:
             except (pickle.PicklingError, AttributeError):
                 self.__dict__[name] = None
 
-    def connect(self, username=None, password=None, timeout=None, port=22, key_filename=None):
+    def connect(
+        self, username=None, password=None, timeout=None, port=22, key_filename=None
+    ):
         username = username or self.username
         password = password or self.password
         timeout = timeout or self.timeout
