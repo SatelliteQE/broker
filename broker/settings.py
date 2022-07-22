@@ -20,6 +20,7 @@ validators = [
     Validator("HOST_PASSWORD", must_exist=True),
     Validator("HOST_CONNECTION_TIMEOUT", default=None),
     Validator("HOST_SSH_PORT", default=22),
+    Validator("HOST_SSH_KEY_FILENAME", default=None),
 ]
 
 # temportary fix for dynaconf #751

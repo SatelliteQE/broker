@@ -29,13 +29,16 @@ class Session:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
+        key_filename = kwargs.get("key_filename")
         simple_retry(sock.connect, [(host, port)])
         self.session = ssh2_Session()
         self.session.handshake(sock)
-        if kwargs.get("password"):
+        if key_filename:
+            if not Path(key_filename).exists():
+                raise FileNotFoundError(f"Key not found in '{key_filename}'")
+            self.session.userauth_publickey_fromfile(user, key_filename)
+        elif kwargs.get("password"):
             self.session.userauth_password(user, kwargs["password"])
-        elif kwargs.get("key_filename"):
-            self.session.userauth_publickey_fromfile(user, kwargs["key_filename"])
         else:
             raise AuthException("No password or key file provided.")
 
