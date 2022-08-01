@@ -1,4 +1,6 @@
 """Miscellaneous helpers live here"""
+import getpass
+import inspect
 import json
 import logging
 import os
@@ -489,3 +491,17 @@ class Result:
             stdout=nonduplex_exec.output.decode("utf-8"),
             stderr="",
         )
+
+
+def find_origin():
+    """Move up the call stack to find tests, fixtures, or cli invocations"""
+    prev = None
+    for frame in inspect.stack():
+        if frame.function == "checkout" and frame.filename.endswith("broker/commands.py"):
+            return f"broker_cli:{getpass.getuser()}"
+        if frame.function.startswith("test_"):
+            return f"{frame.function}:{frame.filename}"
+        if frame.function == "call_fixture_func":
+            return prev or "Uknown fixture"
+        prev = f"{frame.function}:{frame.filename}"
+    return f"Unknown origin by {getpass.getuser()}"

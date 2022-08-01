@@ -6,7 +6,7 @@ from urllib import parse as url_parser
 from functools import cached_property
 from dynaconf import Validator
 from broker import exceptions
-from broker.helpers import results_filter
+from broker.helpers import find_origin, results_filter
 from broker.settings import settings
 from logzero import logger
 from datetime import datetime
@@ -416,6 +416,7 @@ class AnsibleTower(Provider):
         if name := kwargs.get("workflow"):
             subject = "workflow"
             get_path = self.v2.workflow_job_templates
+            kwargs["_broker_origin"] = find_origin()
         elif name := kwargs.get("job_template"):
             subject = "job_template"
             get_path = self.v2.job_templates
