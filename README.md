@@ -240,7 +240,7 @@ from broker.hosts import Host
 class MyHost(Host):
    ...
 
-with Broker(..., host_classes={'host': MyHost}) as my_host:
+with Broker(..., host_class=MyHost) as my_host:
     ...
 ```
 

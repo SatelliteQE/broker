@@ -105,7 +105,10 @@ class Broker:
             nick = kwargs.pop("nick")
             kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick))
             logger.debug(f"kwargs after nick resolution {kwargs=}")
-        if "host_classes" in kwargs:
+        # Allow users to more simply pass a host class instead of a dict
+        if "host_class" in kwargs:
+            self.host_classes["host"] = kwargs.pop("host_class")
+        elif "host_classes" in kwargs:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
