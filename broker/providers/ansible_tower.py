@@ -1,6 +1,7 @@
 import click
 import inspect
 import json
+import os
 import yaml
 from urllib import parse as url_parser
 from functools import cached_property
@@ -417,6 +418,8 @@ class AnsibleTower(Provider):
             subject = "workflow"
             get_path = self.v2.workflow_job_templates
             kwargs["_broker_origin"] = find_origin()
+            if (jenkins_url := os.environ.get("BUILD_URL")):
+                kwargs["_jenkins_url"] = jenkins_url
         elif name := kwargs.get("job_template"):
             subject = "job_template"
             get_path = self.v2.job_templates
