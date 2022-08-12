@@ -11,19 +11,6 @@ from broker.providers import Provider
 from broker.binds import containers
 
 
-def container_execute(self, command, demux=True, **kwargs):
-    """This method is injected into the container host object on creation"""
-    kwargs["demux"] = demux
-    logger.debug(f"{self.hostname} executing command: {command}")
-    result = self._cont_inst.exec_run(command, **kwargs)
-    if demux:
-        result = helpers.Result.from_duplexed_exec(result)
-    else:
-        result = helpers.Result.from_nonduplexed_exec(result)
-    logger.debug(f"{self.hostname} command result:\n{result}")
-    return result
-
-
 def container_info(container_inst):
     return {
         "_broker_provider": "Container",
@@ -43,9 +30,13 @@ def _cont_inst(self):
     return self._cont_inst_p
 
 
-def _host_release(self):
+def _host_release():
     caller_host = inspect.stack()[1][0].f_locals["host"]
-    caller_host._cont_inst.remove(v=True, force=True)
+    if not caller_host._cont_inst_p:
+        caller_host._cont_inst_p = caller_host._prov_inst._cont_inst_by_name(
+            caller_host.name
+        )
+    caller_host._cont_inst_p.remove(v=True, force=True)
 
 
 class Container(Provider):
@@ -57,6 +48,7 @@ class Container(Provider):
             "CONTAINER.host_password",
         ),
         Validator("CONTAINER.host_port", default=22),
+        Validator("CONTAINER.timeout", default=360),
         Validator("CONTAINER.auto_map_ports", is_type_of=bool, default=True),
     ]
     _checkout_options = [
@@ -101,6 +93,7 @@ class Container(Provider):
                 username=settings.container.host_username,
                 password=settings.container.host_password,
                 port=settings.container.host_port,
+                timeout=settings.container.timeout,
             )
         return self._runtime
 
@@ -139,12 +132,10 @@ class Container(Provider):
                 "_cont_inst_p": cont_inst,
                 "_broker_provider": "Container",
                 "_broker_args": broker_args,
+                "release": _host_release,
             }
         )
-        host_inst.__class__.release = _host_release
         host_inst.__class__._cont_inst = _cont_inst
-        if not cont_inst.ports.get(22):
-            host_inst.__class__.execute = container_execute
 
     def _port_mapping(self, image, **kwargs):
         """
@@ -229,19 +220,14 @@ class Container(Provider):
             images = [
                 img.tags[0]
                 for img in self.runtime.images
-                if img.labels.get("broker_compatible")
-                and img.tags
+                if img.labels.get("broker_compatible") and img.tags
             ]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.results_filter(images, res_filter)
             images = "\n".join(images[:results_limit])
             logger.info(f"Available host images:\n{images}")
         elif kwargs.get("container_apps"):
-            images = [
-                img.tags[0]
-                for img in self.runtime.images
-                if img.tags
-            ]
+            images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.results_filter(images, res_filter)
             images = "\n".join(images[:results_limit])

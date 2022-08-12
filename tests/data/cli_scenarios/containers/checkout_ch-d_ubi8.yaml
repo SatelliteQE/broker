@@ -1,1 +1,1 @@
-container_host: ch-d:ubi8
+container_host: ubi8:latest

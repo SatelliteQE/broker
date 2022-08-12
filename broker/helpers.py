@@ -1,15 +1,18 @@
 """Miscellaneous helpers live here"""
+from contextlib import contextmanager
 import getpass
 import inspect
 import json
 import logging
 import os
 import sys
+import tarfile
 import time
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
 from copy import deepcopy
 from pathlib import Path
+from uuid import uuid4
 
 import yaml
 from logzero import logger
@@ -497,7 +500,9 @@ def find_origin():
     """Move up the call stack to find tests, fixtures, or cli invocations"""
     prev = None
     for frame in inspect.stack():
-        if frame.function == "checkout" and frame.filename.endswith("broker/commands.py"):
+        if frame.function == "checkout" and frame.filename.endswith(
+            "broker/commands.py"
+        ):
             return f"broker_cli:{getpass.getuser()}"
         if frame.function.startswith("test_"):
             return f"{frame.function}:{frame.filename}"
@@ -505,3 +510,35 @@ def find_origin():
             return prev or "Uknown fixture"
         prev = f"{frame.function}:{frame.filename}"
     return f"Unknown origin by {getpass.getuser()}"
+
+
+@contextmanager
+def data_to_tempfile(data, path=None, as_tar=False):
+    """Write data to a temporary file and return the path"""
+    path = Path(path or uuid4().hex[-10])
+    logger.debug(f"Creating temporary file {path.absolute()}")
+    if isinstance(data, bytes):
+        path.write_bytes(data)
+    elif isinstance(data, str):
+        path.write_text(data)
+    else:
+        raise TypeError(f"data must be bytes or str, not {type(data)}")
+    if as_tar:
+        tar = tarfile.open(path)
+        yield tarfile.open(path)
+        tar.close()
+    else:
+        yield path
+    path.unlink()
+
+
+@contextmanager
+def temporary_tar(paths):
+    """Create a temporary tar file and return the path"""
+    temp_tar = Path(f"{uuid4().hex[-10]}.tar")
+    with tarfile.open(temp_tar, mode="w") as tar:
+        for path in paths:
+            logger.debug(f"Adding {path.absolute()} to {temp_tar.absolute()}")
+            tar.add(path, arcname=path.name)
+    yield temp_tar.absolute()
+    temp_tar.unlink()

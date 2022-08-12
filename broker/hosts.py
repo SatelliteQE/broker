@@ -2,7 +2,7 @@
 import pickle
 from logzero import logger
 from broker.exceptions import NotImplementedError
-from broker.session import Session
+from broker.session import ContainerSession, Session
 from broker.settings import settings
 
 
@@ -36,7 +36,11 @@ class Host:
     def session(self):
         # This attribute may be missing after pickling
         if not isinstance(getattr(self, "_session", None), Session):
-            self.connect()
+            # Check to see if we're a non-ssh-enabled Container Host
+            if hasattr(self, "_cont_inst") and not self._cont_inst.ports.get(22):
+                self._session = ContainerSession(self)
+            else:
+                self.connect()
         return self._session
 
     def __getstate__(self):
@@ -48,7 +52,7 @@ class Host:
                 logger.warning(f"Recursion limit reached on {self._purify_target}")
                 self.__dict__[self._purify_target] = None
                 self.__getstate__()
-        del self.__dict__["_purify_target"]
+        self.__dict__.pop("_purify_target", None)
         return self.__dict__
 
     def _purify(self):
@@ -85,14 +89,10 @@ class Host:
         # This attribute may be missing after pickling
         if isinstance(getattr(self, "_session", None), Session):
             self._session.session.disconnect()
-            self._session = None
+        self._session = None
 
     def release(self):
         raise NotImplementedError("release has not been implemented for this provider")
-
-    # @cached_property
-    def hostname(self):
-        return self.session.execute("hostname").strip()
 
     # @cached_property
     def _pkg_mgr(self):
