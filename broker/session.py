@@ -4,7 +4,7 @@ from pathlib import Path
 from logzero import logger
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
-from broker.helpers import simple_retry, translate_timeout, Result
+from broker import helpers
 
 SESSIONS = {}
 
@@ -30,7 +30,7 @@ class Session:
         sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
         key_filename = kwargs.get("key_filename")
-        simple_retry(sock.connect, [(host, port)])
+        helpers.simple_retry(sock.connect, [(host, port)])
         self.session = ssh2_Session()
         self.session.handshake(sock)
         if key_filename:
@@ -53,14 +53,14 @@ class Session:
             except UnicodeDecodeError as err:
                 logger.error(f"Skipping data chunk due to {err}\nReceived: {data}")
             size, data = channel.read()
-        return Result.from_ssh(
+        return helpers.Result.from_ssh(
             stdout=results,
             channel=channel,
         )
 
     def run(self, command, timeout=0):
         """run a command on the host and return the results"""
-        self.session.set_timeout(translate_timeout(timeout))
+        self.session.set_timeout(helpers.translate_timeout(timeout))
         channel = self.session.open_session()
         channel.execute(
             command,
@@ -188,3 +188,72 @@ class InteractiveShell:
                 results += data.decode("utf-8")
                 size, data = self._chan.read()
         return results
+
+
+class ContainerSession:
+    """An approximation of ssh-based functionality from the Session class"""
+
+    def __init__(self, cont_inst):
+        self._cont_inst = cont_inst
+
+    def run(self, command, demux=True, **kwargs):
+        """This is the container approximation of Session.run"""
+        kwargs.pop("timeout", None)  # Timeouts are set at the client level
+        kwargs["demux"] = demux
+        if any([s in command for s in "|&><"]):
+            # Containers don't handle pipes, redirects, etc well in a bare exec_run
+            command = f"/bin/bash -c '{command}'"
+        result = self._cont_inst._cont_inst.exec_run(command, **kwargs)
+        if demux:
+            result = helpers.Result.from_duplexed_exec(result)
+        else:
+            result = helpers.Result.from_nonduplexed_exec(result)
+        return result
+
+    def disconnect(self):
+        """Needed for simple compatability with Session"""
+        pass
+
+    def sftp_write(self, sources, destination=None):
+        """Add one of more files to the container"""
+        # ensure sources is a list of Path objects
+        if not isinstance(sources, list):
+            sources = [Path(sources)]
+        else:
+            sources = [Path(source) for source in sources]
+        # validate each source's existenence
+        for source in sources:
+            if not Path(source).exists():
+                raise FileNotFoundError(source)
+        destination = destination or sources[0].parent
+        # Files need to be added to a tarfile
+        with helpers.temporary_tar(sources) as tar:
+            logger.debug(
+                f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
+            )
+            self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
+
+    def sftp_read(self, source, destination=None):
+        """Get a file or directory from the container"""
+        destination = Path(destination or source)
+        logger.debug(
+            f"{self._cont_inst.hostname} getting file {source} from {destination}"
+        )
+        data, status = self._cont_inst._cont_inst.get_archive(source)
+        logger.debug(f"{self._cont_inst.hostname}: {status}")
+        all_data = b"".join(d for d in data)
+        if destination.name == "_raw":
+            return all_data
+        with helpers.data_to_tempfile(all_data, as_tar=True) as tar:
+            logger.debug(f"Extracting {source} to {destination}")
+            tar.extractall(destination.parent if destination.is_file() else destination)
+
+    def shell(self, pty=False):
+        """Create and return an interactive shell instance"""
+        raise NotImplementedError("ContainerSession.shell has not been implemented")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass

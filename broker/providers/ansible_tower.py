@@ -397,7 +397,7 @@ class AnsibleTower(Provider):
                 if key.endswith("host_type"):
                     host_type = value if value in host_classes else host_type
             if not hostname:
-                raise Exception(f"No hostname found in job attributes:\n{job_attrs}")
+                logger.warning(f"No hostname found in job attributes:\n{job_attrs}")
             logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
             host_inst = host_classes[host_type](
                 **{**kwargs, "hostname": hostname, "name": name}

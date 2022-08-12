@@ -59,7 +59,7 @@ def test_containerhosts_list():
 
 def test_containerhost_query():
     result = CliRunner().invoke(
-        cli, ["providers", "Container", "--container-host", "ch-d:ubi8"]
+        cli, ["providers", "Container", "--container-host", "ubi8:latest"]
     )
     assert result.exit_code == 0
 
@@ -67,7 +67,11 @@ def test_containerhost_query():
 # ----- Broker API Tests -----
 
 def test_container_e2e():
-    with Broker(container_host="ch-d:ubi8") as c_host:
+    with Broker(container_host="ubi8:latest") as c_host:
         assert c_host._cont_inst.top()['Processes']
         res = c_host.execute("hostname")
         assert res.stdout.strip() == c_host.hostname
+        # Test that a file can be uploaded to the container
+        c_host.session.sftp_write("broker_settings.yaml", "/root")
+        res = c_host.execute("ls")
+        assert "broker_settings.yaml" in res.stdout

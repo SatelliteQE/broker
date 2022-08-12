@@ -1,16 +1,17 @@
 class ContainerBind:
-    def __init__(self, host=None, username=None, password=None, port=22):
+    def __init__(self, host=None, username=None, password=None, port=22, timeout=None):
         self.host = host
         self.username = username
         self.password = password
         self.port = port
+        self.timeout = timeout
         self._client = None
         self._ClientClass = None
 
     @property
     def client(self):
         if not isinstance(self._client, self._ClientClass):
-            self._client = self._ClientClass(base_url=self.uri)
+            self._client = self._ClientClass(base_url=self.uri, timeout=self.timeout)
         return self._client
 
     @property
@@ -74,24 +75,29 @@ class ContainerBind:
 
 
 class PodmanBind(ContainerBind):
-    def __init__(self, host=None, username=None, password=None, port=22):
-        super().__init__(host, username, password, port)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         from podman import PodmanClient
 
         self._ClientClass = PodmanClient
         if self.host == "localhost":
             self.uri = "unix:///run/user/1000/podman/podman.sock"
         else:
-            self.uri = f"http+ssh://{username}@{host}:{port}/run/podman/podman.sock"
+            self.uri = (
+                "http+ssh://{username}@{host}:{port}/run/podman/podman.sock".format(
+                    **kwargs
+                )
+            )
 
 
 class DockerBind(ContainerBind):
-    def __init__(self, host=None, username=None, password=None, port=2375):
-        super().__init__(host, username, password, port)
+    def __init__(self, port=2375, **kwargs):
+        kwargs["port"] = port
+        super().__init__(**kwargs)
         from docker import DockerClient
 
         self._ClientClass = DockerClient
         if self.host == "localhost":
             self.uri = "unix://var/run/docker.sock"
         else:
-            self.uri = f"ssh://{username}@{host}"
+            self.uri = "ssh://{username}@{host}".format(**kwargs)
