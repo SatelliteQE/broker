@@ -33,7 +33,6 @@ def _try_teardown(host_obj):
         return exceptions.HostError(host_obj, f"error during teardown:\n{err}")
 
 
-
 class mp_decorator:
     """This decorator wraps Broker methods to enable multiprocessing
 
@@ -240,9 +239,7 @@ class Broker:
             logger.debug("Checkin called with no hosts, taking no action")
             return
 
-        with ProcessPoolExecutor(
-            max_workers=1 if sequential else len(hosts)
-        ) as workers:
+        with ProcessPoolExecutor(max_workers=1 if sequential else None) as workers:
             completed_checkins = as_completed(
                 # reversing over a copy of the list to avoid skipping
                 workers.submit(self._checkin, _host)
