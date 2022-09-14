@@ -461,7 +461,7 @@ class Result:
         self.__dict__.update(kwargs)
 
     def __repr__(self):
-        return getattr(self, "stdout")
+        return f"stdout:\n{self.stdout}\nstderr:\n{self.stderr}\nstatus: {self.status}"
 
     @classmethod
     def from_ssh(cls, stdout, channel):
@@ -497,19 +497,21 @@ class Result:
 
 
 def find_origin():
-    """Move up the call stack to find tests, fixtures, or cli invocations"""
-    prev = None
+    """Move up the call stack to find tests, fixtures, or cli invocations.
+    Additionally, return the jenkins url, if it exists.
+    """
+    prev, jenkins_url = None, os.environ.get("BUILD_URL")
     for frame in inspect.stack():
         if frame.function == "checkout" and frame.filename.endswith(
             "broker/commands.py"
         ):
-            return f"broker_cli:{getpass.getuser()}"
+            return f"broker_cli:{getpass.getuser()}", jenkins_url
         if frame.function.startswith("test_"):
-            return f"{frame.function}:{frame.filename}"
+            return f"{frame.function}:{frame.filename}", jenkins_url
         if frame.function == "call_fixture_func":
-            return prev or "Uknown fixture"
+            return prev or "Uknown fixture", jenkins_url
         prev = f"{frame.function}:{frame.filename}"
-    return f"Unknown origin by {getpass.getuser()}"
+    return f"Unknown origin by {getpass.getuser()}", jenkins_url
 
 
 @contextmanager

@@ -16,8 +16,12 @@ class Provider:
     _checkout_options = []
     _execute_options = []
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self._construct_params = []
+        cls_name = self.__class__.__name__
+        logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
+        instance_name = kwargs.pop(f"{cls_name}", None)
+        self._validate_settings(instance_name)
 
     def _validate_settings(self, instance_name=None):
         """Load and validate provider settings
@@ -34,41 +38,30 @@ class Provider:
         fresh_settings = settings.get_fresh(section_name)
         instance, default = None, False
         for candidate in fresh_settings.instances:
+            logger.debug(f"Checking {instance_name} against {candidate}")
             if instance_name in candidate:
                 instance = candidate
                 default = False
+                break
             elif (
                 candidate.values()[0].get("default")
                 or len(fresh_settings.instances) == 1
             ):
                 instance = candidate
                 default = True
+        self.instance, *_ = instance  # store the instance name on the provider
         fresh_settings.update(instance.values()[0])
+        settings[section_name] = fresh_settings
         if default:
             # if a default provider is selected, defer to loaded environment variables
-            # settings[section_name] = fresh_settings
-            # settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
-            # ideal solution above. However, need to workaround until
-            # https://github.com/rochacbruno/dynaconf/issues/511
-            settings.execute_loaders()
-            for key in fresh_settings.keys():
-                if key in settings[section_name]:
-                    fresh_settings[key] = settings[section_name][key]
-            settings[section_name] = fresh_settings
-        else:
-            settings[section_name] = fresh_settings
+            settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
 
-        # temporary workaround for https://github.com/rochacbruno/dynaconf/issues/508
-        # remove the current valiators, add ours, and validate
-        # then add the other validators back in and move on
-        current_validators = settings.validators[:]
-        settings.validators.clear()
         settings.validators.extend(self._validators)
+        # use selective validation to only validate the instance settings
         try:
-            settings.validators.validate()
+            settings.validators.validate(only=section_name)
         except dynaconf.ValidationError as err:
             raise exceptions.ConfigurationError(err)
-        settings.validators.extend(current_validators)
 
     def _host_release(self):
         raise exceptions.NotImplementedError("_host_release has not been implemented")

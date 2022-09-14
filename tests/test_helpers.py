@@ -71,3 +71,19 @@ def test_lock_timeout(tmp_file):
         with helpers.FileLock(tmp_file, timeout=1):
             pass
     assert str(exc.value).startswith("Timeout while attempting to open")
+
+
+def test_find_origin():
+    origin = helpers.find_origin()
+    assert len(origin) == 2
+    assert origin[0].startswith("test_find_origin")
+    assert origin[1] == None
+
+
+@pytest.mark.parametrize(
+    "set_envars", [("BUILD_URL", "fake")], indirect=True
+)
+def test_find_origin_jenkins(set_envars):
+    origin = helpers.find_origin()
+    assert len(origin) == 2
+    assert origin[1] == "fake"

@@ -35,6 +35,7 @@ class ContainerBind:
 
     def create_container(self, image, command=None, **kwargs):
         """Create and return running container instance"""
+        kwargs = self._sanitize_create_args(kwargs)
         return self.client.containers.create(image, command, **kwargs)
 
     def execute(self, image, command=None, remove=True, **kwargs):
@@ -89,6 +90,16 @@ class PodmanBind(ContainerBind):
                 )
             )
 
+    def _sanitize_create_args(self, kwargs):
+        from podman.domain.containers_create import CreateMixin
+        try:
+            CreateMixin._render_payload(kwargs)
+        except TypeError as err:
+            sanitized = err.args[0].replace("Unknown keyword argument(s): ", "").replace("'", "").split(" ,")
+            kwargs = {k: v for k, v in kwargs.items() if k not in sanitized}
+            kwargs = self._sanitize_create_args(kwargs)
+        return kwargs
+
 
 class DockerBind(ContainerBind):
     def __init__(self, port=2375, **kwargs):
@@ -101,3 +112,7 @@ class DockerBind(ContainerBind):
             self.uri = "unix://var/run/docker.sock"
         else:
             self.uri = "ssh://{username}@{host}".format(**kwargs)
+
+    def _sanitize_create_args(self, kwargs):
+        from docker.models.containers import RUN_CREATE_KWARGS
+        return {k: v for k, v in kwargs.items() if k in RUN_CREATE_KWARGS}

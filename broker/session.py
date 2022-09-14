@@ -214,20 +214,20 @@ class ContainerSession:
         """Needed for simple compatability with Session"""
         pass
 
-    def sftp_write(self, sources, destination=None):
+    def sftp_write(self, source, destination=None):
         """Add one of more files to the container"""
-        # ensure sources is a list of Path objects
-        if not isinstance(sources, list):
-            sources = [Path(sources)]
+        # ensure source is a list of Path objects
+        if not isinstance(source, list):
+            source = [Path(source)]
         else:
-            sources = [Path(source) for source in sources]
+            source = [Path(src) for src in source]
         # validate each source's existenence
-        for source in sources:
-            if not Path(source).exists():
-                raise FileNotFoundError(source)
-        destination = destination or sources[0].parent
+        for src in source:
+            if not Path(src).exists():
+                raise FileNotFoundError(src)
+        destination = destination or source[0].parent
         # Files need to be added to a tarfile
-        with helpers.temporary_tar(sources) as tar:
+        with helpers.temporary_tar(source) as tar:
             logger.debug(
                 f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
             )
