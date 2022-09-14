@@ -1,7 +1,6 @@
 import click
 import inspect
 import json
-import os
 import yaml
 from urllib import parse as url_parser
 from functools import cached_property
@@ -74,11 +73,7 @@ class AnsibleTower(Provider):
     ]
 
     def __init__(self, **kwargs):
-        # Get the specified AT instance
-        logger.debug(f"AnsibleTower instantiated with {kwargs=}")
-        instance_name = kwargs.pop("AnsibleTower", None)
-        # Validate the AnsibleTower-specific settings
-        self._validate_settings(instance_name)
+        super().__init__(**kwargs)
         # get our instance settings
         self.url = settings.ANSIBLETOWER.base_url
         self.uname = settings.ANSIBLETOWER.get("username")
@@ -88,7 +83,6 @@ class AnsibleTower(Provider):
             kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
         )
         # Init the class itself
-        self._construct_params = []
         config = kwargs.get("config", awxkit.config)
         config.base_url = self.url
         root = kwargs.get("root")
@@ -155,6 +149,14 @@ class AnsibleTower(Provider):
         broker_args = getattr(caller_host, "_broker_args", {}).get("_broker_args", {})
         # remove the workflow field since it will conflict with the release workflow
         broker_args.pop("workflow", None)
+        # reconstruct tower provider inventory information when needed
+        prov_inv = broker_args.pop("tower_inventory", None)
+        if isinstance(prov_inv, str):
+            logger.debug(f"prov_inv: {prov_inv}")
+            prov_inv = self._translate_inventory(prov_inv)
+        if prov_inv:
+            logger.debug(f"prov_inv: {prov_inv}")
+            broker_args["inventory"] = prov_inv
         caller_host._prov_inst.release(
             broker_args.get("source_vm", caller_host.name), broker_args
         )
@@ -168,6 +170,30 @@ class AnsibleTower(Provider):
                 "_broker_args": broker_args,
             }
         )
+
+    def _translate_inventory(self, inventory):
+        if isinstance(inventory, int):  # already an id, silly
+            if inventory_info := self.v2.inventory.get(id=inventory):
+                return inventory_info.results[0].name
+            else:
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message=f"Unknown AnsibleTower inventory by id {inventory}",
+                )
+        if inventory_info := self.v2.inventory.get(search=inventory):
+            if inventory_info.count > 1:
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message=f"Ambigious AnsibleTower inventory name {inventory}",
+                )
+            elif inventory_info.count == 1:
+                inv_struct = inventory_info.results.pop()
+                return inv_struct.id
+            else:
+                raise exceptions.ProviderError(
+                    provider="AnsibleTower",
+                    message=f"Unknown AnsibleTower inventory {inventory}",
+                )
 
     def _merge_artifacts(self, at_object, strategy="last", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children
@@ -303,7 +329,9 @@ class AnsibleTower(Provider):
             "name": host.name,
             "type": host.type,
             "hostname": host.variables.get("fqdn"),
+            "tower_inventory": self._translate_inventory(host.inventory),
             "_broker_provider": "AnsibleTower",
+            "_broker_provider_instance": self.instance,
             "_broker_args": getattr(host, "_broker_args", {}),
         }
         expire_time = self._get_expire_date(host.id)
@@ -337,7 +365,6 @@ class AnsibleTower(Provider):
                 if val and isinstance(val, str)
             }
         )
-        host_info["_broker_args"]["tower_inventory"] = create_job.inventory
         return host_info
 
     @cached_property
@@ -347,20 +374,8 @@ class AnsibleTower(Provider):
         elif isinstance(self._inventory, int):
             # inventory already resolved as id
             return self._inventory
-        if inventory_info := self.v2.inventory.get(search=self._inventory):
-            if inventory_info.count > 1:
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
-                    message=f"Ambigious AnsibleTower inventory name {self._inventory}",
-                )
-            elif inventory_info.count == 1:
-                inv_struct = inventory_info.results.pop()
-                return inv_struct.id
-            else:
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
-                    message=f"Unknown AnsibleTower inventory {self._inventory}",
-                )
+        self._inventory = self._translate_inventory(self._inventory)
+        return self._inventory
 
     def construct_host(self, provider_params, host_classes, **kwargs):
         """Constructs host to be read by Ansible Tower
@@ -417,9 +432,10 @@ class AnsibleTower(Provider):
         if name := kwargs.get("workflow"):
             subject = "workflow"
             get_path = self.v2.workflow_job_templates
-            kwargs["_broker_origin"] = find_origin()
-            if (jenkins_url := os.environ.get("BUILD_URL")):
-                kwargs["_jenkins_url"] = jenkins_url
+            origin = find_origin()
+            kwargs["_broker_origin"] = origin[0]
+            if origin[1]:
+                kwargs["_jenkins_url"] = origin[1]
         elif name := kwargs.get("job_template"):
             subject = "job_template"
             get_path = self.v2.job_templates
@@ -438,11 +454,14 @@ class AnsibleTower(Provider):
                 provider="AnsibleTower",
                 message=f"{subject.capitalize()} not found by name: {name}",
             )
-        payload = {"extra_vars": str(kwargs)}
-        if self.inventory:
+        payload = {}
+        if inventory := kwargs.pop("inventory", None):
+            payload["inventory"] = inventory
+        elif self.inventory:
             payload["inventory"] = self.inventory
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
+        payload["extra_vars"] = str(kwargs)
         logger.debug(
             f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n"
             f"{payload=}"

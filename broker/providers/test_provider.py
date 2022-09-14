@@ -17,11 +17,10 @@ HOST_PROPERTIES = {
 class TestProvider(Provider):
     __test__ = False  # don't use for testing
     hidden = True  # hide from click command generation
-    _validators = [Validator("TestProvider.foo", must_exist=True)]
+    _validators = [Validator("TESTPROVIDER.foo", must_exist=True)]
 
     def __init__(self, **kwargs):
-        self.instance_name = kwargs.pop("TestProvider", "default")
-        self._validate_settings(self.instance_name)
+        super().__init__(**kwargs)
         self.config = settings.TESTPROVIDER.config_value
         self.foo = settings.TESTPROVIDER.foo
 
@@ -33,8 +32,9 @@ class TestProvider(Provider):
         host_inst.__dict__.update(
             {
                 "release": self._host_release,
-                "_test_inst": self,
+                "_prov_inst": self,
                 "_broker_provider": "TestProvider",
+                "_broker_provider_instance": self.instance,
                 "_broker_args": broker_args,
             }
         )

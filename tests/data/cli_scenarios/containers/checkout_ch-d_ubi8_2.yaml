@@ -1,0 +1,2 @@
+container_host: ubi8:latest
+count: 2

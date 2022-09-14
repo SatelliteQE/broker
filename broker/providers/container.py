@@ -68,8 +68,7 @@ class Container(Provider):
     _extend_options = []
 
     def __init__(self, **kwargs):
-        instance_name = kwargs.pop("Container", None)
-        self._validate_settings(instance_name)
+        super().__init__(**kwargs)
         if kwargs.get("bind") is not None:
             self._runtime_cls = kwargs.pop("bind")
         elif settings.container.runtime.lower() == "podman":
@@ -131,6 +130,7 @@ class Container(Provider):
                 "_prov_inst": self,
                 "_cont_inst_p": cont_inst,
                 "_broker_provider": "Container",
+                "_broker_provider_instance": self.instance,
                 "_broker_args": broker_args,
                 "release": _host_release,
             }
@@ -254,6 +254,12 @@ class Container(Provider):
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
+        envars, origin = {}, helpers.find_origin()
+        envars["BROKER_ORIGIN"] = origin[0]
+        if origin[1]:
+            envars["JENKINS_URL"] = origin[1]
+        kwargs["environment"] = envars
+        kwargs["labels"] = envars
         container_inst = self.runtime.create_container(container_host, **kwargs)
         container_inst.start()
         return container_inst

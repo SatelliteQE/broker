@@ -113,6 +113,7 @@ class Host:
             "hostname": self.hostname,
             "name": getattr(self, "name", None),
             "_broker_provider": self._broker_provider,
+            "_broker_provider_instance": self._prov_inst.instance,
             "type": "host",
             "_broker_args": self._broker_args,
         }

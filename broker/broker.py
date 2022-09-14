@@ -331,6 +331,8 @@ class Broker:
                 f"No provider found with name {host_export_data.get('_broker_provider')}"
             )
             return
+        if provider_instance := host_export_data.get("_broker_provider_instance"):
+            host_export_data[provider.__name__] = provider_instance
         provider_inst = provider(**host_export_data)
         host = provider_inst.construct_host(
             provider_params=None, host_classes=self.host_classes, **host_export_data

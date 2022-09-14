@@ -238,12 +238,12 @@ def inventory(details, sync, filter):
     emit_data = []
     for num, host in enumerate(inventory):
         emit_data.append(host)
+        if (display_name := host.get("hostname")) is None:
+            display_name = host.get("name")
         if details:
-            logger.info(
-                f"{num}: {host.get('hostname', host.get('name'))}, Details: {helpers.yaml_format(host)}"
-            )
+            logger.info(f"{num}: {display_name}, Details: {helpers.yaml_format(host)}")
         else:
-            logger.info(f"{num}: {host.get('hostname', host.get('name'))}")
+            logger.info(f"{num}: {display_name}")
     helpers.emit({"inventory": emit_data})
 
 
