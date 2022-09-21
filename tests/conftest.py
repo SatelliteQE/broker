@@ -4,7 +4,7 @@ import pytest
 
 @pytest.fixture
 def set_envars(request):
-    """Set and unset one or more envrionment variables"""
+    """Set and unset one or more environment variables"""
     if isinstance(request.param, list):
         for pair in request.param:
             os.environ[pair[0]] = pair[1]

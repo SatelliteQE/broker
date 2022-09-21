@@ -81,7 +81,7 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
                 if isinstance(val, dict):
                     flattened.extend(flatten_dict(val, new_key, separator).items())
                     to_remove.append(index)
-            for index in to_remove:
+            for index in to_remove[::-1]:  # remove from back to front
                 del value[index]
             flattened.append((new_key, value))
         else:
