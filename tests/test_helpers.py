@@ -80,10 +80,14 @@ def test_find_origin():
     assert origin[1] == None
 
 
-@pytest.mark.parametrize(
-    "set_envars", [("BUILD_URL", "fake")], indirect=True
-)
+@pytest.mark.parametrize("set_envars", [("BUILD_URL", "fake")], indirect=True)
 def test_find_origin_jenkins(set_envars):
     origin = helpers.find_origin()
     assert len(origin) == 2
     assert origin[1] == "fake"
+
+
+def test_flatten_duplicate():
+    data = {"rhel_compose_repositories": [{"name": "baseos"}, {"name": "appstream"}]}
+    result = helpers.flatten_dict(data)
+    assert len(result) == 2
