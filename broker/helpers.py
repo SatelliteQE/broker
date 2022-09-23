@@ -509,8 +509,12 @@ def find_origin():
         if frame.function.startswith("test_"):
             return f"{frame.function}:{frame.filename}", jenkins_url
         if frame.function == "call_fixture_func":
+            # attempt to find the test name from the fixture's request object
+            if request := _frame.frame.f_locals.get("request"):
+                return f"{prev} for {request.node._nodeid}", jenkins_url
+            # otherwise, return the fixture name and filename
             return prev or "Uknown fixture", jenkins_url
-        prev = f"{frame.function}:{frame.filename}"
+        prev, _frame = f"{frame.function}:{frame.filename}", frame
     return f"Unknown origin by {getpass.getuser()}", jenkins_url
 
 

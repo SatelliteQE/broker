@@ -254,7 +254,10 @@ class Container(Provider):
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
+        # add some context information about the container's requester
         envars, origin = {}, helpers.find_origin()
+        if "for" in origin:
+            origin = origin.split()[-1]
         envars["BROKER_ORIGIN"] = origin[0]
         if origin[1]:
             envars["JENKINS_URL"] = origin[1]

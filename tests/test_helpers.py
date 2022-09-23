@@ -18,6 +18,16 @@ def tmp_file(tmp_path):
     return tmp_path / "test.json"
 
 
+@pytest.fixture
+def basic_origin():
+    return helpers.find_origin()
+
+
+@pytest.fixture
+def request_origin(request):
+    return helpers.find_origin()
+
+
 def test_load_json_file():
     data = helpers.load_file("tests/data/broker_args.json")
     assert data == BROKER_ARGS_DATA
@@ -73,11 +83,20 @@ def test_lock_timeout(tmp_file):
     assert str(exc.value).startswith("Timeout while attempting to open")
 
 
-def test_find_origin():
+def test_find_origin_simple():
     origin = helpers.find_origin()
     assert len(origin) == 2
     assert origin[0].startswith("test_find_origin")
     assert origin[1] == None
+
+
+def test_find_origin_fixture(basic_origin):
+    assert basic_origin[0].startswith("basic_origin")
+
+
+def test_find_origin_fixture(request_origin):
+    """Test that we can get the request object information from the fixture"""
+    assert "test_find_origin_fixture" in request_origin[0]
 
 
 @pytest.mark.parametrize("set_envars", [("BUILD_URL", "fake")], indirect=True)
