@@ -1,12 +1,12 @@
 # from functools import cached_property
-import pickle
 from logzero import logger
 from broker.exceptions import NotImplementedError
+from broker.helpers import PickleSafe
 from broker.session import ContainerSession, Session
 from broker.settings import settings
 
 
-class Host:
+class Host(PickleSafe):
 
     default_timeout = 0  # timeout in ms, 0 is infinite
 
@@ -43,26 +43,12 @@ class Host:
                 self.connect()
         return self._session
 
-    def __getstate__(self):
-        """If a session is active, remove it for pickle compatability"""
+    def _pre_pickle(self):
         self.close()
-        try:
-            self._purify()
-        except RecursionError:
-                logger.warning(f"Recursion limit reached on {self._purify_target}")
-                self.__dict__[self._purify_target] = None
-                self.__getstate__()
-        self.__dict__.pop("_purify_target", None)
-        return self.__dict__
 
-    def _purify(self):
-        """Strip all unpickleable attributes from a Host before pickling"""
-        for name in list(self.__dict__):
-            self._purify_target = name
-            try:
-                pickle.dumps(self.__dict__[name])
-            except (pickle.PicklingError, AttributeError):
-                self.__dict__[name] = None
+    def _post_pickle(self, purified):
+        if "_cont_inst" in purified and not getattr(self, "_checked_in", False):
+            self._cont_inst = self._prov_inst._cont_inst_by_name(self.name)
 
     def connect(
         self, username=None, password=None, timeout=None, port=22, key_filename=None

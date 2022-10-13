@@ -22,21 +22,14 @@ def container_info(container_inst):
     }
 
 
-@property
-def _cont_inst(self):
-    """Returns a live container object instance"""
-    if not getattr(self, "_cont_inst_p", None):
-        self._cont_inst_p = self._prov_inst._cont_inst_by_name(self.name)
-    return self._cont_inst_p
-
-
 def _host_release():
     caller_host = inspect.stack()[1][0].f_locals["host"]
-    if not caller_host._cont_inst_p:
-        caller_host._cont_inst_p = caller_host._prov_inst._cont_inst_by_name(
+    if not caller_host._cont_inst:
+        caller_host._cont_inst = caller_host._prov_inst._cont_inst_by_name(
             caller_host.name
         )
-    caller_host._cont_inst_p.remove(v=True, force=True)
+    caller_host._cont_inst.remove(v=True, force=True)
+    caller_host._checked_in = True
 
 
 class Container(Provider):
@@ -80,21 +73,25 @@ class Container(Provider):
                 "Container",
                 f"Broker has no bind for {settings.container.runtime} containers",
             )
-        self._runtime = None  # this will be used later
+        self.runtime = self._runtime_cls(
+            host=settings.container.host,
+            username=settings.container.host_username,
+            password=settings.container.host_password,
+            port=settings.container.host_port,
+            timeout=settings.container.timeout,
+        )
         self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
 
-    @property
-    def runtime(self):
-        """Making this a property helps to recover from pickle environments"""
-        if not self._runtime:
-            self._runtime = self._runtime_cls(
-                host=settings.container.host,
-                username=settings.container.host_username,
-                password=settings.container.host_password,
-                port=settings.container.host_port,
-                timeout=settings.container.timeout,
-            )
-        return self._runtime
+
+    def _post_pickle(self, purified):
+        self._validate_settings()
+        self.runtime = self._runtime_cls(
+            host=settings.container.host,
+            username=settings.container.host_username,
+            password=settings.container.host_password,
+            port=settings.container.host_port,
+            timeout=settings.container.timeout,
+        )
 
     def _ensure_image(self, name):
         """Check if an image exists on the provider, attempt a pull if not"""
@@ -128,14 +125,13 @@ class Container(Provider):
         host_inst.__dict__.update(
             {
                 "_prov_inst": self,
-                "_cont_inst_p": cont_inst,
+                "_cont_inst": cont_inst,
                 "_broker_provider": "Container",
                 "_broker_provider_instance": self.instance,
                 "_broker_args": broker_args,
                 "release": _host_release,
             }
         )
-        host_inst.__class__._cont_inst = _cont_inst
 
     def _port_mapping(self, image, **kwargs):
         """

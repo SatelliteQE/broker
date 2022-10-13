@@ -5,6 +5,7 @@ import inspect
 import json
 import logging
 import os
+import pickle
 import sys
 import tarfile
 import time
@@ -548,3 +549,46 @@ def temporary_tar(paths):
             tar.add(path, arcname=path.name)
     yield temp_tar.absolute()
     temp_tar.unlink()
+
+
+class PickleSafe:
+    """A class that helps with pickling and unpickling complex objects"""
+
+    def _pre_pickle(self):
+        """This method is called before pickling an object"""
+        pass
+
+    def _post_pickle(self, purified):
+        """This method is called after pickling an object
+
+        purified will be a list of names of attributes that were removed
+        """
+        pass
+
+    def _purify(self):
+        """Strip all unpickleable attributes from a Host before pickling"""
+        self.purified = getattr(self, "purified", [])
+        for name in list(self.__dict__):
+            self._purify_target = name
+            try:
+                pickle.dumps(self.__dict__[name])
+            except (pickle.PicklingError, AttributeError):
+                self.__dict__[name] = None
+                self.purified.append(name)
+
+    def __getstate__(self):
+        """If a session is active, remove it for pickle compatability"""
+        self._pre_pickle()
+        try:
+            self._purify()
+        except RecursionError:
+                logger.warning(f"Recursion limit reached on {self._purify_target}")
+                self.__dict__[self._purify_target] = None
+                self.__getstate__()
+        self.__dict__.pop("_purify_target", None)
+        return self.__dict__
+
+    def __setstate__(self, state):
+        """Sometimes pickle strips things that we need. This should be used to restore them"""
+        self.__dict__.update(state)
+        self._post_pickle(purified=getattr(self, "purified", []))
