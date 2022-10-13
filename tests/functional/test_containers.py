@@ -75,3 +75,15 @@ def test_container_e2e():
         c_host.session.sftp_write("broker_settings.yaml", "/root")
         res = c_host.execute("ls")
         assert "broker_settings.yaml" in res.stdout
+
+
+def test_container_e2e_mp():
+    with Broker(container_host="ubi8:latest", _count=2) as c_hosts:
+        for c_host in c_hosts:
+            assert c_host._cont_inst.top()['Processes']
+            res = c_host.execute("hostname")
+            assert res.stdout.strip() == c_host.hostname
+            # Test that a file can be uploaded to the container
+            c_host.session.sftp_write("broker_settings.yaml", "/root")
+            res = c_host.execute("ls")
+            assert "broker_settings.yaml" in res.stdout

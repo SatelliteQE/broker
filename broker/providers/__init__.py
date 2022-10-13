@@ -2,11 +2,12 @@ import pickle
 import dynaconf
 
 from broker import exceptions
+from broker.helpers import PickleSafe
 from broker.settings import settings
 from logzero import logger
 
 
-class Provider:
+class Provider(PickleSafe):
     # Populate with a list of Dynaconf Validators specific to your provider
     _validators = []
     # Set to true if you don't want your provider shown in the CLI
@@ -33,6 +34,7 @@ class Provider:
 
         :param instance_name: A string matching an instance name
         """
+        instance_name = instance_name or getattr(self, "instance", None)
         section_name = self.__class__.__name__.upper()
         # make sure each instance isn't loading values from another
         fresh_settings = settings.get_fresh(section_name)
