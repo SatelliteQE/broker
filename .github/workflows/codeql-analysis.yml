@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
     - name: Checkout repository
@@ -36,6 +36,6 @@ jobs:
     - name: Unit Tests
       run: |
         pip install -U pip
-        pip install -U .[test]
+        pip install -U .[test,docker]
         cp broker_settings.yaml.example broker_settings.yaml
         pytest -v tests/ --ignore tests/functional
