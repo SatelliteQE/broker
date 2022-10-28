@@ -4,7 +4,7 @@ from broker.providers.container import Container
 from broker.providers.test_provider import TestProvider
 from broker.hosts import Host
 from broker import exceptions, helpers
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 PROVIDERS = {
@@ -38,26 +38,11 @@ class mp_decorator:
 
     The decorated method is expected to return an itearable.
     """
-
-    # Note that this is a descriptor as the other option -- using nested function
-    # like this:
-    #
-    # def mp_decorator(func)
-    #   @wraps(func)
-    #   def wrapper(func)
-    #       return
-    #
-    #   return wrapper
-    #
-    # is not working with pickling that is necessary for the ProcessPoolExecutor of
-    # concurrent.futures. I got errors like:
-    # _pickle.PicklingError: Can't pickle ... it's not the same object as ...
-
     MAX_WORKERS = None
     """ If set to integer, the count of workers will be limited to that amount.
      If set to None, the max workers count of the EXECUTOR will match the count of items."""
 
-    EXECUTOR = ProcessPoolExecutor
+    EXECUTOR = ThreadPoolExecutor
 
     def __init__(self, func=None):
         self.func = func
@@ -239,7 +224,7 @@ class Broker:
             logger.debug("Checkin called with no hosts, taking no action")
             return
 
-        with ProcessPoolExecutor(max_workers=1 if sequential else None) as workers:
+        with ThreadPoolExecutor(max_workers=1 if sequential else None) as workers:
             completed_checkins = as_completed(
                 # reversing over a copy of the list to avoid skipping
                 workers.submit(self._checkin, _host)
@@ -291,7 +276,7 @@ class Broker:
             logger.debug("Extend called with no hosts, taking no action")
             return
 
-        with ProcessPoolExecutor(
+        with ThreadPoolExecutor(
             max_workers=1 if sequential else len(hosts)
         ) as workers:
             completed_extends = as_completed(

@@ -1,4 +1,5 @@
 """Miscellaneous helpers live here"""
+import collections
 from contextlib import contextmanager
 import getpass
 import inspect
@@ -338,6 +339,17 @@ class MockStub(UserDict):
 
     def __call__(self, *args, **kwargs):
         return self
+
+    def __hash__(self):
+        return hash(
+            tuple(
+                (
+                    kp
+                    for kp in self.__dict__.items()
+                    if isinstance(kp[1], collections.abc.Hashable)
+                )
+            )
+        )
 
 
 def update_log_level(ctx, param, value):
