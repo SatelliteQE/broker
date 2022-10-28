@@ -225,12 +225,15 @@ class ContainerSession:
         for src in source:
             if not Path(src).exists():
                 raise FileNotFoundError(src)
-        destination = destination or source[0].parent
+        destination = Path(destination) or source[0].parent
         # Files need to be added to a tarfile
         with helpers.temporary_tar(source) as tar:
             logger.debug(
                 f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
             )
+            # if the destination is a file, create the parent path
+            if destination.is_file():
+                self.execute(f"mkdir -p {destination.parent}")
             self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
 
     def sftp_read(self, source, destination=None):

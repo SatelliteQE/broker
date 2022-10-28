@@ -1,3 +1,4 @@
+from functools import cache
 import getpass
 import inspect
 from uuid import uuid4
@@ -30,6 +31,19 @@ def _host_release():
         )
     caller_host._cont_inst.remove(v=True, force=True)
     caller_host._checked_in = True
+
+
+@cache
+def get_runtime(
+    runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None
+):
+    return runtime_cls(
+        host=host,
+        username=username,
+        password=password,
+        port=port,
+        timeout=timeout,
+    )
 
 
 class Container(Provider):
@@ -73,7 +87,8 @@ class Container(Provider):
                 "Container",
                 f"Broker has no bind for {settings.container.runtime} containers",
             )
-        self.runtime = self._runtime_cls(
+        self.runtime = get_runtime(
+            runtime_cls=self._runtime_cls,
             host=settings.container.host,
             username=settings.container.host_username,
             password=settings.container.host_password,
@@ -81,7 +96,6 @@ class Container(Provider):
             timeout=settings.container.timeout,
         )
         self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
-
 
     def _post_pickle(self, purified):
         self._validate_settings()
@@ -220,12 +234,14 @@ class Container(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.results_filter(images, res_filter)
+                images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available host images:\n{images}")
         elif kwargs.get("container_apps"):
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.results_filter(images, res_filter)
+                images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available app images:\n{images}")
 

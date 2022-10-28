@@ -3,7 +3,7 @@ import inspect
 import json
 import yaml
 from urllib import parse as url_parser
-from functools import cached_property
+from functools import cache, cached_property
 from dynaconf import Validator
 from broker import exceptions
 from broker.helpers import find_origin, results_filter
@@ -20,6 +20,51 @@ except:
 
 from broker.providers import Provider
 from broker import helpers
+
+
+@cache
+def get_awxkit_and_uname(
+    config=None, root=None, url=None, token=None, uname=None, pword=None
+):
+    """Return an awxkit api object and resolved username"""
+    # Prefer token if its set, otherwise use username/password
+    # auth paths for the API taken from:
+    # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
+    # unit test mock structure means the root API instance can't be loaded on the same line
+    config = config or awxkit.config
+    config.base_url = url
+    if root is None:
+        root = awxkit.api.Api()  # support mock stub for unit tests
+    if token:
+        helpers.emit(auth_type="token")
+        logger.info("Using token authentication")
+        config.token = token
+        try:
+            root.connection.login(
+                username=None, password=None, token=token, auth_type="Bearer"
+            )
+        except awxkit.exceptions.Unauthorized as err:
+            raise exceptions.AuthenticationError(err.args[0])
+        versions = root.get().available_versions
+        try:
+            # lookup the user that authenticated with the token
+            # If a username was specified in config, use that instead
+            my_username = uname or versions.v2.get().me.get().results[0].username
+        except (IndexError, AttributeError):
+            # lookup failed for whatever reason
+            raise exceptions.ProviderError(
+                provider="AnsibleTower",
+                message="Failed to lookup a username for the given token, please check credentials",
+            )
+    else:  # dynaconf validators should have checked that either token or password was provided
+        helpers.emit(auth_type="password")
+        logger.info("Using username and password authentication")
+        config.credentials = {"default": {"username": uname, "password": pword}}
+        config.use_sessions = True
+        root.load_session().get()
+        versions = root.available_versions
+        my_username = uname
+    return versions.v2.get(), my_username
 
 
 class AnsibleTower(Provider):
@@ -83,52 +128,18 @@ class AnsibleTower(Provider):
             kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
         )
         # Init the class itself
-        config = kwargs.get("config", awxkit.config)
-        config.base_url = self.url
+        config = kwargs.get("config")
         root = kwargs.get("root")
-        if root is None:
-            root = awxkit.api.Api()  # support mock stub for unit tests
-        # Prefer token if its set, otherwise use username/password
-        # auth paths for the API taken from:
-        # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
-        # unit test mock structure means the root API instance can't be loaded on the same line
-        if self.token:
-            helpers.emit(auth_type="token")
-            logger.info("Using token authentication")
-            config.token = self.token
-            try:
-                root.connection.login(
-                    username=None, password=None, token=self.token, auth_type="Bearer"
-                )
-            except awxkit.exceptions.Unauthorized as err:
-                raise exceptions.AuthenticationError(err.args[0])
-            versions = root.get().available_versions
-            try:
-                # lookup the user that authenticated with the token
-                # If a username was specified in config, use that instead
-                my_username = (
-                    self.uname or versions.v2.get().me.get().results[0].username
-                )
-            except (IndexError, AttributeError):
-                # lookup failed for whatever reason
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
-                    message="Failed to lookup a username for the given token, please check credentials",
-                )
-        else:  # dynaconf validators should have checked that either token or password was provided
-            helpers.emit(auth_type="password")
-            logger.info("Using username and password authentication")
-            config.credentials = {
-                "default": {"username": self.uname, "password": self.pword}
-            }
-            config.use_sessions = True
-            root.load_session().get()
-            versions = root.available_versions
-            my_username = self.uname
-        self.v2 = versions.v2.get()
+        self.v2, self.username = get_awxkit_and_uname(
+            config=config,
+            root=root,
+            url=self.url,
+            token=self.token,
+            uname=self.uname,
+            pword=self.pword,
+        )
         # Check to see if we're running AAP (ver 4.0+)
         self._is_aap = False if self.v2.ping.get().version[0] == "3" else True
-        self.username = my_username
 
     @staticmethod
     def _pull_params(kwargs):
@@ -542,6 +553,7 @@ class AnsibleTower(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 workflows = results_filter(workflows, res_filter)
+                workflows = workflows if isinstance(workflows, list) else [workflows]
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
         elif inventory := kwargs.get("inventory"):
@@ -555,6 +567,7 @@ class AnsibleTower(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 inv = results_filter(inv, res_filter)
+                inv = inv if isinstance(inv, list) else [inv]
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
         elif job_template := kwargs.get("job_template"):
@@ -570,6 +583,7 @@ class AnsibleTower(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 job_templates = results_filter(job_templates, res_filter)
+                job_templates = job_templates if isinstance(job_templates, list) else [job_templates]
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
         elif kwargs.get("templates"):
@@ -584,6 +598,7 @@ class AnsibleTower(Provider):
             templates.sort(reverse=True)
             if res_filter := kwargs.get("results_filter"):
                 templates = results_filter(templates, res_filter)
+                templates = templates if isinstance(templates, list) else [templates]
             templates = "\n".join(templates[:results_limit])
             logger.info(f"Available templates:\n{templates}")
         else:
