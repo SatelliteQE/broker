@@ -1,5 +1,6 @@
 import os
 import socket
+import tempfile
 from pathlib import Path
 from logzero import logger
 from ssh2.session import Session as ssh2_Session
@@ -200,6 +201,12 @@ class ContainerSession:
         """This is the container approximation of Session.run"""
         kwargs.pop("timeout", None)  # Timeouts are set at the client level
         kwargs["demux"] = demux
+        if "'" in command:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".sh") as tmp:
+                tmp.write(command)
+                tmp.seek(0)
+                command = f"/bin/bash {tmp.name}"
+                self.sftp_write(tmp.name)
         if any([s in command for s in "|&><"]):
             # Containers don't handle pipes, redirects, etc well in a bare exec_run
             command = f"/bin/bash -c '{command}'"
