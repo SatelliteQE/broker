@@ -84,6 +84,6 @@ def test_container_e2e_mp():
             res = c_host.execute("hostname")
             assert res.stdout.strip() == c_host.hostname
             # Test that a file can be uploaded to the container
-            c_host.session.sftp_write("broker_settings.yaml", "/root")
-            res = c_host.execute("ls")
+            c_host.session.sftp_write("broker_settings.yaml", "/tmp/fake/")
+            res = c_host.execute("ls /tmp/fake")
             assert "broker_settings.yaml" in res.stdout
