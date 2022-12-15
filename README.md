@@ -44,10 +44,15 @@ A username can still be provided when using a token to authenticate. This user w
 
 # CLI Usage
 **Checking out a VM or container**
+You can pass in any arbitrary arguments you want.
 ```
 broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-arg2 else
 ```
-You can pass in any arbitrary arguments you want. Broker can also checkout multiple VMs at once by specifying a count.
+Passing environmental variables to the target container.
+```
+broker checkout --nick rhel7 --environment "VAR1=val1,VAR2=val2"
+```
+Broker can also checkout multiple VMs at once by specifying a count.
 ```
 broker checkout --nick rhel7 --count 3
 ```

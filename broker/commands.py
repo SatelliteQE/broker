@@ -130,7 +130,7 @@ def cli(version):
 @click.option(
     "--args-file",
     type=click.Path(exists=True),
-    help="A json or yaml file mappng arguments to values",
+    help="A json or yaml file mapping arguments to values",
 )
 @provider_options
 @click.pass_context
@@ -146,7 +146,7 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
 
     :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
 
-    :param args_file: this broker argument wil be replaced with the contents of the file passed in
+    :param args_file: this broker argument will be replaced with the contents of the file passed in
     """
     broker_args = helpers.clean_dict(kwargs)
     if nick:
@@ -342,7 +342,7 @@ def duplicate(vm, background, count, all_, filter):
 @click.option(
     "--args-file",
     type=click.Path(exists=True),
-    help="A json or yaml file mappng arguments to values",
+    help="A json or yaml file mapping arguments to values",
 )
 @provider_options
 @click.pass_context
@@ -362,7 +362,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
 
     :param artifacts: AnsibleTower provider specific option for choosing what to return
 
-    :param args_file: this broker argument wil be replaced with the contents of the file passed in
+    :param args_file: this broker argument will be replaced with the contents of the file passed in
     """
     broker_args = helpers.clean_dict(kwargs)
     if nick:
