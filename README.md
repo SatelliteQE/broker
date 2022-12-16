@@ -48,7 +48,7 @@ You can pass in any arbitrary arguments you want.
 ```
 broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-arg2 else
 ```
-Passing environmental variables to the target container.
+Passing environment variables to the target container.
 ```
 broker checkout --nick rhel7 --environment "VAR1=val1,VAR2=val2"
 ```
@@ -62,6 +62,9 @@ broker checkout --nick rhel7 --AnsibleTower testing
 ```
 If you have more complex data structures you need to pass in, you can do that in two ways.
 You can populate a json or yaml file where the top-level keys will become broker arguments and their nested data structures become values.
+Note:
+    The json and yaml files need to use the supported suffix ('json', 'yaml', '.yml') in order to be properly recognized.
+    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.  
 ```
 broker checkout --nick rhel7 --args-file tests/data/broker_args.json
 ```
@@ -209,11 +212,11 @@ from broker import Broker
 ```
 The Broker class largely accepts the same arguments as you would pass via the CLI. One key difference is that you need to use underscores instead of dashes. For example, a checkout at the CLI that looks like this
 ```
-broker checkout --nick rhel7 --args-file tests/data/broker_args.json
+broker checkout --nick rhel7 --args-file tests/data/broker_args.json --environment="VAR1=val1,VAR2=val2"
 ```
 could look like this in an API usage
 ```python
-rhel7_host = Broker(nick="rhel7", args_file="tests/data/broker_args.json").checkout()
+rhel7_host = Broker(nick="rhel7", args_file="tests/data/broker_args.json", environment={"VAR1": "val1", "VAR2": "val2"}).checkout()
 ```
 Broker will carry out its usual actions and package the resulting host in a Host object. This host object will also include some basic functionality, like the ability to execute ssh commands on the host.
 Executed ssh command results are packaged in a Results object containing status (return code), stdout, and stderr.
