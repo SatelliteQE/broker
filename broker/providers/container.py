@@ -266,8 +266,13 @@ class Container(Provider):
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
+
+        envars = kwargs.get('environment', {})
+        if isinstance(envars, str):
+            envars = {var.split('=')[0]: var.split('=')[1] for var in envars.split(',')}
         # add some context information about the container's requester
-        envars, origin = {}, helpers.find_origin()
+        origin = helpers.find_origin()
+
         if "for" in origin:
             origin = origin.split()[-1]
         envars["BROKER_ORIGIN"] = origin[0]
