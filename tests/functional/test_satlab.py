@@ -68,3 +68,6 @@ def test_tower_host():
     with Broker(workflow="deploy-base-rhel") as r_host:
         res = r_host.execute("hostname")
         assert res.stdout.strip() == r_host.hostname
+        r_host.session.sftp_write("broker_settings.yaml", "/tmp/fake/")
+        res = r_host.execute("ls /tmp/fake")
+        assert "broker_settings.yaml" in res.stdout

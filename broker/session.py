@@ -81,6 +81,8 @@ class Session:
         """read a remote file into a local destination"""
         if not destination:
             destination = source
+        elif destination.endswith("/"):
+            destination = destination + Path(source).name
         # create the destination path if it doesn't exist
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -94,19 +96,25 @@ class Session:
                 for size, data in remote:
                     local.write(data)
 
-    def sftp_write(self, source, destination=None):
+    def sftp_write(self, source, destination=None, ensure_dir=True):
         """sftp write a local file to a remote destination"""
         if not destination:
             destination = source
+        elif destination.endswith("/"):
+            destination = destination + Path(source).name
         data = Path(source).read_bytes()
+        if ensure_dir:
+            self.run(f"mkdir -p {Path(destination).absolute().parent}")
         sftp = self.session.sftp_init()
         with sftp.open(destination, FILE_FLAGS, SFTP_MODE) as remote:
             remote.write(data)
 
-    def remote_copy(self, source, dest_host):
+    def remote_copy(self, source, dest_host, ensure_dir=True):
         """Copy a file from this host to another"""
         sftp_down = self.session.sftp_init()
         sftp_up = dest_host.session.session.sftp_init()
+        if ensure_dir:
+            dest_host.run(f"mkdir -p {Path(source).absolute().parent}")
         with sftp_down.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
         ) as download:
@@ -114,10 +122,12 @@ class Session:
                 for size, data in download:
                     upload.write(data)
 
-    def scp_write(self, source, destination=None):
+    def scp_write(self, source, destination=None, ensure_dir=True):
         """scp write a local file to a remote destination"""
         if not destination:
             destination = source
+        elif destination.endswith("/"):
+            destination = destination + Path(source).name
         fileinfo = os.stat(source)
         chan = self.session.scp_send64(
             destination,
@@ -126,6 +136,8 @@ class Session:
             fileinfo.st_mtime,
             fileinfo.st_atime,
         )
+        if ensure_dir:
+            self.run(f"mkdir -p {Path(destination).absolute().parent}")
         with open(source, "rb") as local:
             for data in local:
                 chan.write(data)
@@ -221,7 +233,7 @@ class ContainerSession:
         """Needed for simple compatability with Session"""
         pass
 
-    def sftp_write(self, source, destination=None):
+    def sftp_write(self, source, destination=None, ensure_dir=True):
         """Add one of more files to the container"""
         # ensure source is a list of Path objects
         if not isinstance(source, list):
@@ -232,15 +244,17 @@ class ContainerSession:
         for src in source:
             if not Path(src).exists():
                 raise FileNotFoundError(src)
-        destination = Path(destination) or source[0].parent
+        destination = destination or f"{source[0].parent}/"
         # Files need to be added to a tarfile
         with helpers.temporary_tar(source) as tar:
             logger.debug(
                 f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
             )
-            # if the destination is a file, create the parent path
-            if destination.is_file():
-                self.execute(f"mkdir -p {destination.parent}")
+            if ensure_dir:
+                if destination.endswith("/"):
+                    self.run(f"mkdir -m 666 -p {destination}")
+                else:
+                    self.run(f"mkdir -m 666 -p {Path(destination).parent}")
             self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
 
     def sftp_read(self, source, destination=None):
