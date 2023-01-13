@@ -58,7 +58,17 @@ def get_awxkit_and_uname(
             )
     else:  # dynaconf validators should have checked that either token or password was provided
         helpers.emit(auth_type="password")
-        logger.info("Using username and password authentication")
+        if datetime.now() < datetime(2023, 2, 6):
+            time_based_modifier = " and will be unavailable soon"
+        else:
+            time_based_modifier = ""
+        logger.warning(
+            f"Password-based authentication is deprecated{time_based_modifier}. "
+            "Please use a token instead.\n"
+            "See https://docs.ansible.com/automation-controller/latest/html/userguide/"
+            "applications_auth.html#applications-tokens for more information"
+        )
+
         config.credentials = {"default": {"username": uname, "password": pword}}
         config.use_sessions = True
         root.load_session().get()
@@ -583,7 +593,11 @@ class AnsibleTower(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 job_templates = results_filter(job_templates, res_filter)
-                job_templates = job_templates if isinstance(job_templates, list) else [job_templates]
+                job_templates = (
+                    job_templates
+                    if isinstance(job_templates, list)
+                    else [job_templates]
+                )
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
         elif kwargs.get("templates"):
