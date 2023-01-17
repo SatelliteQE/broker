@@ -78,7 +78,7 @@ def test_container_e2e():
 
 
 def test_container_e2e_mp():
-    with Broker(container_host="ubi8:latest", _count=2) as c_hosts:
+    with Broker(container_host="ubi8:latest", _count=7) as c_hosts:
         for c_host in c_hosts:
             assert c_host._cont_inst.top()['Processes']
             res = c_host.execute("hostname")
