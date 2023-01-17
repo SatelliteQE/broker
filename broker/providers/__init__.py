@@ -16,6 +16,7 @@ class Provider(PickleSafe):
     # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
     _checkout_options = []
     _execute_options = []
+    _fresh_settings = settings.dynaconf_clone()
 
     def __init__(self, **kwargs):
         self._construct_params = []
@@ -36,8 +37,7 @@ class Provider(PickleSafe):
         """
         instance_name = instance_name or getattr(self, "instance", None)
         section_name = self.__class__.__name__.upper()
-        # make sure each instance isn't loading values from another
-        fresh_settings = settings.get_fresh(section_name)
+        fresh_settings = self._fresh_settings.get(section_name).copy()
         instance, default = None, False
         for candidate in fresh_settings.instances:
             logger.debug(f"Checking {instance_name} against {candidate}")
