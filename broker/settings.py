@@ -34,7 +34,7 @@ settings = Dynaconf(
     validators=validators,
 )
 # to make doubly sure, remove the vault loader if set somehow
-settings._loaders = [loader for loader in settings._loaders if not "vault" in loader]
+settings._loaders = [loader for loader in settings._loaders if "vault" not in loader]
 
 try:
     settings.validators.validate()

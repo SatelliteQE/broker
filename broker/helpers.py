@@ -201,7 +201,7 @@ def resolve_file_args(broker_args):
             if data := load_file(val):
                 final_args.update({key: data})
             else:
-                final_arg.update({key: val})
+                final_args.update({key: val})
         else:
             final_args.update({key: val})
     return final_args
@@ -599,9 +599,9 @@ class PickleSafe:
         try:
             self._purify()
         except RecursionError:
-                logger.warning(f"Recursion limit reached on {self._purify_target}")
-                self.__dict__[self._purify_target] = None
-                self.__getstate__()
+            logger.warning(f"Recursion limit reached on {self._purify_target}")
+            self.__dict__[self._purify_target] = None
+            self.__getstate__()
         self.__dict__.pop("_purify_target", None)
         return self.__dict__
 

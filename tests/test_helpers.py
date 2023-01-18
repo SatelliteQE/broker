@@ -87,10 +87,10 @@ def test_find_origin_simple():
     origin = helpers.find_origin()
     assert len(origin) == 2
     assert origin[0].startswith("test_find_origin")
-    assert origin[1] == None
+    assert origin[1] is None
 
 
-def test_find_origin_fixture(basic_origin):
+def test_find_origin_fixture_basic(basic_origin):
     assert basic_origin[0].startswith("basic_origin")
 
 

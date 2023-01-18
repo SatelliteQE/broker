@@ -13,7 +13,7 @@ from datetime import datetime
 
 try:
     import awxkit
-except:
+except ImportError:
     raise exceptions.ProviderError(
         provider="AnsibleTower", message="Unable to import awxkit. Is it installed?"
     )
@@ -342,7 +342,7 @@ class AnsibleTower(Provider):
                 .expire_date
             )
             return str(datetime.fromtimestamp(int(time_stamp)))
-        except:
+        except Exception:
             return None
 
     def _compile_host_info(self, host):
@@ -372,7 +372,7 @@ class AnsibleTower(Provider):
                     host_info["_broker_args"]["workflow"] = host.get_related(
                         "last_job"
                     ).summary_fields.source_workflow_job.name
-                except:
+                except Exception:
                     logger.warning(
                         f"Unable to determine workflow for {host_info['hostname']}"
                     )
@@ -619,7 +619,7 @@ class AnsibleTower(Provider):
             logger.warning("That action is not yet implemented.")
 
     def release(self, name, broker_args=None):
-        if broker_args == None:
+        if broker_args is None:
             broker_args = {}
         return self.execute(
             workflow=settings.ANSIBLETOWER.release_workflow,
