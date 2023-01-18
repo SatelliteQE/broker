@@ -1,4 +1,3 @@
-from asyncio import QueueEmpty
 import json
 import pytest
 from broker.broker import Broker

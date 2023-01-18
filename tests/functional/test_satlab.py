@@ -72,6 +72,7 @@ def test_tower_host():
         res = r_host.execute("ls /tmp/fake")
         assert "broker_settings.yaml" in res.stdout
 
+
 def test_tower_host_mp():
     with Broker(workflow="deploy-base-rhel", _count=3) as r_hosts:
         for r_host in r_hosts:
