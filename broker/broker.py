@@ -136,8 +136,8 @@ class Broker:
                 host = self._act(provider, method, checkout=True)
             except exceptions.ProviderError as err:
                 host = err
+            hosts.append(host)
             if host and not isinstance(host, exceptions.ProviderError):
-                hosts.append(host)
                 logger.info(f"{host.__class__.__name__}: {host.hostname}")
         return hosts
 
@@ -147,11 +147,9 @@ class Broker:
         :return: Host obj or list of Host objects
         """
         hosts = self._checkout()
-        err, to_emit = None, []
-        for host in hosts:
-            if not isinstance(host, exceptions.ProviderError):
-                to_emit.append(host.to_dict())
-            else:
+        err = None
+        for host in hosts[:]:
+            if isinstance(host, exceptions.ProviderError):
                 err = host
                 hosts.remove(host)
         helpers.emit(hosts=[host.to_dict() for host in hosts])
