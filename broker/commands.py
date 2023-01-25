@@ -5,8 +5,8 @@ import click
 from logzero import logger
 from broker import exceptions, helpers, settings
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
-from broker.providers import Provider
 from broker.logger import LOG_LEVEL
+from broker import exceptions, helpers, settings
 
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
@@ -50,7 +50,7 @@ class ExceptionHandler(click.Group):
 
 def provider_options(command):
     """Applies provider-specific decorators to each command this decorates"""
-    for prov in Provider.__subclasses__():
+    for prov in PROVIDERS.values():
         if prov.hidden:
             continue
         for option in getattr(prov, f"_{command.__name__}_options"):

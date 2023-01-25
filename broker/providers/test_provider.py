@@ -46,6 +46,7 @@ class TestProvider(Provider):
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
+    @Provider.register_action()
     def test_action(self, **kwargs):
         action = kwargs.get("test_action")
         if action == "release":

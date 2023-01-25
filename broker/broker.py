@@ -1,28 +1,12 @@
 from logzero import logger
-from broker.providers.ansible_tower import AnsibleTower
-from broker.providers.container import Container
-from broker.providers.test_provider import TestProvider
+from broker.providers import PROVIDERS, PROVIDER_ACTIONS, _provider_imports
 from broker.hosts import Host
 from broker import exceptions, helpers
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-PROVIDERS = {
-    "AnsibleTower": AnsibleTower,
-    "Container": Container,
-    "TestProvider": TestProvider,
-}
-
-PROVIDER_ACTIONS = {
-    # action: (InterfaceClass, "method_name")
-    "workflow": (AnsibleTower, "execute"),
-    "job_template": (AnsibleTower, "execute"),
-    "template": (AnsibleTower, None),  # needed for list-templates
-    "inventory": (AnsibleTower, None),
-    "container_host": (Container, "run_container"),
-    "container_app": (Container, "execute"),
-    "test_action": (TestProvider, "test_action"),
-}
+# load all the provider class so they are registered
+for _import in _provider_imports:
+    __import__(f"broker.providers.{_import}", globals(), locals(), [], 0)
 
 
 def _try_teardown(host_obj):
