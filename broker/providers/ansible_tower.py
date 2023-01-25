@@ -459,6 +459,7 @@ class AnsibleTower(Provider):
         self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=misc_attrs)
         return host_inst
 
+    @Provider.register_action("workflow", "job_template")
     def execute(self, **kwargs):
         """Execute workflow or job template in Ansible Tower
 
@@ -568,6 +569,7 @@ class AnsibleTower(Provider):
             or settings.ANSIBLETOWER.get("new_expire_time"),
         )
 
+    @Provider.register_action("template", "inventory")
     def nick_help(self, **kwargs):
         """Get a list of extra vars and their defaults from a workflow"""
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)

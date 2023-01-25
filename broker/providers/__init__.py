@@ -1,12 +1,43 @@
 from abc import ABCMeta, abstractmethod
 import dynaconf
+from pathlib import Path
 
 from broker import exceptions
 from broker.settings import settings
 from logzero import logger
 
 
-class Provider(metaclass=ABCMeta):
+# populate a list of all provider module names
+_provider_imports = [
+    f.stem
+    for f in Path(__file__).parent.glob("*.py")
+    if f.is_file() and f.stem != "__init__"
+]
+
+# ProviderName: ProviderClassObject
+PROVIDERS = {}
+# action: (InterfaceClass, "method_name")
+PROVIDER_ACTIONS = {}
+
+
+class ProviderMeta(ABCMeta):
+    """Metaclass that registers provider classes and actions"""
+
+    def __new__(cls, name, bases, attrs):
+        """Register provider classes and actions"""
+        new_cls = super().__new__(cls, name, bases, attrs)
+        if name != "Provider":
+            PROVIDERS[name] = new_cls
+            logger.debug(f"Registered provider {name}")
+            for attr in attrs.values():
+                if hasattr(attr, "_as_action"):
+                    for action in attr._as_action:
+                        PROVIDER_ACTIONS[action] = (new_cls, attr.__name__)
+                        logger.debug(f"Registered action {action} for provider {name}")
+        return new_cls
+
+
+class Provider(metaclass=ProviderMeta):
     # Populate with a list of Dynaconf Validators specific to your provider
     _validators = []
     # Set to true if you don't want your provider shown in the CLI
@@ -103,3 +134,15 @@ class Provider(metaclass=ABCMeta):
         )
         return f"{self.__class__.__name__}({inner})"
 
+    @staticmethod
+    def register_action(*as_names):
+        """Decorator to register a provider action
+
+        :param as_names: One or more action names to register the decorated function as
+        """
+
+        def decorator(func):
+            func._as_action = as_names or [func.__name__]
+            return func
+
+        return decorator

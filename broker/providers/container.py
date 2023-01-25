@@ -252,6 +252,7 @@ class Container(Provider):
     def release(self, host_obj):
         host_obj._cont_inst.remove(force=True)
 
+    @Provider.register_action("container_host")
     def run_container(self, container_host, **kwargs):
         """Start a container based on an image name (container_host)"""
         self._ensure_image(container_host)
@@ -276,6 +277,7 @@ class Container(Provider):
         container_inst.start()
         return container_inst
 
+    @Provider.register_action("container_app")
     def execute(self, container_app, **kwargs):
         """Run a container and return the raw results"""
         return self.runtime.execute(container_app, **kwargs)
