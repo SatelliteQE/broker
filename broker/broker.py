@@ -96,13 +96,12 @@ class Broker:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
-        for key, action in PROVIDER_ACTIONS.items():
-            if key in kwargs:
-                self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs = kwargs
 
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
+        logger.debug(f"Resolving action {method} on provider {provider}.")
         provider_inst = provider(**self._kwargs)
         helpers.emit(
             {
@@ -111,14 +110,22 @@ class Broker:
                 "arguments": self._kwargs,
             }
         )
-        result = getattr(provider_inst, method)(**self._kwargs)
-        logger.debug(result)
+        method_obj = getattr(provider_inst, method)
+        logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
+        result = method_obj(**self._kwargs)
+        logger.debug(logger.debug(f"Action {result=}"))
         if result and checkout:
             return provider_inst.construct_host(
                 provider_params=result, host_classes=self.host_classes, **self._kwargs
             )
         else:
             return result
+
+    def _update_provider_actions(self, kwargs):
+        if not self._provider_actions:
+            for key, action in PROVIDER_ACTIONS.items():
+                if key in kwargs:
+                    self._provider_actions[key] = action
 
     @mp_decorator
     def _checkout(self):
@@ -127,6 +134,7 @@ class Broker:
         :return: List of Host objects
         """
         hosts = []
+        logger.debug(f"Doing _checkout(): {self._provider_actions=}")
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
         for action in self._provider_actions.keys():
@@ -164,12 +172,9 @@ class Broker:
     def execute(self, **kwargs):
         """execute a provider action
 
-        :return: Any The results given back by the provider
+        :return: Any results given back by the provider
         """
-        if not self._provider_actions:
-            for key, action in PROVIDER_ACTIONS.items():
-                if key in kwargs:
-                    self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs.update(kwargs)
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
@@ -183,7 +188,7 @@ class Broker:
         if self._provider_actions:
             provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
             logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, "nick_help", checkout=False)
+            self._act(provider, provider.nick_help, checkout=False)
 
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
