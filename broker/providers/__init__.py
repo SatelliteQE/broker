@@ -17,6 +17,7 @@ class Provider(PickleSafe):
     _checkout_options = []
     _execute_options = []
     _fresh_settings = settings.dynaconf_clone()
+    _sensitive_attrs = []
 
     def __init__(self, **kwargs):
         self._construct_params = []
@@ -40,7 +41,7 @@ class Provider(PickleSafe):
         fresh_settings = self._fresh_settings.get(section_name).copy()
         instance, default = None, False
         for candidate in fresh_settings.instances:
-            logger.debug(f"Checking {instance_name} against {candidate}")
+            logger.debug("Checking %s against %s", instance_name, candidate)
             if instance_name in candidate:
                 instance = candidate
                 default = False
@@ -95,7 +96,7 @@ class Provider(PickleSafe):
 
     def __repr__(self):
         inner = ", ".join(
-            f"{k}={v}"
+            f"{k}={'*' * 6 if k in self._sensitive_attrs and v else v}"
             for k, v in self.__dict__.items()
             if not k.startswith("_") and not callable(v)
         )

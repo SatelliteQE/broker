@@ -359,6 +359,7 @@ class MockStub(UserDict):
 
 def update_log_level(ctx, param, value):
     b_log.set_log_level(value)
+    b_log.set_file_logging(value)
 
 
 def set_emit_file(ctx, param, value):

@@ -1,5 +1,8 @@
 # Broker settings
-debug: False
+# different log levels for file and stdout
+logging:
+    console_level: info
+    file_level: debug
 inventory_file: "inventory.yaml"
 # Host Settings
 host_username: "root"

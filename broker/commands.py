@@ -3,6 +3,7 @@ import signal
 import sys
 import click
 from logzero import logger
+from broker import exceptions, helpers, settings
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
 from broker.providers import Provider
 from broker.logger import LOG_LEVEL
@@ -12,11 +13,12 @@ signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
 
 def loggedcli(*cli_args, **cli_kwargs):
+    """Updates the cli.command wrapper function in order to add logging"""
     def decorator(func):
         @cli.command(*cli_args, **cli_kwargs)
         @wraps(func)
         def wrapper(*args, **kwargs):
-            logger.log(LOG_LEVEL.TRACE.value, f"Calling  {func=}(*{args=} **{kwargs=}")
+            logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=}")
             retval = func(*args, **kwargs)
             logger.log(LOG_LEVEL.TRACE.value, f"Finished {func=}(*{args=} **{kwargs=}) {retval=}")
             return retval
@@ -101,8 +103,8 @@ def populate_providers(click_group):
 @click.group(cls=ExceptionHandler, invoke_without_command=True)
 @click.option(
     "--log-level",
-    type=click.Choice(["info", "warning", "error", "critical", "debug", "trace", "silent"]),
-    default="debug" if settings.settings.debug else "info",
+    type=click.Choice(["info", "warning", "error", "debug", "trace", "silent"]),
+    default=settings.settings.logging.console_level,
     callback=helpers.update_log_level,
     is_eager=True,
     expose_value=False,

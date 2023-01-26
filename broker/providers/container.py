@@ -74,6 +74,8 @@ class Container(Provider):
     ]
     _extend_options = []
 
+    _sensitive_attrs = ["password", "host_password"]
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if kwargs.get("bind") is not None:
