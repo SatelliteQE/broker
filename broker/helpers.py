@@ -533,4 +533,3 @@ def temporary_tar(paths):
             tar.add(path, arcname=path.name)
     yield temp_tar.absolute()
     temp_tar.unlink()
-
