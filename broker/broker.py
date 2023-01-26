@@ -113,7 +113,7 @@ class Broker:
         method_obj = getattr(provider_inst, method)
         logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
         result = method_obj(**self._kwargs)
-        logger.debug(logger.debug(f"Action {result=}"))
+        logger.debug(f"Action {result=}")
         if result and checkout:
             return provider_inst.construct_host(
                 provider_params=result, host_classes=self.host_classes, **self._kwargs
@@ -186,7 +186,7 @@ class Broker:
         if self._provider_actions:
             provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
             logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, provider.nick_help, checkout=False)
+            self._act(provider, "nick_help", checkout=False)
 
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
