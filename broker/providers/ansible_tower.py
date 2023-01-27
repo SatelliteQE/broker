@@ -127,7 +127,7 @@ class AnsibleTower(Provider):
         ),
     ]
 
-    _sensitive_attrs = ['pword', 'password', 'token']
+    _sensitive_attrs = ["pword", "password", "token"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
