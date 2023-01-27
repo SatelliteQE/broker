@@ -12,7 +12,11 @@ Broker is a tool designed to provide a common interface between one or many serv
 ```
 dnf install cmake
 cd <broker root directory>
-pip install .   or   pip install broker
+
+pip install .   ( install Broker downloaded locally )   
+or   
+pip install broker   ( install latest version from PyPI )
+
 cp broker_settings.yaml.example broker_settings.yaml
 ```
 Then edit the broker_settings.yaml file
@@ -35,7 +39,11 @@ brew install cmake
 brew install openssl
 brew install libssh2
 cd <broker root directory>
-pip install . or pip install broker
+
+pip install .   ( install Broker downloaded locally )   
+or   
+pip install broker   ( install latest version from PyPI )
+
 pip install ssh2-python
 cp broker_settings.yaml.example broker_settings.yaml
 ```
