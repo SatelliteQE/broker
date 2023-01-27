@@ -6,7 +6,7 @@ from urllib import parse as url_parser
 from functools import cache, cached_property
 from dynaconf import Validator
 from broker import exceptions
-from broker.helpers import find_origin, results_filter
+from broker.helpers import find_origin, eval_filter
 from broker.settings import settings
 from logzero import logger
 from datetime import datetime
@@ -562,7 +562,7 @@ class AnsibleTower(Provider):
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
             if res_filter := kwargs.get("results_filter"):
-                workflows = results_filter(workflows, res_filter)
+                workflows = eval_filter(workflows, res_filter, "res")
                 workflows = workflows if isinstance(workflows, list) else [workflows]
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
@@ -576,7 +576,7 @@ class AnsibleTower(Provider):
                 for inv in self.v2.inventory.get(kind="", page_size=1000).results
             ]
             if res_filter := kwargs.get("results_filter"):
-                inv = results_filter(inv, res_filter)
+                inv = eval_filter(inv, res_filter, "res")
                 inv = inv if isinstance(inv, list) else [inv]
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
@@ -592,12 +592,8 @@ class AnsibleTower(Provider):
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
             if res_filter := kwargs.get("results_filter"):
-                job_templates = results_filter(job_templates, res_filter)
-                job_templates = (
-                    job_templates
-                    if isinstance(job_templates, list)
-                    else [job_templates]
-                )
+                job_templates = eval_filter(job_templates, res_filter, "res")
+                job_templates = job_templates if isinstance(job_templates, list) else [job_templates]
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
         elif kwargs.get("templates"):
@@ -611,7 +607,7 @@ class AnsibleTower(Provider):
             )
             templates.sort(reverse=True)
             if res_filter := kwargs.get("results_filter"):
-                templates = results_filter(templates, res_filter)
+                templates = eval_filter(templates, res_filter, "res")
                 templates = templates if isinstance(templates, list) else [templates]
             templates = "\n".join(templates[:results_limit])
             logger.info(f"Available templates:\n{templates}")

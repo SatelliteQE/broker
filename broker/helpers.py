@@ -91,58 +91,29 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
     return dict(flattened)
 
 
-def classify_filter(filter_string):
-    """Given a filter string, determine the filter action and components"""
-    tests = {
-        "!<": "'{needle}' not in '{haystack}'",
-        "<": "'{needle}' in '{haystack}'",
-        "!=": "'{haystack}' != '{needle}'",
-        "=": "'{haystack}' == '{needle}'",
-        "!{": "not '{haystack}'.startswith('{needle}')",
-        "{": "'{haystack}'.startswith('{needle}')",
-        "!}": "not '{haystack}'.endswith('{needle}')",
-        "}": "'{haystack}'.endswith('{needle}')",
-    }
-    if "," in filter_string:
-        return [classify_filter(f) for f in filter_string.split(",")]
-    for cond, test in tests.items():
-        if cond in filter_string:
-            k, v = filter_string.split(cond)
-            return FilterTest(haystack=k, needle=v, test=test)
-
-
-def inventory_filter(inventory, raw_filter):
-    """Filter out inventory items depending on the filter provided"""
-    resolved_filter = classify_filter(raw_filter)
-    if not isinstance(resolved_filter, list):
-        resolved_filter = [resolved_filter]
-    matching = []
-    for host in inventory:
-        flattened_host = flatten_dict(host, separator=".")
-        eval_list = [
-            eval(rf.test.format(haystack=flattened_host[rf.haystack], needle=rf.needle))
-            for rf in resolved_filter
-            if rf.haystack in flattened_host
-        ]
-        if eval_list and all(eval_list):
-            matching.append(host)
-    return matching
-
-
-def results_filter(results, raw_filter):
-    """Filter out a list of results depending on the filter provided"""
-    resolved_filter = classify_filter(raw_filter)
-    if not isinstance(resolved_filter, list):
-        resolved_filter = [resolved_filter]
-    matching = []
-    for res in results:
-        eval_list = [
-            eval(rf.test.format(haystack=res, needle=rf.needle))
-            for rf in resolved_filter
-        ]
-        if eval_list and all(eval_list):
-            matching.append(res)
-    return matching
+def eval_filter(filter_list, raw_filter, filter_key="inv"):
+    """Run each filter through an eval to get the results"""
+    filter_list = [
+        MockStub(item) if isinstance(item, dict) else item for item in filter_list
+    ]
+    for raw_f in raw_filter.split("|"):
+        if f"@{filter_key}[" in raw_f:
+            # perform a list filter on the inventory
+            filter_list = eval(
+                raw_f.replace(f"@{filter_key}", filter_key), {filter_key: filter_list}
+            )
+            filter_list = filter_list if isinstance(filter_list, list) else [filter_list]
+        elif f"@{filter_key}" in raw_f:
+            # perform an attribute filter on each host
+            filter_list = list(
+                filter(
+                    lambda item: eval(
+                        raw_f.replace(f"@{filter_key}", filter_key), {filter_key: item}
+                    ),
+                    filter_list,
+                )
+            )
+    return [dict(item) if isinstance(item, MockStub) else item for item in filter_list]
 
 
 def resolve_nick(nick):
@@ -216,7 +187,7 @@ def load_inventory(filter=None):
         settings.settings.INVENTORY_FILE
     )
     inv_data = load_file(inventory_file, warn=False)
-    return inv_data if not filter else inventory_filter(inv_data, filter)
+    return inv_data if not filter else eval_filter(inv_data, filter)
 
 
 def update_inventory(add=None, remove=None):

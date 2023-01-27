@@ -183,22 +183,18 @@ Actions that Broker can take against hosts (checkin, duplicate, extend) can take
 
 Broker's filters are based on what is stored in its local inventory file. Therefore, only properties in that file are filter-able. Nested properties are annotated with a `.` notation. For example, a top-level property `hostname` can be accessed by itself. However, a nested property of `_broker_args` called `version` would be accessed by `_broker_args.version`.
 
-Filters take the form `"(property)(condition)(value)"`. Filters have several possible conditions:
- - `<` means "in" or that the filter value exists within the actual value
- - `=` means "equals"
- - `{` means "starts with"
- - `}` means "ends with"
-
-Furthermore, putting a `!` before the condition inverts the filter. So `!=` means "not equals" and `!<` means "not in".
+Filters are any valid python expression that acts upon a filterable object. A filterable object is a list typically noted with either `@inv` or `@res`. Broker will replace that notation, in the filter expression, with a valid list whose contents are context-dependent.
 
 **Example filters:**
 
-`--filter 'hostname<test'` The string test should exist somewhere in the hostname value
-`--filter '_broker_args.template{deploy-sat'` The template should start with the string "deploy-sat"
+`--filter '"test" in @inv.hosname'` The string test should exist somewhere in the hostname value
+`--filter '@inv[-1]'` Use the last host in the inventory
+`--filter '@inv[3:7]'` Pick the 3rd through 6th hosts in the inventory
+`--filter '@inv._broker_args.template.startswith("deploy-sat")'` The template should start with the string "deploy-sat"
 
-You can also chain multiple filters together by separating them with a comma. These are additive AND filters where each filter condition must match.
+You can also chain multiple filters together, feeding the results of the previous filter into the next, using the pipe `|` symbol. This allows you to perform multiple layers of filtering in a single expression.
 
-`--filter 'name<test,_broker_args.provider!=RHEV'` The host's name should have test in it and the provider should not equal RHEV.
+`--filter '"test" in @inv.name | @inv._broker_args.provider != "RHEV"'` The host's name should have test in it and the provider should not equal RHEV.
 
 **Note:** Due to shell expansion, it is recommended to wrap a filter in single quotes.
 
