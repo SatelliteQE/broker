@@ -20,8 +20,8 @@ class LOG_LEVEL(IntEnum):
     ERROR = logging.ERROR
 
 
-_sensitive = ['password', 'pword', 'token']
-_old_factory = logging.getLogRecordFactory()
+_sensitive = ["password", "pword", "token", "host_password"]
+_old_factory = None
 logging.addLevelName("TRACE", LOG_LEVEL.TRACE)
 logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
 
@@ -71,7 +71,8 @@ def formatter_factory(log_level, color=True):
     )
     return formatter
 
-def record_factory(*args, **kwargs):
+
+def broker_record_factory(*args, **kwargs):
     """Factory to create a redacted logging.LogRecord"""
     record = _old_factory(*args, **kwargs)
     args_new = []
@@ -83,6 +84,7 @@ def record_factory(*args, **kwargs):
     record.args = tuple(args_new)
     return record
 
+
 def redact_dynaconf(data):
     if isinstance(data, (list, tuple)):
         data_copy = [redact_dynaconf(item) for item in data]
@@ -92,28 +94,28 @@ def redact_dynaconf(data):
             if isinstance(v, (dict, list)):
                 data_copy[k] = redact_dynaconf(v)
             elif k in _sensitive and v:
-                data_copy[k] = '*' * 6
+                data_copy[k] = "*" * 6
     else:
         data_copy = data
     return data_copy
 
 
 def set_log_level(level=settings.logging.console_level):
+    if level == "silent":
+        log_level = LOG_LEVEL.INFO
+    else:
+        log_level = resolve_log_level(level)
+    logzero.formatter(formatter=formatter_factory(log_level))
+    logzero.loglevel(level=log_level)
+
+
+def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
     silent = False
     if level == "silent":
         silent = True
         log_level = LOG_LEVEL.INFO
     else:
         log_level = resolve_log_level(level)
-    logzero.setup_default_logger(
-        level=log_level,
-        formatter=formatter_factory(log_level),
-        disableStderrLogger=silent,
-    )
-
-
-def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
-    log_level = resolve_log_level(level)
     path = BROKER_DIRECTORY.joinpath(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     logzero.logfile(
@@ -122,6 +124,7 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
         maxBytes=1e9,
         backupCount=3,
         formatter=formatter_factory(log_level, color=False),
+        disableStderrLogger=silent,
     )
 
 
@@ -134,7 +137,11 @@ def setup_logzero(
     patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
     set_file_logging(file_level, path)
-    logging.setLogRecordFactory(record_factory)
+    global _old_factory
+    lrf = logging.getLogRecordFactory()
+    if lrf.__name__ is not broker_record_factory.__name__:
+        _old_factory = lrf
+        logging.setLogRecordFactory(broker_record_factory)
 
 
 setup_logzero()

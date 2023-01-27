@@ -22,8 +22,16 @@ validators = [
     Validator("HOST_SSH_PORT", default=22),
     Validator("HOST_SSH_KEY_FILENAME", default=None),
     Validator("LOGGING", is_type_of=dict),
-    Validator("LOGGING.LEVEL", is_in=["error", "warning", "info", "debug", "trace", "silent"], default="info"),
-    Validator("LOGGING.FILE_LEVEL", is_in=["error", "warning", "info", "debug", "trace", "silent"], default="debug"),
+    Validator(
+        "LOGGING.CONSOLE_LEVEL",
+        is_in=["error", "warning", "info", "debug", "trace", "silent"],
+        default="info",
+    ),
+    Validator(
+        "LOGGING.FILE_LEVEL",
+        is_in=["error", "warning", "info", "debug", "trace", "silent"],
+        default="debug",
+    ),
 ]
 
 # temporary fix for dynaconf #751

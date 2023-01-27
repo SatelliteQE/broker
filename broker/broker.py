@@ -111,7 +111,9 @@ class Broker:
             }
         )
         method_obj = getattr(provider_inst, method)
-        logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
+        logger.debug(
+            f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}."
+        )
         result = method_obj(**self._kwargs)
         logger.debug(f"Action {result=}")
         if result and checkout:

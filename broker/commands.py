@@ -14,15 +14,21 @@ signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
 def loggedcli(*cli_args, **cli_kwargs):
     """Updates the cli.command wrapper function in order to add logging"""
+
     def decorator(func):
         @cli.command(*cli_args, **cli_kwargs)
         @wraps(func)
         def wrapper(*args, **kwargs):
             logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=}")
             retval = func(*args, **kwargs)
-            logger.log(LOG_LEVEL.TRACE.value, f"Finished {func=}(*{args=} **{kwargs=}) {retval=}")
+            logger.log(
+                LOG_LEVEL.TRACE.value,
+                f"Finished {func=}(*{args=} **{kwargs=}) {retval=}",
+            )
             return retval
+
         return wrapper
+
     return decorator
 
 
@@ -135,9 +141,7 @@ def cli(version):
         click.echo(f"Log File: {broker_directory}/logs/broker.log")
 
 
-@loggedcli(
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
@@ -192,6 +196,7 @@ def providers():
 
 
 populate_providers(providers)
+
 
 @loggedcli()
 @click.argument("vm", type=str, nargs=-1)
@@ -260,6 +265,7 @@ def inventory(details, sync, filter):
         else:
             logger.info(f"{num}: {display_name}")
     helpers.emit({"inventory": emit_data})
+
 
 @loggedcli()
 @click.argument("vm", type=str, nargs=-1)
@@ -340,9 +346,7 @@ def duplicate(vm, background, count, all_, filter):
                 )
 
 
-@loggedcli(
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
