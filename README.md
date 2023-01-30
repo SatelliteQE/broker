@@ -51,12 +51,10 @@ Then edit the broker_settings.yaml file
 Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
 
 - Locate the .dylib files from within libssh2 (likely in `/opt/homebrew/Cellar/` or `/usr/lib/`)
-
 - Export the path to the .dylibs directory as the 
-`DYLD_LIBRARY_PATH` environment variable.
+`DYLD_LIBRARY_PATH` environment variable;
 
 ```export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/libssh2/1.10.0/lib/```
-
 - Place the export statement in your working shell config; .bashrc .zshrc etc
 
 If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
