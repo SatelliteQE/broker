@@ -127,6 +127,8 @@ class AnsibleTower(Provider):
         ),
     ]
 
+    _sensitive_attrs = ["pword", "password", "token"]
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # get our instance settings
@@ -626,14 +628,6 @@ class AnsibleTower(Provider):
             source_vm=name,
             **broker_args,
         )
-
-    def __repr__(self):
-        inner = ", ".join(
-            f"{k}={v}"
-            for k, v in self.__dict__.items()
-            if not k.startswith("_") and not callable(v)
-        )
-        return f"{self.__class__.__name__}({inner})"
 
 
 def awxkit_representer(dumper, data):

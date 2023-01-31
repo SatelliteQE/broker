@@ -358,14 +358,8 @@ class MockStub(UserDict):
 
 
 def update_log_level(ctx, param, value):
-    silent = False
-    if value == "silent":
-        silent = True
-        value = "info"
-    if getattr(logging, value.upper()) is not logger.getEffectiveLevel() or silent:
-        b_log.setup_logzero(level=value, silent=silent)
-        if not silent:
-            print(f"Log level changed to [{value}]")
+    b_log.set_log_level(value)
+    b_log.set_file_logging(value)
 
 
 def set_emit_file(ctx, param, value):
