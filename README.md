@@ -13,7 +13,7 @@ Broker is a tool designed to provide a common interface between one or many serv
 dnf install cmake
 cd <broker root directory>
 
-pip install .   ( install Broker downloaded locally )   
+pip install .   ( install Broker cloned locally )   
 or   
 pip install broker   ( install latest version from PyPI )
 
@@ -33,20 +33,26 @@ Broker can also be ran outside of its base directory. In order to do so, specify
 `BROKER_DIRECTORY` envronment variable.
 ```BROKER_DIRECTORY=/home/jake/Programming/broker/ broker inventory```
 
-# Installation MacOS 12.x
+# Installation MacOS 12.x 
 ```
 brew install cmake
 brew install openssl
 brew install libssh2
 cd <broker root directory>
 
-pip install .   ( install Broker downloaded locally )   
+pip install .   ( install Broker cloned locally )   
 or   
 pip install broker   ( install latest version from PyPI )
 
 cp broker_settings.yaml.example broker_settings.yaml
 ```
 Then edit the broker_settings.yaml file
+
+Error: If pycurl fails, attempt to remove the current version of pycurl and reinstall:
+```
+$ pip uninstall pycurl
+$ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycur
+```
 
 Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
 
