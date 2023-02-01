@@ -51,7 +51,7 @@ Then edit the broker_settings.yaml file
 Error: If pycurl fails, remove the current version of pycurl and reinstall using openSSL:
 ```
 $ pip uninstall pycurl
-$ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycur
+$ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycurl
 ```
 
 Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
