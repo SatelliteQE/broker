@@ -48,7 +48,7 @@ cp broker_settings.yaml.example broker_settings.yaml
 ```
 Then edit the broker_settings.yaml file
 
-Error: If pycurl fails, attempt to remove the current version of pycurl and reinstall:
+Error: If pycurl fails, remove the current version of pycurl and reinstall using openSSL:
 ```
 $ pip uninstall pycurl
 $ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycur
@@ -61,7 +61,7 @@ Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
 `DYLD_LIBRARY_PATH` environment variable;
 
 ```export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/libssh2/1.10.0/lib/```
-- Place the export statement in your working shell config; .bashrc .zshrc etc
+- Place the export statement in your working shell config; .zshrc etc
 
 If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
 ```
