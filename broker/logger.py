@@ -20,8 +20,20 @@ class LOG_LEVEL(IntEnum):
     ERROR = logging.ERROR
 
 
+class RedactingFilter(logging.Filter):
+    def __init__(self, sensitive):
+        super(RedactingFilter, self).__init__()
+        self._sensitive = sensitive
+
+    def filter(self, record):
+        if isinstance(record.args, dict):
+            record.args = redact_dynaconf(record.args)
+        else:
+            record.args = tuple(redact_dynaconf(arg) for arg in record.args)
+        return True
+
+
 _sensitive = ["password", "pword", "token", "host_password"]
-_old_factory = None
 logging.addLevelName("TRACE", LOG_LEVEL.TRACE)
 logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
 
@@ -70,19 +82,6 @@ def formatter_factory(log_level, color=True):
         fmt=debug_fmt if log_level <= LOG_LEVEL.DEBUG else log_fmt, color=color
     )
     return formatter
-
-
-def broker_record_factory(*args, **kwargs):
-    """Factory to create a redacted logging.LogRecord"""
-    record = _old_factory(*args, **kwargs)
-    args_new = []
-    for arg in record.args:
-        if isinstance(arg, (tuple, Box, BoxList)):
-            args_new.append(redact_dynaconf(arg))
-        else:
-            args_new.append(arg)
-    record.args = tuple(args_new)
-    return record
 
 
 def redact_dynaconf(data):
@@ -137,11 +136,7 @@ def setup_logzero(
     patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
     set_file_logging(file_level, path)
-    global _old_factory
-    lrf = logging.getLogRecordFactory()
-    if lrf.__name__ is not broker_record_factory.__name__:
-        _old_factory = lrf
-        logging.setLogRecordFactory(broker_record_factory)
+    logzero.logger.addFilter(RedactingFilter(_sensitive))
 
 
 setup_logzero()
