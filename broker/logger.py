@@ -21,16 +21,35 @@ class LOG_LEVEL(IntEnum):
 
 
 class RedactingFilter(logging.Filter):
+    """Custom logging.Filter to redact secrets from the Dynaconf config"""
     def __init__(self, sensitive):
         super(RedactingFilter, self).__init__()
         self._sensitive = sensitive
 
     def filter(self, record):
         if isinstance(record.args, dict):
-            record.args = redact_dynaconf(record.args)
+            record.args = self.redact_dynaconf(record.args)
         else:
-            record.args = tuple(redact_dynaconf(arg) for arg in record.args)
+            record.args = tuple(self.redact_dynaconf(arg) for arg in record.args)
         return True
+
+    def redact_dynaconf(self, data):
+        """
+        This method goes over the data and redacts all values of keys
+        that match the sensitive ones
+        """
+        if isinstance(data, (list, tuple)):
+            data_copy = [self.redact_dynaconf(item) for item in data]
+        elif isinstance(data, dict):
+            data_copy = copy.deepcopy(data)
+            for k, v in data_copy.items():
+                if isinstance(v, (dict, list)):
+                    data_copy[k] = self.redact_dynaconf(v)
+                elif k in self._sensitive and v:
+                    data_copy[k] = "******"
+        else:
+            data_copy = data
+        return data_copy
 
 
 _sensitive = ["password", "pword", "token", "host_password"]
@@ -82,21 +101,6 @@ def formatter_factory(log_level, color=True):
         fmt=debug_fmt if log_level <= LOG_LEVEL.DEBUG else log_fmt, color=color
     )
     return formatter
-
-
-def redact_dynaconf(data):
-    if isinstance(data, (list, tuple)):
-        data_copy = [redact_dynaconf(item) for item in data]
-    elif isinstance(data, dict):
-        data_copy = copy.deepcopy(data)
-        for k, v in data_copy.items():
-            if isinstance(v, (dict, list)):
-                data_copy[k] = redact_dynaconf(v)
-            elif k in _sensitive and v:
-                data_copy[k] = "*" * 6
-    else:
-        data_copy = data
-    return data_copy
 
 
 def set_log_level(level=settings.logging.console_level):
