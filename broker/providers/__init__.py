@@ -96,7 +96,7 @@ class Provider(PickleSafe):
 
     def __repr__(self):
         inner = ", ".join(
-            f"{k}={'*' * 6 if k in self._sensitive_attrs and v else v}"
+            f"{k}={'******' if k in self._sensitive_attrs and v else v}"
             for k, v in self.__dict__.items()
             if not k.startswith("_") and not callable(v)
         )
