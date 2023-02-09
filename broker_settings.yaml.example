@@ -5,6 +5,7 @@ logging:
     file_level: debug
 inventory_file: "inventory.yaml"
 # Host Settings
+# These can be left alone if you're not using Broker as a library
 host_username: "root"
 host_password: "<password>"
 host_ssh_port: "<port>"
