@@ -552,8 +552,11 @@ class AnsibleTower(Provider):
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
         if workflow := kwargs.get("workflow"):
             wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
+            default_inv = self.v2.inventory.get(id=wfjt.inventory).results.pop()
             logger.info(
+                f"\nDescription:\n{wfjt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
+                f"tower_inventory: {default_inv['name']}"
             )
         elif kwargs.get("workflows"):
             workflows = [
@@ -584,8 +587,11 @@ class AnsibleTower(Provider):
             logger.info(f"Available Inventories:\n{inv}")
         elif job_template := kwargs.get("job_template"):
             jt = self.v2.job_templates.get(name=job_template).results.pop()
+            default_inv = self.v2.inventory.get(id=jt.inventory).results.pop()
             logger.info(
+                f"\nDescription:\n{jt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
+                f"tower_inventory: {default_inv['name']}"
             )
         elif kwargs.get("job_templates"):
             job_templates = [
