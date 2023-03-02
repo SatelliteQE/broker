@@ -4,20 +4,22 @@ from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
 from broker.exceptions import ConfigurationError
 
-settings_file = "broker_settings.yaml"
-BROKER_DIRECTORY = Path()
+BROKER_DIRECTORY = Path.home().joinpath(".broker")
 
 if "BROKER_DIRECTORY" in os.environ:
     envar_location = Path(os.environ["BROKER_DIRECTORY"])
     if envar_location.is_dir():
         BROKER_DIRECTORY = envar_location
 
+# ensure the broker directory exists
+BROKER_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
 settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 validators = [
     Validator("HOST_USERNAME", default="root"),
-    Validator("HOST_PASSWORD", must_exist=True),
+    Validator("HOST_PASSWORD", default="toor"),
     Validator("HOST_CONNECTION_TIMEOUT", default=None),
     Validator("HOST_SSH_PORT", default=22),
     Validator("HOST_SSH_KEY_FILENAME", default=None),
