@@ -13,8 +13,8 @@ Broker is a tool designed to provide a common interface between one or many serv
 dnf install cmake
 cd <broker root directory>
 
-pip install .   ( install Broker cloned locally )   
-or   
+pip install .   ( install Broker cloned locally )
+or
 pip install broker   ( install latest version from PyPI )
 
 cp broker_settings.yaml.example broker_settings.yaml
@@ -29,19 +29,19 @@ pip install broker[docker]
 ```
 These may not work correctly in non-bash environments.
 
-Broker can also be ran outside of its base directory. In order to do so, specify the directory broker's files are in with the
+By default, Broker's base directory will be located at `.broker/` in your home directory. In order to run from another location, specify the directory Broker's files are in with the
 `BROKER_DIRECTORY` envronment variable.
-```BROKER_DIRECTORY=/home/jake/Programming/broker/ broker inventory```
+```export BROKER_DIRECTORY=/home/jake/Programming/broker/```
 
-# Installation MacOS 12.x 
+# Installation MacOS 12.x
 ```
 brew install cmake
 brew install openssl
 brew install libssh2
 cd <broker root directory>
 
-pip install .   ( install Broker cloned locally )   
-or   
+pip install .   ( install Broker cloned locally )
+or
 pip install broker   ( install latest version from PyPI )
 
 cp broker_settings.yaml.example broker_settings.yaml
@@ -57,7 +57,7 @@ $ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="
 Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
 
 - Locate the .dylib files from within libssh2 (likely in `/opt/homebrew/Cellar/` or `/usr/lib/`)
-- Export the path to the .dylibs directory as the 
+- Export the path to the .dylibs directory as the
 `DYLD_LIBRARY_PATH` environment variable;
 
 ```export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/libssh2/1.10.0/lib/```
@@ -110,7 +110,7 @@ If you have more complex data structures you need to pass in, you can do that in
 You can populate a json or yaml file where the top-level keys will become broker arguments and their nested data structures become values.
 Note:
     The json and yaml files need to use the supported suffix ('json', 'yaml', '.yml') in order to be properly recognized.
-    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.  
+    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.
 ```
 broker checkout --nick rhel7 --args-file tests/data/broker_args.json
 ```
