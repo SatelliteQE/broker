@@ -12,11 +12,13 @@ from broker.logger import LOG_LEVEL
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
 
-def loggedcli(*cli_args, **cli_kwargs):
-    """Updates the cli.command wrapper function in order to add logging"""
+def loggedcli(group=None, *cli_args, **cli_kwargs):
+    """Updates the group command wrapper function in order to add logging"""
+    if not group:
+        group = cli  # default to the main cli group
 
     def decorator(func):
-        @cli.command(*cli_args, **cli_kwargs)
+        @group.command(*cli_args, **cli_kwargs)
         @wraps(func)
         def wrapper(*args, **kwargs):
             logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=}")
@@ -72,9 +74,23 @@ def populate_providers(click_group):
     """
     for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
 
-        @click_group.command(name=prov, hidden=prov_class.hidden)
-        def provider_cmd(*args, **kwargs):  # the actual subcommand
+        @loggedcli(
+            group=click_group,
+            name=prov,
+            hidden=prov_class.hidden,
+            context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+        )
+        @click.pass_context
+        def provider_cmd(ctx, *args, **kwargs):  # the actual subcommand
             """Get information about a provider's actions"""
+            # if additional arguments were passed, include them in the broker args
+            # strip leading -- characters
+            kwargs.update(
+                {
+                    (key[2:] if key.startswith("--") else key): val
+                    for key, val in zip(ctx.args[::2], ctx.args[1::2])
+                }
+            )
             broker_inst = Broker(**kwargs)
             broker_inst.nick_help()
 

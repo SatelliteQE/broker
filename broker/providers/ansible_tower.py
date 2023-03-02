@@ -348,10 +348,15 @@ class AnsibleTower(Provider):
             return None
 
     def _compile_host_info(self, host):
+        # attempt to get the hostname from the host variables and then facts
+        if not (hostname := host.variables.get("fqdn")):
+            if hasattr(host_facts := host.related.ansible_facts.get(), "results"):
+                hostname = host_facts.results[0].ansible_facts.get("ansible_fqdn")
         host_info = {
             "name": host.name,
             "type": host.type,
-            "hostname": host.variables.get("fqdn"),
+            "hostname": hostname,
+            "ip": host.variables.get("ansible_host"),
             "tower_inventory": self._translate_inventory(host.inventory),
             "_broker_provider": "AnsibleTower",
             "_broker_provider_instance": self.instance,
@@ -480,8 +485,14 @@ class AnsibleTower(Provider):
         payload = {}
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
+            logger.info(
+                f"Using tower inventory: {self._translate_inventory(inventory)}"
+            )
         elif self.inventory:
             payload["inventory"] = self.inventory
+            logger.info(
+                f"Using tower inventory: {self._translate_inventory(self.inventory)}"
+            )
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
         payload["extra_vars"] = str(kwargs)
