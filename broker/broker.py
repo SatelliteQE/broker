@@ -201,7 +201,7 @@ class Broker:
             # pass
         return host
 
-    def checkin(self, sequential=False, host=None):
+    def checkin(self, sequential=False, host=None, in_context=False):
         """checkin one or more VMs
 
         :param host: can be one of:
@@ -211,6 +211,7 @@ class Broker:
             A dictionary mapping host types to one or more host objects
 
         :param sequential: boolean whether to run checkins sequentially
+        :param in_context: Whether checkin is part of context manager
         """
         # default to hosts listed on the instance
         hosts = host or self._hosts
@@ -222,9 +223,11 @@ class Broker:
         if isinstance(hosts, dict):
             # flatten the lists of hosts from the values of the dict
             hosts = [host for host_list in hosts.values() for host in host_list]
-        if not isinstance(hosts, list):
-            hosts = [hosts]
-
+        else:
+            if not isinstance(hosts, list):
+                hosts = [hosts]
+            if in_context:
+                hosts = [host for host in hosts if not getattr(host, '_skip_context_checkin', False)]
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
             return
@@ -365,6 +368,6 @@ class Broker:
         last_exception = None
         for host in self._hosts:
             last_exception = _try_teardown(host)
-        self.checkin()
+        self.checkin(in_context=True)
         if last_exception:
             raise last_exception
