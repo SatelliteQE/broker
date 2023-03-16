@@ -550,7 +550,8 @@ class AnsibleTower(Provider):
         if new_inv := target_vm._broker_args.get("tower_inventory"):
             if new_inv != self._inventory:
                 self._inventory = new_inv
-                del self.inventory  # clear the cached value
+                if hasattr(self.__dict__, 'inventory'):
+                    del self.inventory  # clear the cached value
         return self.execute(
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
