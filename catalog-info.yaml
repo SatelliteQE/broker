@@ -12,7 +12,7 @@ metadata:
     - python
     - infrastructure
     - click
-    - ansible tower
+    - ansible-tower
     - aap
     - docker
     - podman
