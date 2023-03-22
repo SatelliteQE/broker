@@ -393,6 +393,9 @@ class AnsibleTower(Provider):
                 if val and isinstance(val, str)
             }
         )
+        # temporary workaround for OSP hosts that have lost their hostname
+        if not host_info["hostname"] and host.variables.get("openstack"):
+            host_info["hostname"] = host.variables["openstack"]["metadata"].get("fqdn")
         return host_info
 
     @cached_property

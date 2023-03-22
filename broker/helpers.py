@@ -181,7 +181,7 @@ def resolve_file_args(broker_args):
     """
     final_args = {}
     # parse the eventual args_file first
-    if val := broker_args.pop('args_file', None):
+    if val := broker_args.pop("args_file", None):
         if isinstance(val, Path) or (
             isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
         ):
@@ -233,6 +233,8 @@ def update_inventory(add=None, remove=None):
     )
     if add and not isinstance(add, list):
         add = [add]
+    else:
+        add = []
     if remove and not isinstance(remove, list):
         remove = [remove]
     with FileLock(inventory_file):
@@ -243,6 +245,14 @@ def update_inventory(add=None, remove=None):
         if remove:
             for host in inv_data[::-1]:
                 if host["hostname"] in remove or host["name"] in remove:
+                    # iterate through new hosts and update with old host data if it would nullify
+                    for new_host in add:
+                        if (
+                            host["hostname"] == new_host["hostname"]
+                            or host["name"] == new_host["name"]
+                        ):
+                            # update missing data in the new_host with the old_host data
+                            new_host.update(merge_dicts(new_host, host))
                     inv_data.remove(host)
         if add:
             inv_data.extend(add)

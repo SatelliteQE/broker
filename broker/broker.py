@@ -309,9 +309,8 @@ class Broker:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
-            host.get("hostname", host.get("name"))
-            for host in helpers.load_inventory()
-            if host["_broker_provider"] == provider
+            hostname if (hostname := host.get("hostname")) else host.get("name")
+            for host in helpers.load_inventory(filter=f"_broker_provider={provider}")
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
