@@ -184,7 +184,7 @@ class AnsibleTower(Provider):
             broker_args.get("source_vm", caller_host.name), broker_args
         )
 
-    def _set_attributes(self, host_inst, broker_args=None):
+    def _set_attributes(self, host_inst, broker_args=None, misc_attrs=None):
         host_inst.__dict__.update(
             {
                 "release": self._host_release,
@@ -193,6 +193,8 @@ class AnsibleTower(Provider):
                 "_broker_args": broker_args,
             }
         )
+        if isinstance(misc_attrs, dict):
+            host_inst.__dict__.update(misc_attrs)
 
     def _translate_inventory(self, inventory):
         if isinstance(inventory, int):  # already an id, silly
@@ -418,6 +420,7 @@ class AnsibleTower(Provider):
 
         :return: broker object of constructed host instance
         """
+        misc_attrs = {}  # used later to add misc attributes to host object
         if provider_params:
             job = provider_params
             job_attrs = self._merge_artifacts(
@@ -430,8 +433,11 @@ class AnsibleTower(Provider):
                 job_extra_vars[key] = job_attrs.get(key)
             kwargs.update({key: val for key, val in job_extra_vars.items() if val})
             kwargs.update({key: val for key, val in job_attrs.items() if val})
-            if "tower_inventory" in job_attrs:
-                kwargs["tower_inventory"] = job_attrs["tower_inventory"]
+            misc_attrs = {
+                "tower_inventory": job_attrs["tower_inventory"]
+                if "tower_inventory" in job_attrs
+                else self._translate_inventory(job.summary_fields.inventory)
+            }
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
@@ -450,7 +456,7 @@ class AnsibleTower(Provider):
             )
         else:
             host_inst = host_classes[kwargs.get("type")](**kwargs)
-        self._set_attributes(host_inst, broker_args=kwargs)
+        self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=misc_attrs)
         return host_inst
 
     def execute(self, **kwargs):
@@ -544,7 +550,7 @@ class AnsibleTower(Provider):
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
 
-    def extend_vm(self, target_vm, new_expire_time=None):
+    def extend(self, target_vm, new_expire_time=None):
         """Run the extend workflow with defaults args
 
         :param target_vm: This should be a host object

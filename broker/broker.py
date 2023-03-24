@@ -253,7 +253,7 @@ class Broker:
         logger.info(f"Extending host {host.hostname}")
         provider = PROVIDERS[host._broker_provider]
         self._kwargs["target_vm"] = host
-        self._act(provider, "extend_vm", checkout=False)
+        self._act(provider, "extend", checkout=False)
         return host
 
     def extend(self, sequential=False, host=None):
