@@ -233,7 +233,7 @@ def update_inventory(add=None, remove=None):
     )
     if add and not isinstance(add, list):
         add = [add]
-    else:
+    elif not add:
         add = []
     if remove and not isinstance(remove, list):
         remove = [remove]
