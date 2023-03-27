@@ -55,9 +55,9 @@ def test_nondefault_envar(set_envars):
     """Set a top-level instance value via environment variable
     then verify that the value has been overriden when the provider is specified.
     """
-    test_provider = TestProvider(TestProvider="test1")
-    assert test_provider.instance == "test1"
-    assert test_provider.foo == "bar"
+    test_provider = TestProvider(TestProvider="test2")
+    assert test_provider.instance == "test2"
+    assert test_provider.foo == "baz"
 
 
 @pytest.mark.parametrize(

@@ -57,6 +57,7 @@ TestProvider:
             default: True
         - test2:
             foo: "baz"
+            override_envars: True
         - bad:
             nothing: False
     config_value: "something"

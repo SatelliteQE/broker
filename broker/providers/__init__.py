@@ -29,37 +29,38 @@ class Provider(PickleSafe):
     def _validate_settings(self, instance_name=None):
         """Load and validate provider settings
 
-        Each provider's settings must include an instances list with specific instance
+        Each provider's settings can include an instances list with specific instance
         details.
+        One instance should have a "default" key set to True, if instances are defined.
         General provider settings should live on the top level for that provider.
-        One instance should have a "default" key set to True
 
         :param instance_name: A string matching an instance name
         """
-        instance_name = instance_name or getattr(self, "instance", None)
         section_name = self.__class__.__name__.upper()
-        fresh_settings = self._fresh_settings.get(section_name).copy()
-        instance, default = None, False
-        for candidate in fresh_settings.instances:
-            logger.debug("Checking %s against %s", instance_name, candidate)
-            if instance_name in candidate:
-                instance = candidate
-                default = False
-                break
-            elif (
-                candidate.values()[0].get("default")
-                or len(fresh_settings.instances) == 1
-            ):
-                instance = candidate
-                default = True
-        self.instance, *_ = instance  # store the instance name on the provider
-        fresh_settings.update(instance.values()[0])
-        settings[section_name] = fresh_settings
-        if default:
-            # if a default provider is selected, defer to loaded environment variables
-            settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
+        # if the provider has instances, load the instance settings
+        if self._fresh_settings.get(section_name).get("instances"):
+            fresh_settings = self._fresh_settings.get(section_name).copy()
+            instance_name = instance_name or getattr(self, "instance", None)
+            # iterate through the instances and find the one that matches the instance_name
+            # if no instance matches, use the default instance
+            for candidate in fresh_settings.instances:
+                logger.debug("Checking %s against %s", instance_name, candidate)
+                if instance_name in candidate:
+                    instance = candidate
+                    break
+                elif (
+                    candidate.values()[0].get("default")
+                    or len(fresh_settings.instances) == 1
+                ):
+                    instance = candidate
+            self.instance, *_ = instance  # store the instance name on the provider
+            fresh_settings.update((inst_vals := instance.values()[0]))
+            settings[section_name] = fresh_settings
+            if not inst_vals.get("override_envars"):
+                # if a provider instance doesn't want to override envars, load them
+                settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
 
-        settings.validators.extend(self._validators)
+        settings.validators.extend([v for v in self._validators if v not in settings.validators])
         # use selective validation to only validate the instance settings
         try:
             settings.validators.validate(only=section_name)
