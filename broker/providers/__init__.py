@@ -23,8 +23,8 @@ class Provider(PickleSafe):
         self._construct_params = []
         cls_name = self.__class__.__name__
         logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
-        instance_name = kwargs.pop(f"{cls_name}", None)
-        self._validate_settings(instance_name)
+        self.instance = kwargs.pop(f"{cls_name}", None)
+        self._validate_settings(self.instance)
 
     def _validate_settings(self, instance_name=None):
         """Load and validate provider settings
