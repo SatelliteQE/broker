@@ -56,3 +56,12 @@ class TestProvider(Provider):
 
     def release(self, host_obj):
         return self.test_action(test_action="release", **host_obj.to_dict())
+
+    def extend(self):
+        pass
+
+    def get_inventory(self, **kwargs):
+        pass
+
+    def nick_help(self):
+        pass
