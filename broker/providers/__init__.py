@@ -1,13 +1,12 @@
-import pickle
+from abc import ABCMeta, abstractmethod
 import dynaconf
 
 from broker import exceptions
-from broker.helpers import PickleSafe
 from broker.settings import settings
 from logzero import logger
 
 
-class Provider(PickleSafe):
+class Provider(metaclass=ABCMeta):
     # Populate with a list of Dynaconf Validators specific to your provider
     _validators = []
     # Set to true if you don't want your provider shown in the CLI
@@ -67,9 +66,6 @@ class Provider(PickleSafe):
         except dynaconf.ValidationError as err:
             raise exceptions.ConfigurationError(err)
 
-    def _host_release(self):
-        raise exceptions.NotImplementedError("_host_release has not been implemented")
-
     def _set_attributes(self, obj, attrs):
         obj.__dict__.update(attrs)
 
@@ -83,17 +79,21 @@ class Provider(PickleSafe):
         self._set_attributes(host_inst, host_attrs)
         return host_inst
 
+    @abstractmethod
     def nick_help(self):
-        raise exceptions.NotImplementedError("nick_help has not been implemented")
+        pass
 
+    @abstractmethod
     def get_inventory(self, **kwargs):
-        raise exceptions.NotImplementedError("get_inventory has not been implemented")
+        pass
 
+    @abstractmethod
     def extend(self):
-        raise exceptions.NotImplementedError("extend has not been implemented")
+        pass
 
+    @abstractmethod
     def release(self, host_obj):
-        raise exceptions.NotImplementedError("release has not been implemented")
+        pass
 
     def __repr__(self):
         inner = ", ".join(
@@ -103,17 +103,3 @@ class Provider(PickleSafe):
         )
         return f"{self.__class__.__name__}({inner})"
 
-    def __getstate__(self):
-        """If a session is active, remove it for pickle compatability"""
-        self._purify()
-        return self.__dict__
-
-    def _purify(self):
-        """Strip all unpickleable attributes from a Host before pickling"""
-        for key, obj in self.__dict__.items():
-            try:
-                pickle.dumps(obj)
-            except (pickle.PicklingError, AttributeError):
-                self.__dict__[key] = None
-            except RecursionError:
-                logger.warning(f"Recursion limit reached on {obj=}")

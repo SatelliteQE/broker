@@ -99,16 +99,6 @@ class Container(Provider):
         )
         self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
 
-    def _post_pickle(self, purified):
-        self._validate_settings()
-        self.runtime = self._runtime_cls(
-            host=settings.container.host,
-            username=settings.container.host_username,
-            password=settings.container.host_password,
-            port=settings.container.host_port,
-            timeout=settings.container.timeout,
-        )
-
     def _ensure_image(self, name):
         """Check if an image exists on the provider, attempt a pull if not"""
         for image in self.runtime.images:
