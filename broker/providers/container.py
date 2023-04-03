@@ -225,14 +225,14 @@ class Container(Provider):
                 if img.labels.get("broker_compatible") and img.tags
             ]
             if res_filter := kwargs.get("results_filter"):
-                images = helpers.results_filter(images, res_filter)
+                images = helpers.eval_filter(images, res_filter, "res")
                 images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available host images:\n{images}")
         elif kwargs.get("container_apps"):
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
-                images = helpers.results_filter(images, res_filter)
+                images = helpers.eval_filter(images, res_filter, "res")
                 images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available app images:\n{images}")

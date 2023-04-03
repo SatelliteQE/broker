@@ -28,6 +28,11 @@ def request_origin(request):
     return helpers.find_origin()
 
 
+@pytest.fixture(scope="module")
+def fake_inventory():
+    return helpers.load_file("tests/data/fake_inventory.yaml")
+
+
 def test_load_json_file():
     data = helpers.load_file("tests/data/broker_args.json")
     assert data == BROKER_ARGS_DATA
@@ -110,3 +115,36 @@ def test_flatten_duplicate():
     data = {"rhel_compose_repositories": [{"name": "baseos"}, {"name": "appstream"}]}
     result = helpers.flatten_dict(data)
     assert len(result) == 2
+
+
+def test_eval_filter_list_copy(fake_inventory):
+    """Test that a python list copy operation returns all entries in the inventory"""
+    filtered = helpers.eval_filter(fake_inventory, "@inv[:]")
+    assert len(filtered) == 10
+
+
+def test_eval_filter_list_last(fake_inventory):
+    """Test that a neative list index returns the last host in the inventory"""
+    filtered = helpers.eval_filter(fake_inventory, "@inv[-1]")
+    assert len(filtered) == 1
+    assert filtered[0]["hostname"] == "dhcp-369.test.example.com"
+
+
+def test_eval_filter_list_slice(fake_inventory):
+    """Test that a list slice returns the correct number of hosts"""
+    filtered = helpers.eval_filter(fake_inventory, "@inv[1:3]")
+    assert len(filtered) == 2
+    assert filtered[0]["hostname"] == "dhcp-121.test.example.com"
+    assert filtered[1]["hostname"] == "dhcp-113.test.example.com"
+
+
+def test_eval_filter_attribute(fake_inventory):
+    """Test that a filter can access an attribute from an inventory host"""
+    filtered = helpers.eval_filter(fake_inventory, "'rhel8.7' in @inv.name")
+    assert len(filtered) == 4
+
+
+def test_eval_filter_chain(fake_inventory):
+    """Test that a user can chain multiple filters together"""
+    filtered = helpers.eval_filter(fake_inventory, "@inv[:3] | 'sat-jenkins' in @inv.name")
+    assert len(filtered) == 1
