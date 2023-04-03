@@ -210,10 +210,7 @@ def load_inventory(filter=None):
 
     :return: list of dictionaries
     """
-    inventory_file = settings.BROKER_DIRECTORY.joinpath(
-        settings.settings.INVENTORY_FILE
-    )
-    inv_data = load_file(inventory_file, warn=False)
+    inv_data = load_file(settings.inventory_path, warn=False)
     return inv_data if not filter else inventory_filter(inv_data, filter)
 
 
@@ -226,19 +223,16 @@ def update_inventory(add=None, remove=None):
 
     :return: no return value
     """
-    inventory_file = settings.BROKER_DIRECTORY.joinpath(
-        settings.settings.INVENTORY_FILE
-    )
     if add and not isinstance(add, list):
         add = [add]
     elif not add:
         add = []
     if remove and not isinstance(remove, list):
         remove = [remove]
-    with FileLock(inventory_file):
+    with FileLock(settings.inventory_path):
         inv_data = load_inventory()
         if inv_data:
-            inventory_file.unlink()
+            settings.inventory_path.unlink()
 
         if remove:
             for host in inv_data[::-1]:
@@ -255,8 +249,8 @@ def update_inventory(add=None, remove=None):
         if add:
             inv_data.extend(add)
 
-        inventory_file.touch()
-        with inventory_file.open("w") as inv_file:
+        settings.inventory_path.touch()
+        with settings.inventory_path.open("w") as inv_file:
             yaml.dump(inv_data, inv_file)
 
 
