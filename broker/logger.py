@@ -56,7 +56,6 @@ _sensitive = ["password", "pword", "token", "host_password"]
 logging.addLevelName("TRACE", LOG_LEVEL.TRACE)
 logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
 
-
 def patch_awx_for_verbosity(api):
     client = api.client
     awx_log = client.log
@@ -133,13 +132,18 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
 
 def setup_logzero(
     level=settings.logging.console_level,
+    formatter=None,
     file_level=settings.logging.file_level,
+    name=None,
     path="logs/broker.log",
 ):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
     set_file_logging(file_level, path)
+    if formatter:
+        logzero.formatter(formatter)
+    logzero.logger.name = name or "broker"
     logzero.logger.addFilter(RedactingFilter(_sensitive))
 
 
