@@ -4,137 +4,47 @@
 # Broker
 The infrastrucure middleman
 
-
 # Description
 Broker is a tool designed to provide a common interface between one or many services that provision virtual machines or containers. It is an abstraction layer that allows you to ignore most of the implementation details and just get what you need.
 
-# Installation
-```
-dnf install cmake
-cd <broker root directory>
+# Docs
+Broker's docs can be found at the wiki for this repo: https://github.com/SatelliteQE/broker/wiki
 
-pip install .   ( install Broker cloned locally )
-or
-pip install broker   ( install latest version from PyPI )
+# Quickstart
+Install cmake with `dnf install cmake`
 
-cp broker_settings.yaml.example broker_settings.yaml
-```
-Then edit the broker_settings.yaml file
+Install Broker either by cloning locally with `pip install .` or with `pip install broker` for the latest version from PyPI.
 
-If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
-```
-pip install broker[podman]
-or
-pip install broker[docker]
-```
-These may not work correctly in non-bash environments.
+Copy the example settings file to `broker_settings.yaml` and edit it.
 
-By default, Broker's base directory will be located at `.broker/` in your home directory. In order to run from another location, specify the directory Broker's files are in with the
-`BROKER_DIRECTORY` envronment variable.
-```export BROKER_DIRECTORY=/home/jake/Programming/broker/```
+(optional) If you are using the Container provider, install the extra dependency based on your container runtime of choice with either `pip install broker[podman]` or `pip install broker[docker]`.
 
-# Installation MacOS 12.x
-```
-brew install cmake
-brew install openssl
-brew install libssh2
-cd <broker root directory>
+To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
 
-pip install .   ( install Broker cloned locally )
-or
-pip install broker   ( install latest version from PyPI )
+Configure the `broker_settings.yaml` file to set configuration values for broker's interaction with its providers.
 
-cp broker_settings.yaml.example broker_settings.yaml
-```
-Then edit the broker_settings.yaml file
-
-Error: If pycurl fails, remove the current version of pycurl and reinstall using openSSL:
-```
-$ pip uninstall pycurl
-$ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycurl
-```
-
-Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
-
-- Locate the .dylib files from within libssh2 (likely in `/opt/homebrew/Cellar/` or `/usr/lib/`)
-- Export the path to the .dylibs directory as the
-`DYLD_LIBRARY_PATH` environment variable;
-
-```export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/libssh2/1.10.0/lib/```
-- Place the export statement in your working shell config; .zshrc etc
-
-If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
-```
-pip install broker[podman]
-or
-pip install broker[docker]
-```
-These may not work correctly in non-bash environments.
-
-Broker can also be ran outside of its base directory. In order to do so, specify the directory broker's files are in with the
-`BROKER_DIRECTORY` envronment variable.
-```BROKER_DIRECTORY=/home/jake/Programming/broker/ broker inventory```
-
-# Configuration
-The broker_settings.yaml file is used, through DynaConf, to set configuration values for broker's interaction with its 'providers'.
-
-DynaConf integration provides support for setting environment variables to override any settings from broker's config file.
-
-An environment variable override would take the form of: `BROKER_AnsibleTower__base_url="https://my.ansibletower.instance.com"`. Note the use of double underscores to model nested maps in yaml.
-
-Broker allows for multiple instances of a provider to be in its config file. You can name an instance anything you want, then put instance-specfic settings nested under the instance name. One of your instances must have a setting `default: True`.
-
-For the AnsibleTower provider, authentication can be achieved either through setting a username and password, or through a token (Personal Access Token in Tower).
-
-A username can still be provided when using a token to authenticate. This user will be used for inventory sync (examples below). This might be helpful for AnsibleTower administrators who would like to use their own token to authenticate, but want to set a different user in configuration for checking inventory.
-
-# CLI Usage
+# Basic CLI Usage
 **Checking out a VM or container**
-You can pass in any arbitrary arguments you want.
+To checkout a single VM with arbitrary arguments:
 ```
-broker checkout --workflow "workflow-name" --workflow-arg1 something --workflow-arg2 else
+broker checkout --workflow test-workflow --workflow-arg1 something --workflow-arg2 else
 ```
-Passing environment variables to the target container.
+
+To checkout multiple VMs at once:
 ```
-broker checkout --nick rhel7 --environment "VAR1=val1,VAR2=val2"
+broker checkout --workflow test-workflow --count 3
 ```
-Broker can also checkout multiple VMs at once by specifying a count.
+
+To pass complex data structures:
 ```
-broker checkout --nick rhel7 --count 3
+broker checkout --container-host my-image --args-file tests/data/broker_args.json --extra tests/data/args_file.yaml
 ```
-To specify an instance a checkout should be performed against, pass a flag name matching your provider class and a value matching the instance name.
-```
-broker checkout --nick rhel7 --AnsibleTower testing
-```
-If you have more complex data structures you need to pass in, you can do that in two ways.
-You can populate a json or yaml file where the top-level keys will become broker arguments and their nested data structures become values.
-Note:
-    The json and yaml files need to use the supported suffix ('json', 'yaml', '.yml') in order to be properly recognized.
-    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.
-```
-broker checkout --nick rhel7 --args-file tests/data/broker_args.json
-```
-You can also pass in a file for other arguments, where the contents will become the argument's value
-```
-broker checkout --nick rhel7 --extra tests/data/args_file.yaml
-```
-**Note:** Check with the provider to determine specific arguments.
 
 **Nicks**
 
-Broker allows you to define configurable nicknames for checking out vms. Just add yours to setting.yaml and call with the ```--nick``` option
+Broker allows you to define configurable nicknames for checking out vms. Just add yours to setting.yaml and call with the `--nick` option
 ```
 broker checkout --nick rhel7
-```
-
-**Duplicating a VM**
-
-Broker offers another shortcut for checking out a VM with the same recipe as one already checked out by Broker. This is via the ```duplicate``` command.
-```
-broker duplicate my.awesome.vm.com
-broker duplicate 0
-broker duplicate 1 3
-broker duplicate 0 --count 2
 ```
 
 **Listing your VMs and containers**
@@ -147,19 +57,10 @@ To sync your inventory from a supported provider, use the `--sync` option.
 ```
 broker inventory --sync AnsibleTower
 ```
-To sync an inventory for a specific user, use the following syntax with `--sync`.
-```
-broker inventory --sync AnsibleTower:<username>
-```
 To sync an inventory for a specific instance, use the following syntax with --sync.
 ```
 broker inventory --sync Container::<instance name>
 ```
-This can also be combined with the user syntax above.
-```
-broker inventory --sync Container:<username>::<instance name>
-```
-
 
 **Extending your VM lease time**
 
@@ -173,9 +74,9 @@ broker extend --all
 
 **Checking in VMs and containers**
 
-You can also return a VM to its provider with the ```checkin``` command.
+You can also return a VM to its provider with the `checkin` command.
 Containers checked in this way will be fully deleted regardless of its status.
-You may use either the local id (```broker inventory```), the hostname, or "all" to checkin everything.
+You may use either the local id (`broker inventory`), the hostname, or "all" to checkin everything.
 ```
 broker checkin my.host.fqdn.com
 broker checkin 0
@@ -190,7 +91,7 @@ Broker's `providers` command allows you to gather information about what provide
 broker providers --help
 broker providers AnsibleTower --help
 broker providers AnsibleTower --workflows
-broker providers AnsibleTower --workflow remove-vm
+broker providers AnsibleTower --workflow test-workflow
 ```
 
 **Run arbitrary actions**
@@ -200,11 +101,10 @@ When executing with the Container provider, a new container will be spun up with
 ```
 broker execute --help
 broker execute --workflow my-awesome-workflow --additional-arg True
-broker execute -o raw --workflow my-awesome-workflow --additional-arg True
 broker execute -o raw --workflow my-awesome-workflow --additional-arg True --artifacts last
 ```
 
-**machine processable output**
+**Machine processable output**
 
 If running in a CI or other automated environment, Broker offers the choice to store important output information in an output file. This is json-formatted data. Please be aware that any existing file with the matching path and name will be erased.
 ```
@@ -219,99 +119,5 @@ Note that background mode will interfere with output options for execute since i
 ```
 broker checkout --background --nick rhel7
 broker checkin -b --all
-broker duplicate -b 0
 broker execute -b --workflow my-awesome-workflow --artifacts
 ```
-
-**Filter hosts for Broker actions**
-
-Actions that Broker can take against hosts (checkin, duplicate, extend) can take in a filter argument. This filter will decide which hosts the actions are applied to. A filter by itself will not select hosts for these actions, you will still need to specify which hosts to act against, or use `--all` when available. From there, the filter decides which of those hosts make it through to be acted upon.
-
-Broker's filters are based on what is stored in its local inventory file. Therefore, only properties in that file are filter-able. Nested properties are annotated with a `.` notation. For example, a top-level property `hostname` can be accessed by itself. However, a nested property of `_broker_args` called `version` would be accessed by `_broker_args.version`.
-
-Filters take the form `"(property)(condition)(value)"`. Filters have several possible conditions:
- - `<` means "in" or that the filter value exists within the actual value
- - `=` means "equals"
- - `{` means "starts with"
- - `}` means "ends with"
-
-Furthermore, putting a `!` before the condition inverts the filter. So `!=` means "not equals" and `!<` means "not in".
-
-**Example filters:**
-
-`--filter 'hostname<test'` The string test should exist somewhere in the hostname value
-`--filter '_broker_args.template{deploy-sat'` The template should start with the string "deploy-sat"
-
-You can also chain multiple filters together by separating them with a comma. These are additive AND filters where each filter condition must match.
-
-`--filter 'name<test,_broker_args.provider!=RHEV'` The host's name should have test in it and the provider should not equal RHEV.
-
-**Note:** Due to shell expansion, it is recommended to wrap a filter in single quotes.
-
-# API Usage
-**Basics:**
-
-Broker also exposes most of the same functionality the CLI provides through a Broker class.
-To use this class, simply import:
-```python
-from broker import Broker
-```
-The Broker class largely accepts the same arguments as you would pass via the CLI. One key difference is that you need to use underscores instead of dashes. For example, a checkout at the CLI that looks like this
-```
-broker checkout --nick rhel7 --args-file tests/data/broker_args.json --environment="VAR1=val1,VAR2=val2"
-```
-could look like this in an API usage
-```python
-rhel7_host = Broker(nick="rhel7", args_file="tests/data/broker_args.json", environment={"VAR1": "val1", "VAR2": "val2"}).checkout()
-```
-Broker will carry out its usual actions and package the resulting host in a Host object. This host object will also include some basic functionality, like the ability to execute ssh commands on the host.
-Executed ssh command results are packaged in a Results object containing status (return code), stdout, and stderr.
-```python
-result = rhel7_host.execute("rpm -qa")
-assert result.status == 0
-assert "my-package" in result.stdout
-```
-
-
-**Recommended**
-
-The Broker class has a built-in context manager that automatically performs a checkout upon enter and checkin upon exit. It is the recommended way of interacting with Broker for host management.
-In the below two lines of code, a container host is created (pulled if needed or applicable), a broker Host object is constructed, the host object runs a command on the container, output is checked, then the container is checked in.
-```python
-with Broker(container_host="ch-d:rhel7") as container_host:
-    assert container_host.hostname in container_host.execute("hostname").stdout
-```
-
-
-**Custom Host Classes**
-
-You are encouraged to build upon the existing Host class broker provides, but need to include it as a base class for Broker to work with it properly. This will allow you to build upon the base functionality Broker already provides while incorporating logic specific to your use cases.
-Once you have a new class, you can let broker know to use it during host construction.
-```python
-from broker import Broker
-from broker.hosts import Host
-
-class MyHost(Host):
-   ...
-
-with Broker(..., host_class=MyHost) as my_host:
-    ...
-```
-
-
-**Setup and Teardown**
-
-Sometimes you might want to define some behavior to occur after a host is checked out but before Broker gives it to you. Alternatively, you may want to define teardown logic that happens right before a host is checked in.
-When using the Broker context manager, Broker will run any `setup` or `teardown` method defined on the Host object.
-Broker *will not* pass any arguments to the `setup` or `teardown` methods, so they must not accept arguments.
-```python
-<continued from above>
-class MyHost(Host):
-    ...
-    def setup(self):
-        self.register()
-
-    def teardown(self):
-        self.unregister()
-```
-**Note:** One important thing to keep in mind is that Broker will strip any non-pickleable attributes from Host objects when needed. If you encounter this, then it is best to construct your host classes in such a way that they can recover gracefully in these situations.

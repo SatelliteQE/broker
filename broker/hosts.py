@@ -1,12 +1,11 @@
 # from functools import cached_property
 from logzero import logger
 from broker.exceptions import NotImplementedError, HostError
-from broker.helpers import PickleSafe
 from broker.session import ContainerSession, Session
 from broker.settings import settings
 
 
-class Host(PickleSafe):
+class Host:
 
     default_timeout = 0  # timeout in ms, 0 is infinite
 
@@ -44,13 +43,6 @@ class Host(PickleSafe):
             else:
                 self.connect()
         return self._session
-
-    def _pre_pickle(self):
-        self.close()
-
-    def _post_pickle(self, purified):
-        if "_cont_inst" in purified and not getattr(self, "_checked_in", False):
-            self._cont_inst = self._prov_inst._cont_inst_by_name(self.name)
 
     def connect(
         self, username=None, password=None, timeout=None, port=22, key_filename=None
