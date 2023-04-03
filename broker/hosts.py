@@ -1,6 +1,6 @@
 # from functools import cached_property
 from logzero import logger
-from broker.exceptions import NotImplementedError
+from broker.exceptions import NotImplementedError, HostError
 from broker.helpers import PickleSafe
 from broker.session import ContainerSession, Session
 from broker.settings import settings
@@ -10,12 +10,14 @@ class Host(PickleSafe):
 
     default_timeout = 0  # timeout in ms, 0 is infinite
 
-    def __init__(self, hostname, name=None, from_dict=False, **kwargs):
+    def __init__(self, hostname=None, name=None, from_dict=False, **kwargs):
         # Allow the class to construct itself from kwargs
         if from_dict:
             self.__dict__.update(kwargs)
         else:
-            self.hostname = hostname
+            self.hostname = hostname or kwargs.get("ip", None)
+            if not self.hostname:
+                raise HostError("Host must be constructed with a hostname or ip")
             self.name = name
         self.username = kwargs.get("username", settings.HOST_USERNAME)
         self.password = kwargs.get("password", settings.HOST_PASSWORD)
@@ -95,7 +97,7 @@ class Host(PickleSafe):
         return res
 
     def to_dict(self):
-        return {
+        ret_dict = {
             "hostname": self.hostname,
             "name": getattr(self, "name", None),
             "_broker_provider": self._broker_provider,
@@ -103,6 +105,9 @@ class Host(PickleSafe):
             "type": "host",
             "_broker_args": self._broker_args,
         }
+        if hasattr(self, "tower_inventory"):
+            ret_dict["tower_inventory"] = self.tower_inventory
+        return ret_dict
 
     def setup(self):
         """Automatically ran when entering a Broker context manager"""

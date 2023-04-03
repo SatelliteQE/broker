@@ -77,24 +77,27 @@ class Session:
         channel = self.session.open_session()
         return InteractiveShell(channel, pty)
 
-    def sftp_read(self, source, destination=None):
-        """read a remote file into a local destination"""
-        if not destination:
-            destination = source
-        elif destination.endswith("/"):
-            destination = destination + Path(source).name
-        # create the destination path if it doesn't exist
-        destination = Path(destination)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.touch()
+    def sftp_read(self, source, destination=None, return_data=False):
+        """read a remote file into a local destination or return a bytes object if return_data is True"""
+        if not return_data:
+            if not destination:
+                destination = source
+            elif destination.endswith("/"):
+                destination = destination + Path(source).name
+            # create the destination path if it doesn't exist
+            destination = Path(destination)
+            destination.parent.mkdir(parents=True, exist_ok=True)
         # initiate the sftp session, read data, write it to a local destination
         sftp = self.session.sftp_init()
         with sftp.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
         ) as remote:
-            with destination.open("wb") as local:
-                for size, data in remote:
-                    local.write(data)
+            captured_data = bytes()
+            for rc, data in remote:
+                captured_data += data
+            if return_data:
+                return captured_data
+            destination.write_bytes(data)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
         """sftp write a local file to a remote destination"""
@@ -257,20 +260,31 @@ class ContainerSession:
                     self.run(f"mkdir -m 666 -p {Path(destination).parent}")
             self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
 
-    def sftp_read(self, source, destination=None):
+    def sftp_read(self, source, destination=None, return_data=False):
         """Get a file or directory from the container"""
         destination = Path(destination or source)
-        logger.debug(
-            f"{self._cont_inst.hostname} getting file {source} from {destination}"
-        )
+        logger.debug(f"{self._cont_inst.hostname} getting file {source}")
         data, status = self._cont_inst._cont_inst.get_archive(source)
         logger.debug(f"{self._cont_inst.hostname}: {status}")
-        all_data = b"".join(d for d in data)
+        data = b"".join(d for d in data)
         if destination.name == "_raw":
-            return all_data
-        with helpers.data_to_tempfile(all_data, as_tar=True) as tar:
-            logger.debug(f"Extracting {source} to {destination}")
-            tar.extractall(destination.parent if destination.is_file() else destination)
+            return data
+        with helpers.data_to_tempfile(data, as_tar=True) as tar:
+            del data
+            if len(tar.getmembers()) == 1:
+                f = tar.extractfile(tar.getmember(Path(source).name))
+                if return_data:
+                    logger.debug(f"Extracting {source}")
+                    return f.read()
+                else:
+                    logger.debug(f"Extracting {source} to {destination}")
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(f.read())
+            else:
+                logger.warning("More than one member was found in the tar file.")
+                tar.extractall(
+                    destination.parent if destination.is_file() else destination
+                )
 
     def shell(self, pty=False):
         """Create and return an interactive shell instance"""

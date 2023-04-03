@@ -127,6 +127,8 @@ class AnsibleTower(Provider):
         ),
     ]
 
+    _sensitive_attrs = ["pword", "password", "token"]
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # get our instance settings
@@ -182,7 +184,7 @@ class AnsibleTower(Provider):
             broker_args.get("source_vm", caller_host.name), broker_args
         )
 
-    def _set_attributes(self, host_inst, broker_args=None):
+    def _set_attributes(self, host_inst, broker_args=None, misc_attrs=None):
         host_inst.__dict__.update(
             {
                 "release": self._host_release,
@@ -191,6 +193,8 @@ class AnsibleTower(Provider):
                 "_broker_args": broker_args,
             }
         )
+        if isinstance(misc_attrs, dict):
+            host_inst.__dict__.update(misc_attrs)
 
     def _translate_inventory(self, inventory):
         if isinstance(inventory, int):  # already an id, silly
@@ -346,10 +350,15 @@ class AnsibleTower(Provider):
             return None
 
     def _compile_host_info(self, host):
+        # attempt to get the hostname from the host variables and then facts
+        if not (hostname := host.variables.get("fqdn")):
+            if hasattr(host_facts := host.related.ansible_facts.get(), "results"):
+                hostname = host_facts.results[0].ansible_facts.get("ansible_fqdn")
         host_info = {
             "name": host.name,
             "type": host.type,
-            "hostname": host.variables.get("fqdn"),
+            "hostname": hostname,
+            "ip": host.variables.get("ansible_host"),
             "tower_inventory": self._translate_inventory(host.inventory),
             "_broker_provider": "AnsibleTower",
             "_broker_provider_instance": self.instance,
@@ -386,6 +395,9 @@ class AnsibleTower(Provider):
                 if val and isinstance(val, str)
             }
         )
+        # temporary workaround for OSP hosts that have lost their hostname
+        if not host_info["hostname"] and host.variables.get("openstack"):
+            host_info["hostname"] = host.variables["openstack"]["metadata"].get("fqdn")
         return host_info
 
     @cached_property
@@ -408,6 +420,7 @@ class AnsibleTower(Provider):
 
         :return: broker object of constructed host instance
         """
+        misc_attrs = {}  # used later to add misc attributes to host object
         if provider_params:
             job = provider_params
             job_attrs = self._merge_artifacts(
@@ -420,8 +433,11 @@ class AnsibleTower(Provider):
                 job_extra_vars[key] = job_attrs.get(key)
             kwargs.update({key: val for key, val in job_extra_vars.items() if val})
             kwargs.update({key: val for key, val in job_attrs.items() if val})
-            if "tower_inventory" in job_attrs:
-                kwargs["tower_inventory"] = job_attrs["tower_inventory"]
+            misc_attrs = {
+                "tower_inventory": job_attrs["tower_inventory"]
+                if "tower_inventory" in job_attrs
+                else self._translate_inventory(job.summary_fields.inventory)
+            }
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
@@ -440,7 +456,7 @@ class AnsibleTower(Provider):
             )
         else:
             host_inst = host_classes[kwargs.get("type")](**kwargs)
-        self._set_attributes(host_inst, broker_args=kwargs)
+        self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=misc_attrs)
         return host_inst
 
     def execute(self, **kwargs):
@@ -478,8 +494,14 @@ class AnsibleTower(Provider):
         payload = {}
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
+            logger.info(
+                f"Using tower inventory: {self._translate_inventory(inventory)}"
+            )
         elif self.inventory:
             payload["inventory"] = self.inventory
+            logger.info(
+                f"Using tower inventory: {self._translate_inventory(self.inventory)}"
+            )
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
         payload["extra_vars"] = str(kwargs)
@@ -528,7 +550,7 @@ class AnsibleTower(Provider):
             hosts.extend(inv_hosts)
         return [self._compile_host_info(host) for host in hosts]
 
-    def extend_vm(self, target_vm, new_expire_time=None):
+    def extend(self, target_vm, new_expire_time=None):
         """Run the extend workflow with defaults args
 
         :param target_vm: This should be a host object
@@ -537,7 +559,8 @@ class AnsibleTower(Provider):
         if new_inv := target_vm._broker_args.get("tower_inventory"):
             if new_inv != self._inventory:
                 self._inventory = new_inv
-                del self.inventory  # clear the cached value
+                if hasattr(self.__dict__, 'inventory'):
+                    del self.inventory  # clear the cached value
         return self.execute(
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
@@ -550,8 +573,11 @@ class AnsibleTower(Provider):
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
         if workflow := kwargs.get("workflow"):
             wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
+            default_inv = self.v2.inventory.get(id=wfjt.inventory).results.pop()
             logger.info(
+                f"\nDescription:\n{wfjt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
+                f"tower_inventory: {default_inv['name']}"
             )
         elif kwargs.get("workflows"):
             workflows = [
@@ -582,8 +608,11 @@ class AnsibleTower(Provider):
             logger.info(f"Available Inventories:\n{inv}")
         elif job_template := kwargs.get("job_template"):
             jt = self.v2.job_templates.get(name=job_template).results.pop()
+            default_inv = self.v2.inventory.get(id=jt.inventory).results.pop()
             logger.info(
+                f"\nDescription:\n{jt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
+                f"tower_inventory: {default_inv['name']}"
             )
         elif kwargs.get("job_templates"):
             job_templates = [
@@ -622,14 +651,6 @@ class AnsibleTower(Provider):
             source_vm=name,
             **broker_args,
         )
-
-    def __repr__(self):
-        inner = ", ".join(
-            f"{k}={v}"
-            for k, v in self.__dict__.items()
-            if not k.startswith("_") and not callable(v)
-        )
-        return f"{self.__class__.__name__}({inner})"
 
 
 def awxkit_representer(dumper, data):

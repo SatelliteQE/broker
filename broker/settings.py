@@ -4,26 +4,39 @@ from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
 from broker.exceptions import ConfigurationError
 
-settings_file = "broker_settings.yaml"
-BROKER_DIRECTORY = Path()
+BROKER_DIRECTORY = Path.home().joinpath(".broker")
 
 if "BROKER_DIRECTORY" in os.environ:
     envar_location = Path(os.environ["BROKER_DIRECTORY"])
     if envar_location.is_dir():
         BROKER_DIRECTORY = envar_location
 
+# ensure the broker directory exists
+BROKER_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
 settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 validators = [
     Validator("HOST_USERNAME", default="root"),
-    Validator("HOST_PASSWORD", must_exist=True),
+    Validator("HOST_PASSWORD", default="toor"),
     Validator("HOST_CONNECTION_TIMEOUT", default=None),
     Validator("HOST_SSH_PORT", default=22),
     Validator("HOST_SSH_KEY_FILENAME", default=None),
+    Validator("LOGGING", is_type_of=dict),
+    Validator(
+        "LOGGING.CONSOLE_LEVEL",
+        is_in=["error", "warning", "info", "debug", "trace", "silent"],
+        default="info",
+    ),
+    Validator(
+        "LOGGING.FILE_LEVEL",
+        is_in=["error", "warning", "info", "debug", "trace", "silent"],
+        default="debug",
+    ),
 ]
 
-# temportary fix for dynaconf #751
+# temporary fix for dynaconf #751
 vault_vars = {k: v for k, v in os.environ.items() if "VAULT_" in k}
 for k in vault_vars:
     del os.environ[k]

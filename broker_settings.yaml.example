@@ -1,7 +1,10 @@
 # Broker settings
-debug: False
-inventory_file: "inventory.yaml"
+# different log levels for file and stdout
+logging:
+    console_level: info
+    file_level: debug
 # Host Settings
+# These can be left alone if you're not using Broker as a library
 host_username: "root"
 host_password: "<password>"
 host_ssh_port: "<port>"
@@ -53,6 +56,7 @@ TestProvider:
             default: True
         - test2:
             foo: "baz"
+            override_envars: True
         - bad:
             nothing: False
     config_value: "something"

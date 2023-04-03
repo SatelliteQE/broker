@@ -1,13 +1,37 @@
+from functools import wraps
 import signal
 import sys
 import click
 from logzero import logger
+from broker import exceptions, helpers, settings
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
 from broker.providers import Provider
-from broker import exceptions, helpers, settings
+from broker.logger import LOG_LEVEL
 
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
+
+
+def loggedcli(group=None, *cli_args, **cli_kwargs):
+    """Updates the group command wrapper function in order to add logging"""
+    if not group:
+        group = cli  # default to the main cli group
+
+    def decorator(func):
+        @group.command(*cli_args, **cli_kwargs)
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=}")
+            retval = func(*args, **kwargs)
+            logger.log(
+                LOG_LEVEL.TRACE.value,
+                f"Finished {func=}(*{args=} **{kwargs=}) {retval=}",
+            )
+            return retval
+
+        return wrapper
+
+    return decorator
 
 
 class ExceptionHandler(click.Group):
@@ -50,9 +74,23 @@ def populate_providers(click_group):
     """
     for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
 
-        @click_group.command(name=prov, hidden=prov_class.hidden)
-        def provider_cmd(*args, **kwargs):  # the actual subcommand
+        @loggedcli(
+            group=click_group,
+            name=prov,
+            hidden=prov_class.hidden,
+            context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+        )
+        @click.pass_context
+        def provider_cmd(ctx, *args, **kwargs):  # the actual subcommand
             """Get information about a provider's actions"""
+            # if additional arguments were passed, include them in the broker args
+            # strip leading -- characters
+            kwargs.update(
+                {
+                    (key[2:] if key.startswith("--") else key): val
+                    for key, val in zip(ctx.args[::2], ctx.args[1::2])
+                }
+            )
             broker_inst = Broker(**kwargs)
             broker_inst.nick_help()
 
@@ -87,8 +125,8 @@ def populate_providers(click_group):
 @click.group(cls=ExceptionHandler, invoke_without_command=True)
 @click.option(
     "--log-level",
-    type=click.Choice(["info", "warning", "error", "critical", "debug", "silent"]),
-    default="debug" if settings.settings.debug else "info",
+    type=click.Choice(["info", "warning", "error", "debug", "trace", "silent"]),
+    default=settings.settings.logging.console_level,
     callback=helpers.update_log_level,
     is_eager=True,
     expose_value=False,
@@ -119,9 +157,7 @@ def cli(version):
         click.echo(f"Log File: {broker_directory}/logs/broker.log")
 
 
-@cli.command(
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(
@@ -178,7 +214,7 @@ def providers():
 populate_providers(providers)
 
 
-@cli.command()
+@loggedcli()
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
@@ -217,7 +253,7 @@ def checkin(vm, background, all_, sequential, filter):
     broker_inst.checkin(sequential=sequential)
 
 
-@cli.command()
+@loggedcli()
 @click.option("--details", is_flag=True, help="Display all host details")
 @click.option(
     "--sync",
@@ -247,7 +283,7 @@ def inventory(details, sync, filter):
     helpers.emit({"inventory": emit_data})
 
 
-@cli.command()
+@loggedcli()
 @click.argument("vm", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
@@ -283,7 +319,7 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     broker_inst.extend(sequential=sequential)
 
 
-@cli.command()
+@loggedcli()
 @click.argument("vm", type=str, nargs=-1)
 @click.option(
     "-b", "--background", is_flag=True, help="Run duplicate in the background"
@@ -326,9 +362,7 @@ def duplicate(vm, background, count, all_, filter):
                 )
 
 
-@cli.command(
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
-)
+@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.option(

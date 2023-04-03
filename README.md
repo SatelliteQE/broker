@@ -12,10 +12,56 @@ Broker is a tool designed to provide a common interface between one or many serv
 ```
 dnf install cmake
 cd <broker root directory>
-pip install .   or   pip install broker
+
+pip install .   ( install Broker cloned locally )
+or
+pip install broker   ( install latest version from PyPI )
+
 cp broker_settings.yaml.example broker_settings.yaml
 ```
 Then edit the broker_settings.yaml file
+
+If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
+```
+pip install broker[podman]
+or
+pip install broker[docker]
+```
+These may not work correctly in non-bash environments.
+
+By default, Broker's base directory will be located at `.broker/` in your home directory. In order to run from another location, specify the directory Broker's files are in with the
+`BROKER_DIRECTORY` envronment variable.
+```export BROKER_DIRECTORY=/home/jake/Programming/broker/```
+
+# Installation MacOS 12.x
+```
+brew install cmake
+brew install openssl
+brew install libssh2
+cd <broker root directory>
+
+pip install .   ( install Broker cloned locally )
+or
+pip install broker   ( install latest version from PyPI )
+
+cp broker_settings.yaml.example broker_settings.yaml
+```
+Then edit the broker_settings.yaml file
+
+Error: If pycurl fails, remove the current version of pycurl and reinstall using openSSL:
+```
+$ pip uninstall pycurl
+$ PYCURL_SSL_LIBRARY=openssl LDFLAGS="-L$(brew --prefix openssl)/lib" CPPFLAGS="-I$(brew --prefix openssl)/include" pip install --compile --install-option="--with-openssl" pycurl
+```
+
+Error: If libsshX.Y.dylib cannot be found, follow the additional steps:
+
+- Locate the .dylib files from within libssh2 (likely in `/opt/homebrew/Cellar/` or `/usr/lib/`)
+- Export the path to the .dylibs directory as the
+`DYLD_LIBRARY_PATH` environment variable;
+
+```export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/libssh2/1.10.0/lib/```
+- Place the export statement in your working shell config; .zshrc etc
 
 If you are using the Container provider, then install the extra dependency based on your container runtime of choice.
 ```
@@ -64,7 +110,7 @@ If you have more complex data structures you need to pass in, you can do that in
 You can populate a json or yaml file where the top-level keys will become broker arguments and their nested data structures become values.
 Note:
     The json and yaml files need to use the supported suffix ('json', 'yaml', '.yml') in order to be properly recognized.
-    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.  
+    Any eventual arbitrary arguments passed to CLI will be combined with those in the passed argument file with the CLI ones taking precedence.
 ```
 broker checkout --nick rhel7 --args-file tests/data/broker_args.json
 ```

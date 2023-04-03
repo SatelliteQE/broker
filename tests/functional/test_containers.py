@@ -1,4 +1,5 @@
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 import pytest
 from click.testing import CliRunner
 from broker import Broker
@@ -71,10 +72,23 @@ def test_container_e2e():
         assert c_host._cont_inst.top()['Processes']
         res = c_host.execute("hostname")
         assert res.stdout.strip() == c_host.hostname
-        # Test that a file can be uploaded to the container
-        c_host.session.sftp_write("broker_settings.yaml", "/root")
-        res = c_host.execute("ls")
-        assert "broker_settings.yaml" in res.stdout
+        loc_settings_path = Path("broker_settings.yaml")
+        remote_dir = "/tmp/fake"
+        c_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+        res = c_host.execute(f"ls {remote_dir}")
+        assert str(loc_settings_path) in res.stdout
+        with NamedTemporaryFile() as tmp:
+            c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+            data = c_host.session.sftp_read(
+                f"{remote_dir}/{loc_settings_path.name}", return_data=True
+            )
+            assert (
+                loc_settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
+            ), "Local file is different from the received one"
+            assert (
+                loc_settings_path.read_bytes() == data
+            ), "Local file is different from the received one (return_data=True)"
+            assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
 
 
 def test_container_e2e_mp():
@@ -83,7 +97,20 @@ def test_container_e2e_mp():
             assert c_host._cont_inst.top()['Processes']
             res = c_host.execute("hostname")
             assert res.stdout.strip() == c_host.hostname
-            # Test that a file can be uploaded to the container
-            c_host.session.sftp_write("broker_settings.yaml", "/tmp/fake/")
-            res = c_host.execute("ls /tmp/fake")
-            assert "broker_settings.yaml" in res.stdout
+            loc_settings_path = Path("broker_settings.yaml")
+            remote_dir = "/tmp/fake"
+            c_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+            res = c_host.execute(f"ls {remote_dir}")
+            assert str(loc_settings_path) in res.stdout
+            with NamedTemporaryFile() as tmp:
+                c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+                data = c_host.session.sftp_read(
+                    f"{remote_dir}/{loc_settings_path.name}", return_data=True
+                )
+                assert (
+                    loc_settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
+                ), "Local file is different from the received one"
+                assert (
+                    loc_settings_path.read_bytes() == data
+                ), "Local file is different from the received one (return_data=True)"
+                assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"

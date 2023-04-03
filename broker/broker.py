@@ -96,13 +96,12 @@ class Broker:
             self.host_classes.update(kwargs.pop("host_classes"))
         # determine the provider actions based on kwarg parameters
         self._provider_actions = {}
-        for key, action in PROVIDER_ACTIONS.items():
-            if key in kwargs:
-                self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs = kwargs
 
     def _act(self, provider, method, checkout=False):
         """Perform a general action against a provider's method"""
+        logger.debug(f"Resolving action {method} on provider {provider}.")
         provider_inst = provider(**self._kwargs)
         helpers.emit(
             {
@@ -111,14 +110,24 @@ class Broker:
                 "arguments": self._kwargs,
             }
         )
-        result = getattr(provider_inst, method)(**self._kwargs)
-        logger.debug(result)
+        method_obj = getattr(provider_inst, method)
+        logger.debug(
+            f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}."
+        )
+        result = method_obj(**self._kwargs)
+        logger.debug(f"Action {result=}")
         if result and checkout:
             return provider_inst.construct_host(
                 provider_params=result, host_classes=self.host_classes, **self._kwargs
             )
         else:
             return result
+
+    def _update_provider_actions(self, kwargs):
+        if not self._provider_actions:
+            for key, action in PROVIDER_ACTIONS.items():
+                if key in kwargs:
+                    self._provider_actions[key] = action
 
     @mp_decorator
     def _checkout(self):
@@ -127,6 +136,7 @@ class Broker:
         :return: List of Host objects
         """
         hosts = []
+        logger.debug(f"Doing _checkout(): {self._provider_actions=}")
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
         for action in self._provider_actions.keys():
@@ -162,12 +172,9 @@ class Broker:
     def execute(self, **kwargs):
         """execute a provider action
 
-        :return: Any The results given back by the provider
+        :return: Any results given back by the provider
         """
-        if not self._provider_actions:
-            for key, action in PROVIDER_ACTIONS.items():
-                if key in kwargs:
-                    self._provider_actions[key] = action
+        self._update_provider_actions(kwargs)
         self._kwargs.update(kwargs)
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
@@ -194,7 +201,7 @@ class Broker:
             # pass
         return host
 
-    def checkin(self, sequential=False, host=None):
+    def checkin(self, sequential=False, host=None, in_context=False):
         """checkin one or more VMs
 
         :param host: can be one of:
@@ -204,6 +211,7 @@ class Broker:
             A dictionary mapping host types to one or more host objects
 
         :param sequential: boolean whether to run checkins sequentially
+        :param in_context: Whether checkin is part of context manager
         """
         # default to hosts listed on the instance
         hosts = host or self._hosts
@@ -215,9 +223,11 @@ class Broker:
         if isinstance(hosts, dict):
             # flatten the lists of hosts from the values of the dict
             hosts = [host for host_list in hosts.values() for host in host_list]
-        if not isinstance(hosts, list):
-            hosts = [hosts]
-
+        else:
+            if not isinstance(hosts, list):
+                hosts = [hosts]
+            if in_context:
+                hosts = [host for host in hosts if not getattr(host, '_skip_context_checkin', False)]
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
             return
@@ -243,7 +253,7 @@ class Broker:
         logger.info(f"Extending host {host.hostname}")
         provider = PROVIDERS[host._broker_provider]
         self._kwargs["target_vm"] = host
-        self._act(provider, "extend_vm", checkout=False)
+        self._act(provider, "extend", checkout=False)
         return host
 
     def extend(self, sequential=False, host=None):
@@ -299,9 +309,8 @@ class Broker:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
-            host.get("hostname", host.get("name"))
-            for host in helpers.load_inventory()
-            if host["_broker_provider"] == provider
+            hostname if (hostname := host.get("hostname")) else host.get("name")
+            for host in helpers.load_inventory(filter=f"_broker_provider={provider}")
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
@@ -358,6 +367,6 @@ class Broker:
         last_exception = None
         for host in self._hosts:
             last_exception = _try_teardown(host)
-        self.checkin()
+        self.checkin(in_context=True)
         if last_exception:
             raise last_exception

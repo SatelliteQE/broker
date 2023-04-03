@@ -1,4 +1,6 @@
 class ContainerBind:
+    _sensitive_attrs = ["password", "host_password"]
+
     def __init__(self, host=None, username=None, password=None, port=22, timeout=None):
         self.host = host
         self.username = username
@@ -68,7 +70,7 @@ class ContainerBind:
 
     def __repr__(self):
         inner = ", ".join(
-            f"{k}={v}"
+            f"{k}={'******' if k in self._sensitive_attrs and v else v}"
             for k, v in self.__dict__.items()
             if not k.startswith("_") and not callable(v)
         )
