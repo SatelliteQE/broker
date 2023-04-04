@@ -149,6 +149,23 @@ def cli(version):
         import pkg_resources
 
         broker_version = pkg_resources.get_distribution("broker").version
+        # check the latest version publish to PyPi
+        try:
+            import requests
+            from packaging.version import Version
+
+            latest_version = Version(
+                requests.get("https://pypi.org/pypi/broker/json").json()["info"][
+                    "version"
+                ]
+            )
+            if latest_version > Version(broker_version):
+                click.secho(
+                    f"A newer version of broker is available: {latest_version}",
+                    fg="yellow",
+                )
+        except:
+            pass
         click.echo(f"Version: {broker_version}")
         broker_directory = settings.BROKER_DIRECTORY.absolute()
         click.echo(f"Broker Directory: {broker_directory}")

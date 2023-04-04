@@ -1,8 +1,40 @@
 import os
+import click
 from pathlib import Path
 from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
 from broker.exceptions import ConfigurationError
+
+
+def init_settings(settings_path, interactive=False):
+    """Initialize the broker settings file."""
+    raw_url = "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
+    if not interactive or click.prompt(
+        f"Download example file from GitHub?\n{raw_url}",
+        type=click.Choice(["y", "n"])
+    ) == "y":
+        # download example file from github
+        import requests
+        click.echo(f"Downloading example file from: {raw_url}")
+        raw_file = requests.get(raw_url)
+        settings_path.write_text(raw_file.text)
+        if interative_mode:
+            try:
+                click.edit(filename=str(settings_path.absolute()))
+            except click.exceptions.ClickException:
+                click.secho(
+                    f"Please edit the file {settings_path.absolute()} and add your settings.",
+                    fg="yellow"
+                )
+    else:
+        raise ConfigurationError(
+            f"Broker settings file not found at {settings_path.absolute()}."
+        )
+
+interative_mode = True
+# GitHub action context
+if "GITHUB_WORKFLOW" in os.environ:
+    interative_mode = False
 
 BROKER_DIRECTORY = Path.home().joinpath(".broker")
 
@@ -16,6 +48,10 @@ BROKER_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
+
+if not settings_path.exists():
+    click.secho(f"Broker settings file not found at {settings_path.absolute()}.", fg="red")
+    init_settings(settings_path, interactive=interative_mode)
 
 validators = [
     Validator("HOST_USERNAME", default="root"),
