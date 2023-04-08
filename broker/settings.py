@@ -1,5 +1,6 @@
 import os
 import click
+import inspect
 from pathlib import Path
 from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
@@ -9,12 +10,17 @@ from broker.exceptions import ConfigurationError
 def init_settings(settings_path, interactive=False):
     """Initialize the broker settings file."""
     raw_url = "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
-    if not interactive or click.prompt(
-        f"Download example file from GitHub?\n{raw_url}",
-        type=click.Choice(["y", "n"])
-    ) == "y":
+    if (
+        not interactive
+        or click.prompt(
+            f"Download example file from GitHub?\n{raw_url}",
+            type=click.Choice(["y", "n"]),
+        )
+        == "y"
+    ):
         # download example file from github
         import requests
+
         click.echo(f"Downloading example file from: {raw_url}")
         raw_file = requests.get(raw_url)
         settings_path.write_text(raw_file.text)
@@ -24,17 +30,23 @@ def init_settings(settings_path, interactive=False):
             except click.exceptions.ClickException:
                 click.secho(
                     f"Please edit the file {settings_path.absolute()} and add your settings.",
-                    fg="yellow"
+                    fg="yellow",
                 )
     else:
         raise ConfigurationError(
             f"Broker settings file not found at {settings_path.absolute()}."
         )
 
-interative_mode = True
+
+interative_mode = False
 # GitHub action context
-if "GITHUB_WORKFLOW" in os.environ:
-    interative_mode = False
+if not "GITHUB_WORKFLOW" in os.environ:
+    # determine if we're being ran from a CLI
+    for frame in inspect.stack()[::-1]:
+        if "/bin/broker" in frame.filename:
+            interative_mode = True
+            break
+
 
 BROKER_DIRECTORY = Path.home().joinpath(".broker")
 
@@ -50,7 +62,9 @@ settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 if not settings_path.exists():
-    click.secho(f"Broker settings file not found at {settings_path.absolute()}.", fg="red")
+    click.secho(
+        f"Broker settings file not found at {settings_path.absolute()}.", fg="red"
+    )
     init_settings(settings_path, interactive=interative_mode)
 
 validators = [
