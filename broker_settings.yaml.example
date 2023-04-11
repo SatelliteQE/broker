@@ -11,22 +11,13 @@ host_ssh_port: "<port>"
 host_ssh_key_filename: "</path/to/the/ssh-key>"
 # Provider settings
 AnsibleTower:
-    instances:
-        - production:
-            base_url: "https://<ansible tower host>/"
-            # Username AND password, OR an OAUTH token can be used for authentication
-            username: "<username>"
-            password: "<plain text password>"
-            # token: "<AT personal access token>"
-            inventory: "inventory name"
-            default: True
-        - testing:
-            base_url: "https://<ansible tower host>/"
-            # Username AND password, OR an OAUTH token can be used for authentication
-            username: "<username>"
-            password: "<plain text password>"
-            # token: "<AT personal access token>"
-            inventory: "inventory name"
+    base_url: "https://<ansible tower host>/"
+    # Username is required for both token and password-based authentication
+    username: "<username>"
+    # token is the preferred authentication method
+    token: "<AT personal access token>"
+    # password: "<plain text password>"
+    inventory: "inventory name"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     new_expire_time: "+172800"
