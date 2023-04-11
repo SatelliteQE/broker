@@ -5,9 +5,9 @@ logging:
     file_level: debug
 # Host Settings
 # These can be left alone if you're not using Broker as a library
-host_username: "root"
+host_username: root
 host_password: "<password>"
-host_ssh_port: "<port>"
+host_ssh_port: 22
 host_ssh_key_filename: "</path/to/the/ssh-key>"
 # Provider settings
 AnsibleTower:
