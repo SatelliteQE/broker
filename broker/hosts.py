@@ -16,7 +16,12 @@ class Host:
         else:
             self.hostname = hostname or kwargs.get("ip", None)
             if not self.hostname:
-                raise HostError("Host must be constructed with a hostname or ip")
+                # check to see if we're being reconstructued, likely for checkin
+                import inspect
+                if any(f.function == "reconstruct_host" for f in inspect.stack()):
+                    logger.debug("Ignoring missing hostname and ip for checkin reconstruction.")
+                else:
+                    raise HostError("Host must be constructed with a hostname or ip")
             self.name = name
         self.username = kwargs.get("username", settings.HOST_USERNAME)
         self.password = kwargs.get("password", settings.HOST_PASSWORD)
