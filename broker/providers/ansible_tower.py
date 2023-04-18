@@ -549,7 +549,9 @@ class AnsibleTower(Provider):
         for inv in invs:
             inv_hosts = inv.get_related("hosts", page_size=200).results
             hosts.extend(inv_hosts)
-        return [self._compile_host_info(host) for host in hosts]
+        with click.progressbar(hosts, label='Compiling host information') as hosts_bar:
+            compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
+        return compiled_host_info
 
     def extend(self, target_vm, new_expire_time=None):
         """Run the extend workflow with defaults args
