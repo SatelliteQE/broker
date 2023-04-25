@@ -2,12 +2,14 @@ from functools import wraps
 import signal
 import sys
 import click
-from logzero import logger
+from logging import getLogger
 from broker import exceptions, helpers, settings
 from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
 from broker.logger import LOG_LEVEL
 from broker import exceptions, helpers, settings
 
+logger = getLogger(__name__)
+logger.propagate = True
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
