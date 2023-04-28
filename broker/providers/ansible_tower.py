@@ -205,20 +205,31 @@ class AnsibleTower(Provider):
                     provider="AnsibleTower",
                     message=f"Unknown AnsibleTower inventory by id {inventory}",
                 )
-        if inventory_info := self.v2.inventory.get(search=inventory):
-            if inventory_info.count > 1:
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
-                    message=f"Ambigious AnsibleTower inventory name {inventory}",
-                )
-            elif inventory_info.count == 1:
-                inv_struct = inventory_info.results.pop()
-                return inv_struct.id
-            else:
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
-                    message=f"Unknown AnsibleTower inventory {inventory}",
-                )
+        elif isinstance(inventory, str):
+            if inventory_info := self.v2.inventory.get(search=inventory):
+                if inventory_info.count > 1:
+                    raise exceptions.ProviderError(
+                        provider="AnsibleTower",
+                        message=f"Ambigious AnsibleTower inventory name {inventory}",
+                    )
+                elif inventory_info.count == 1:
+                    inv_struct = inventory_info.results.pop()
+                    return inv_struct.id
+                else:
+                    raise exceptions.ProviderError(
+                        provider="AnsibleTower",
+                        message=f"Unknown AnsibleTower inventory {inventory}",
+                    )
+        elif inv_id := getattr(inventory, "id", None):
+            return inv_id
+        elif inv_name := getattr(inventory, "name", None):
+            return inv_name
+        else:
+            caller_context = inspect.stack()[1][0].f_locals
+            raise exceptions.ProviderError(
+                provider="AnsibleTower",
+                message=f"Ambiguous AnsibleTower inventory {inventory} passed from {caller_context}",
+            )
 
     def _merge_artifacts(self, at_object, strategy="last", artifacts=None):
         """Gather and merge all artifacts associated with an object and its children

@@ -89,8 +89,9 @@ class Provider(metaclass=ProviderMeta):
             if not inst_vals.get("override_envars"):
                 # if a provider instance doesn't want to override envars, load them
                 settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
-
-        settings.validators.extend([v for v in self._validators if v not in settings.validators])
+        new_validators = [v for v in self._validators if v not in settings.validators]
+        logger.debug(f"Adding new validators: {[v.names[0] for v in new_validators]}")
+        settings.validators.extend(new_validators)
         # use selective validation to only validate the instance settings
         try:
             settings.validators.validate(only=section_name)
