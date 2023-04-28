@@ -212,7 +212,7 @@ class Container(Provider):
 
     def nick_help(self, **kwargs):
         """Useful information about container images"""
-        results_limit = kwargs.get("results_limit", settings.CONTAINER.results_limit)
+        results_limit = kwargs.get("results_limit", settings.container.results_limit)
         if image := kwargs.get("container_host"):
             logger.info(
                 f"Information for {image} container-host:\n"
