@@ -31,7 +31,8 @@ class Session:
         sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
         key_filename = kwargs.get("key_filename")
-        helpers.simple_retry(sock.connect, [(host, port)])
+        timeout = kwargs.get("timeout", 60)
+        helpers.simple_retry(sock.connect, [(host, port)], max_timeout=timeout)
         self.session = ssh2_Session()
         self.session.handshake(sock)
         if key_filename:

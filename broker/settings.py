@@ -70,7 +70,7 @@ if not settings_path.exists():
 validators = [
     Validator("HOST_USERNAME", default="root"),
     Validator("HOST_PASSWORD", default="toor"),
-    Validator("HOST_CONNECTION_TIMEOUT", default=None),
+    Validator("HOST_CONNECTION_TIMEOUT", default=60),
     Validator("HOST_SSH_PORT", default=22),
     Validator("HOST_SSH_KEY_FILENAME", default=None),
     Validator("LOGGING", is_type_of=dict),

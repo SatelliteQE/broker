@@ -68,6 +68,7 @@ class Host:
             password=password,
             port=_port,
             key_filename=key_filename,
+            timeout=timeout
         )
 
     def close(self):
