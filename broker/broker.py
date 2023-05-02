@@ -1,8 +1,10 @@
-from logzero import logger
 from broker.providers import PROVIDERS, PROVIDER_ACTIONS, _provider_imports
 from broker.hosts import Host
 from broker import exceptions, helpers
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from logging import getLogger
+
+logger = getLogger('broker')
 
 # load all the provider class so they are registered
 for _import in _provider_imports:

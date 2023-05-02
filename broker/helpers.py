@@ -15,10 +15,13 @@ from pathlib import Path
 from uuid import uuid4
 
 import yaml
-from logzero import logger
+from logging import getLogger
 
 from broker import exceptions, settings
 from broker import logger as b_log
+
+logger = getLogger(__name__)
+logger.propagate = True
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 

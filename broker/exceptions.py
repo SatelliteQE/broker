@@ -1,5 +1,8 @@
 """A collection of Broker-specific exceptions"""
-from logzero import logger
+from logging import getLogger
+
+logger = getLogger(__name__)
+logger.propagate = True
 
 
 class BrokerError(Exception):

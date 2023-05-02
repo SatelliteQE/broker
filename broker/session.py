@@ -2,10 +2,13 @@ import os
 import socket
 import tempfile
 from pathlib import Path
-from logzero import logger
+from logging import getLogger
 from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
 from broker import helpers
+
+logger = getLogger(__name__)
+logger.propagate = True
 
 SESSIONS = {}
 

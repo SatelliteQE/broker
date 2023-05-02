@@ -19,7 +19,6 @@ class LOG_LEVEL(IntEnum):
     WARNING = logging.WARNING
     ERROR = logging.ERROR
 
-
 class RedactingFilter(logging.Filter):
     """Custom logging.Filter to redact secrets from the Dynaconf config"""
     def __init__(self, sensitive):
@@ -55,12 +54,12 @@ class RedactingFilter(logging.Filter):
 _sensitive = ["password", "pword", "token", "host_password"]
 logging.addLevelName("TRACE", LOG_LEVEL.TRACE)
 logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
+logger_prefix = ''
 
 def patch_awx_for_verbosity(api):
     client = api.client
     awx_log = client.log
-
-    awx_log.parent = logzero.logger
+    #awx_log.parent = logzero.logger
 
     def patch(cls, name):
         func = getattr(cls, name)
@@ -130,21 +129,36 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
     )
 
 
-def setup_logzero(
+def setup_logger(
     level=settings.logging.console_level,
     formatter=None,
     file_level=settings.logging.file_level,
     name=None,
-    path="logs/broker.log",
+    path=None,
+    propagate=False,
 ):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    patch_awx_for_verbosity(awxkit.api)
-    set_log_level(level)
-    set_file_logging(file_level, path)
-    if formatter:
-        logzero.formatter(formatter)
-    logzero.logger.name = name or "broker"
-    logzero.logger.addFilter(RedactingFilter(_sensitive))
+    if formatter is None:
+        formatter = formatter_factory(level)
+    logger = logging.getLogger(name or 'broker')
+    logger.propagate = propagate
+    logger.setLevel(resolve_log_level(file_level))
+    logger.addFilter(RedactingFilter(_sensitive))
+    # cover logging to console
+    sh = logging.StreamHandler()
+    sh.setLevel(resolve_log_level(level))
+    logger.addHandler(sh)
+    # attach awxkit upstream logger to the hierarchy
+    awxkit.api.client.log.parent = logger
 
+    # used for attaching module-based loggers to hierarchy properly
+    global logger_prefix
+    logger_prefix = logger.parent.name+'.' if logger.parent.name != 'root' else ''
+    #set_log_level(level)
+    #set_file_logging(file_level, path)
+    #logzero.logger.name = name or "broker"
+    # logzero.logger.addFilter(RedactingFilter(_sensitive))
 
-setup_logzero()
+def init_logger(module):
+    return logging.getLogger(f'{logger_prefix}{module}')
+# setup_logzero()
