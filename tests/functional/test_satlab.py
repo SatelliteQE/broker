@@ -86,6 +86,13 @@ def test_tower_host():
                 loc_settings_path.read_bytes() == data
             ), "Local file is different from the received one (return_data=True)"
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+        # test the tail_file context manager
+        tailed_file = f"{remote_dir}/tail_me.txt"
+        r_host.execute(f"echo 'hello world' > {tailed_file}")
+        with r_host.session.tail_file(tailed_file) as tf:
+            r_host.execute(f"echo 'this is a new line' >> {tailed_file}")
+        assert 'this is a new line' in tf.stdout
+        assert 'hello world' not in tf.stdout
 
 
 def test_tower_host_mp():

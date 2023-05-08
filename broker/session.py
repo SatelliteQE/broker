@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import os
 import socket
 import tempfile
@@ -76,6 +77,23 @@ class Session:
         """Create and return an interactive shell instance"""
         channel = self.session.open_session()
         return InteractiveShell(channel, pty)
+
+    @contextmanager
+    def tail_file(self, filename):
+        """Simulate tailing a file on the remote host
+
+        example:
+            with my_host.session.tail_file("/var/log/messages") as res:
+                # do something that creates new messages
+            print(res.stdout)
+
+        returns a Result object with stdout, stderr, and status
+        """
+        initial_size = int(self.run(f"stat -c %s {filename}").stdout.strip())
+        yield (res := helpers.Result())
+        # get the contents of the file from the initial size to the end
+        result = self.run(f"tail -c +{initial_size} {filename}")
+        res.__dict__.update(result.__dict__)
 
     def sftp_read(self, source, destination=None, return_data=False):
         """read a remote file into a local destination or return a bytes object if return_data is True"""
@@ -235,6 +253,15 @@ class ContainerSession:
     def disconnect(self):
         """Needed for simple compatability with Session"""
         pass
+
+    @contextmanager
+    def tail_file(self, filename):
+        """Simulate tailing a file on the remote host"""
+        initial_size = int(self.run(f"stat -c %s {filename}").stdout.strip())
+        yield (res := helpers.Result())
+        # get the contents of the file from the initial size to the end
+        result = self.run(f"tail -c +{initial_size} {filename}")
+        res.__dict__.update(result.__dict__)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
         """Add one of more files to the container"""

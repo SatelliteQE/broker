@@ -1,4 +1,3 @@
-# from functools import cached_property
 from logzero import logger
 from broker.exceptions import NotImplementedError, HostError
 from broker.session import ContainerSession, Session
@@ -6,7 +5,6 @@ from broker.settings import settings
 
 
 class Host:
-
     default_timeout = 0  # timeout in ms, 0 is infinite
 
     def __init__(self, hostname=None, name=None, from_dict=False, **kwargs):
