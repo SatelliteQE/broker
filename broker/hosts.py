@@ -7,27 +7,36 @@ from broker.settings import settings
 class Host:
     default_timeout = 0  # timeout in ms, 0 is infinite
 
-    def __init__(self, hostname=None, name=None, from_dict=False, **kwargs):
-        # Allow the class to construct itself from kwargs
-        if from_dict:
-            self.__dict__.update(kwargs)
-        else:
-            self.hostname = hostname or kwargs.get("ip", None)
-            if not self.hostname:
-                # check to see if we're being reconstructued, likely for checkin
-                import inspect
-                if any(f.function == "reconstruct_host" for f in inspect.stack()):
-                    logger.debug("Ignoring missing hostname and ip for checkin reconstruction.")
-                else:
-                    raise HostError("Host must be constructed with a hostname or ip")
-            self.name = name
-        self.username = kwargs.get("username", settings.HOST_USERNAME)
-        self.password = kwargs.get("password", settings.HOST_PASSWORD)
-        self.timeout = kwargs.get(
+    def __init__(self, **kwargs):
+        """Create a Host instance
+
+        Expected kwargs:
+          hostname: str - Hostname or IP address of the host, required
+          name: str - Name of the host
+          username: str - Username to use for SSH connection
+          password: str - Password to use for SSH connection
+          connection_timeout: int - Timeout for SSH connection
+          port: int - Port to use for SSH connection
+          key_filename: str - Path to SSH key file to use for SSH connection
+        """
+        logger.debug(f"Constructing host using {kwargs=}")
+        self.hostname = kwargs.get("hostname") or kwargs.get("ip")
+        if not self.hostname:
+            # check to see if we're being reconstructued, likely for checkin
+            import inspect
+            if any(f.function == "reconstruct_host" for f in inspect.stack()):
+                logger.debug("Ignoring missing hostname and ip for checkin reconstruction.")
+            else:
+                raise HostError("Host must be constructed with a hostname or ip")
+        self.name = kwargs.pop("name", None)
+        self.username = kwargs.pop("username", settings.HOST_USERNAME)
+        self.password = kwargs.pop("password", settings.HOST_PASSWORD)
+        self.timeout = kwargs.pop(
             "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
         )
-        self.port = kwargs.get("port", settings.HOST_SSH_PORT)
-        self.key_filename = kwargs.get("key_filename", settings.HOST_SSH_KEY_FILENAME)
+        self.port = kwargs.pop("port", settings.HOST_SSH_PORT)
+        self.key_filename = kwargs.pop("key_filename", settings.HOST_SSH_KEY_FILENAME)
+        self.__dict__.update(kwargs) # Make every other kwarg an attribute
         self._session = None
 
     def __del__(self):
