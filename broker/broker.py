@@ -150,7 +150,7 @@ class Broker:
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
         if err:
-            raise err
+            raise self.BrokerError(f"Error during checkout from {self}") from err
         return hosts if not len(hosts) == 1 else hosts[0]
 
     def execute(self, **kwargs):
@@ -167,12 +167,11 @@ class Broker:
         logger.info(f"Using provider {provider.__name__} for execution")
         return self._act(provider, method)
 
-    def nick_help(self):
-        """Use a provider's nick_help method to get argument information"""
-        if self._provider_actions:
-            provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
-            logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, "nick_help", checkout=False)
+    def provider_help(self, provider_name):
+        """Use a provider's provider_help method to get argument information"""
+        provider = PROVIDERS[provider_name]
+        logger.info(f"Querying provider {provider.__name__}")
+        self._act(provider, "provider_help", checkout=False)
 
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
@@ -294,7 +293,7 @@ class Broker:
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
             hostname if (hostname := host.get("hostname")) else host.get("name")
-            for host in helpers.load_inventory(filter=f"_broker_provider={provider}")
+            for host in helpers.load_inventory(filter=f'@inv._broker_provider == "{provider}"')
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 

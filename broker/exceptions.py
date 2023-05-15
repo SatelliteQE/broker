@@ -43,3 +43,11 @@ class HostError(BrokerError):
         if host:
             self.message = f"{host.hostname or host.name}: {message}"
         super().__init__(message=self.message)
+
+
+class ContainerBindError(BrokerError):
+    error_code = 11
+
+
+class BeakerBindError(BrokerError):
+    error_code = 12

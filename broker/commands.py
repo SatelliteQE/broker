@@ -4,9 +4,9 @@ import sys
 import click
 from logzero import logger
 from broker import exceptions, helpers, settings
-from broker.broker import PROVIDERS, PROVIDER_ACTIONS, Broker
+from broker.broker import Broker
 from broker.logger import LOG_LEVEL
-from broker import exceptions, helpers, settings
+from broker.providers import PROVIDERS, PROVIDER_HELP
 
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
@@ -39,17 +39,19 @@ class ExceptionHandler(click.Group):
 
     def __call__(self, *args, **kwargs):
         try:
-            return self.main(*args, **kwargs)
+            res = self.main(*args, **kwargs)
+            helpers.emit(return_code=0)
+            return res
         except Exception as err:
             if not isinstance(err, exceptions.BrokerError):
                 err = exceptions.BrokerError(err)
             helpers.emit(return_code=err.error_code, error_message=str(err.message))
             sys.exit(err.error_code)
-        helpers.emit(return_code=0)
 
 
 def provider_options(command):
     """Applies provider-specific decorators to each command this decorates"""
+    # import IPython; IPython.embed()
     for prov in PROVIDERS.values():
         if prov.hidden:
             continue
@@ -78,11 +80,18 @@ def populate_providers(click_group):
             group=click_group,
             name=prov,
             hidden=prov_class.hidden,
-            context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+            context_settings={
+                "allow_extra_args": True,
+                "ignore_unknown_options": True,
+            },
         )
         @click.pass_context
         def provider_cmd(ctx, *args, **kwargs):  # the actual subcommand
             """Get information about a provider's actions"""
+            # add additional args flags to the kwargs
+            for arg in ctx.args:
+                if arg.startswith("--"):
+                    kwargs[arg[2:]] = True
             # if additional arguments were passed, include them in the broker args
             # strip leading -- characters
             kwargs.update(
@@ -92,24 +101,21 @@ def populate_providers(click_group):
                 }
             )
             broker_inst = Broker(**kwargs)
-            broker_inst.nick_help()
+            broker_inst.provider_help(ctx.info_name)
 
         # iterate through available actions and populate options from them
-        for action in (
-            action
-            for action, prov_info in PROVIDER_ACTIONS.items()
-            if prov_info[0] == prov_class
-        ):
-            action = action.replace("_", "-")
-            plural = (
-                action.replace("y", "ies") if action.endswith("y") else f"{action}s"
-            )
-            provider_cmd = click.option(
-                f"--{plural}", is_flag=True, help=f"Get available {plural}"
-            )(provider_cmd)
-            provider_cmd = click.option(
-                f"--{action}", type=str, help=f"Get information about a {action}"
-            )(provider_cmd)
+        for option, (p_cls, is_flag) in PROVIDER_HELP.items():
+            if p_cls is not prov_class:
+                continue
+            option = option.replace("_", "-")
+            if is_flag:
+                provider_cmd = click.option(
+                    f"--{option}", is_flag=True, help=f"Get available {option}"
+                )(provider_cmd)
+            else:
+                provider_cmd = click.option(
+                    f"--{option}", type=str, help=f"Get information about a {option}"
+                )(provider_cmd)
         provider_cmd = click.option(
             "--results-limit",
             type=int,
@@ -189,17 +195,10 @@ def cli(version):
 @click.pass_context
 def checkout(ctx, background, nick, count, args_file, **kwargs):
     """Checkout or "create" a Virtual Machine broker instance
-    COMMAND: broker checkout --workflow "workflow-name" --workflow-arg1 something
-    or
+
+    COMMAND: broker checkout --workflow "workflow-name" --workflow_arg1 something
+
     COMMAND: broker checkout --nick "nickname"
-
-    :param ctx: clicks context object
-
-    :param background: run a new broker subprocess to carry out command
-
-    :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
-
-    :param args_file: this broker argument will be replaced with the contents of the file passed in
     """
     broker_args = helpers.clean_dict(kwargs)
     if nick:
@@ -218,8 +217,7 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
     )
     if background:
         helpers.fork_broker()
-    broker_inst = Broker(**broker_args)
-    broker_inst.checkout()
+    Broker(**broker_args).checkout()
 
 
 @cli.group(cls=ExceptionHandler)
@@ -242,17 +240,7 @@ populate_providers(providers)
 def checkin(vm, background, all_, sequential, filter):
     """Checkin or "remove" a VM or series of VM broker instances
 
-    COMMAND: broker checkin <vm hostname>|<local id>|all
-
-    :param vm: Hostname or local id of host
-
-    :param background: run a new broker subprocess to carry out command
-
-    :param all_: Flag for whether to checkin everything
-
-    :param sequential: Flag for whether to run checkins sequentially
-
-    :param filter: a filter string matching broker's specification
+    COMMAND: broker checkin <vm hostname>|<local id>|--all
     """
     if background:
         helpers.fork_broker()
@@ -266,8 +254,7 @@ def checkin(vm, background, all_, sequential, filter):
             or all_
         ):
             to_remove.append(Broker().reconstruct_host(host))
-    broker_inst = Broker(hosts=to_remove)
-    broker_inst.checkin(sequential=sequential)
+    Broker(hosts=to_remove).checkin(sequential=sequential)
 
 
 @loggedcli()
@@ -294,7 +281,7 @@ def inventory(details, sync, filter):
         if (display_name := host.get("hostname")) is None:
             display_name = host.get("name")
         if details:
-            logger.info(f"{num}: {display_name}, Details: {helpers.yaml_format(host)}")
+            logger.info(f"{num}: {display_name}:\n{helpers.yaml_format(host)}")
         else:
             logger.info(f"{num}: {display_name}")
     helpers.emit({"inventory": emit_data})
@@ -312,17 +299,7 @@ def inventory(details, sync, filter):
 def extend(vm, background, all_, sequential, filter, **kwargs):
     """Extend a host's lease time
 
-    COMMAND: broker extend <vm hostname>|<vm name>|<local id>
-
-    :param vm: Hostname, VM Name, or local id of host
-
-    :param background: run a new broker subprocess to carry out command
-
-    :param all_: Click option all
-
-    :param sequential: Flag for whether to run extends sequentially
-
-    :param filter: a filter string matching broker's specification
+    COMMAND: broker extend <vm hostname>|<vm name>|<local id>|--all
     """
     broker_args = helpers.clean_dict(kwargs)
     if background:
@@ -330,10 +307,9 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     inventory = helpers.load_inventory(filter=filter)
     to_extend = []
     for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
+        if str(num) in vm or host["hostname"] in vm or host.get("name") in vm or all_:
             to_extend.append(Broker().reconstruct_host(host))
-    broker_inst = Broker(hosts=to_extend, **broker_args)
-    broker_inst.extend(sequential=sequential)
+    Broker(hosts=to_extend, **broker_args).extend(sequential=sequential)
 
 
 @loggedcli()
@@ -352,20 +328,12 @@ def duplicate(vm, background, count, all_, filter):
     """Duplicate a broker-procured vm
 
     COMMAND: broker duplicate <vm hostname>|<local id>|all
-
-    :param vm: Hostname or local id of host
-
-    :param background: run a new broker subprocess to carry out command
-
-    :param all_: Click option all
-
-    :param filter: a filter string matching broker's specification
     """
     if background:
         helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or host["name"] in vm or all_:
+        if str(num) in vm or host["hostname"] in vm or host.get("name") in vm or all_:
             broker_args = host.get("_broker_args")
             if broker_args:
                 if count:
@@ -399,21 +367,10 @@ def duplicate(vm, background, count, all_, filter):
 @click.pass_context
 def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs):
     """Execute an arbitrary provider action
-    COMMAND: broker execute --workflow "workflow-name" --workflow-arg1 something
-    or
+
+    COMMAND: broker execute --workflow "workflow-name" --workflow_arg1 something
+
     COMMAND: broker execute --nick "nickname"
-
-    :param ctx: clicks context object
-
-    :param background: run a new broker subprocess to carry out command
-
-    :param nick: shortcut for arguments saved in settings.yaml, passed in as a string
-
-    :param output_format: change the format of the output to one of the choice options
-
-    :param artifacts: AnsibleTower provider specific option for choosing what to return
-
-    :param args_file: this broker argument will be replaced with the contents of the file passed in
     """
     broker_args = helpers.clean_dict(kwargs)
     if nick:
@@ -432,8 +389,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
     )
     if background:
         helpers.fork_broker()
-    broker_inst = Broker(**broker_args)
-    result = broker_inst.execute()
+    result = Broker(**broker_args).execute()
     helpers.emit({"output": result})
     if output_format == "raw":
         print(result)

@@ -67,8 +67,8 @@ class TestProvider(Provider):
 
     def get_inventory(self, *args, **kwargs):
         return helpers.load_inventory(
-            filter=f"_broker_provider={self.__class__.__name__}"
+            filter=f'@inv._broker_provider == "{self.__class__.__name__}"'
         )
 
-    def nick_help(self):
+    def provider_help(self):
         pass

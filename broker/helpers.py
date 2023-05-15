@@ -1,6 +1,7 @@
 """Miscellaneous helpers live here"""
+import threading
+import click
 import collections
-from contextlib import contextmanager
 import getpass
 import inspect
 import json
@@ -8,19 +9,20 @@ import os
 import sys
 import tarfile
 import time
+import yaml
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
+from contextlib import contextmanager
 from copy import deepcopy
+from logzero import logger
 from pathlib import Path
 from uuid import uuid4
-
-import yaml
-from logzero import logger
 
 from broker import exceptions, settings
 from broker import logger as b_log
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
+INVENTORY_LOCK = threading.Lock()
 
 
 def clean_dict(in_dict):
@@ -87,6 +89,39 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
         else:
             flattened.append((new_key, value))
     return dict(flattened)
+
+
+def dict_from_paths(source_dict, paths):
+    """Given a dictionary of desired keys and nested paths, return a new dictionary
+
+    example:
+        source_dict = {
+            "key1": "value1",
+            "key2": {
+                "nested1": "value2",
+                "nested2": {
+                    "deep": "value3"
+                }
+            }
+        }
+        paths = {
+            "key1": "key1",
+            "key2": "key2/nested2/deep"
+        }
+        returns {
+            "key1": "value1",
+            "key2": "value3"
+        }
+    """
+    result = {}
+    for key, path in paths.items():
+        if "/" not in path:
+            result[key] = source_dict.get(path)
+        else:
+            top, rem = path.split("/", 1)
+            result.update(dict_from_paths(source_dict[top], {key: rem}))
+    return result
+
 
 
 def eval_filter(filter_list, raw_filter, filter_key="inv"):
@@ -200,19 +235,19 @@ def update_inventory(add=None, remove=None):
         add = []
     if remove and not isinstance(remove, list):
         remove = [remove]
-    with FileLock(settings.inventory_path):
+    with INVENTORY_LOCK:
         inv_data = load_inventory()
         if inv_data:
             settings.inventory_path.unlink()
 
         if remove:
             for host in inv_data[::-1]:
-                if host["hostname"] in remove or host["name"] in remove:
+                if host["hostname"] in remove or host.get("name") in remove:
                     # iterate through new hosts and update with old host data if it would nullify
                     for new_host in add:
                         if (
                             host["hostname"] == new_host["hostname"]
-                            or host["name"] == new_host["name"]
+                            or host.get("name") == new_host.get("name")
                         ):
                             # update missing data in the new_host with the old_host data
                             new_host.update(merge_dicts(new_host, host))
@@ -246,6 +281,7 @@ class Emitter:
         helpers.emit(key=value, another=5)
         helpers.emit({"key": "value", "another": 5})
     """
+    EMIT_LOCK = threading.Lock()
 
     def __init__(self, emit_file=None):
         """Can empty init and set the file later"""
@@ -271,7 +307,7 @@ class Emitter:
         for key in kwargs.keys():
             if getattr(kwargs[key], "json", None):
                 kwargs[key] = kwargs[key].json
-        with FileLock(self.file):
+        with self.EMIT_LOCK:
             curr_data = json.loads(self.file.read_text() or "{}")
             curr_data.update(kwargs)
             self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
@@ -349,12 +385,14 @@ def fork_broker():
 
 
 def handle_keyboardinterrupt(*args):
-    choice = input(
+    choice = click.prompt(
         "\nEnding Broker while running won't end processes being monitored.\n"
         "Would you like to switch Broker to run in the background?\n"
-        "[y/n]: "
+        "[y/n]: ",
+        type=click.Choice(["y", "n"]),
+        default="n"
     )
-    if choice.lower()[0] == "y":
+    if choice == "y":
         fork_broker()
     else:
         raise exceptions.BrokerError("Broker killed by user.")
@@ -398,45 +436,6 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
         )
         time.sleep(_cur_timeout)
         simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait)
-
-
-class FileLock:
-    """Basic file locking class that acquires and releases locks
-    recommended usage is the context manager which will handle everythign for you
-
-    with FileLock("basic_file.txt") as basic_file:
-        basic_file.write("some text")
-
-    basic_file is a Path object of the desired file
-    If a lock is already in place, FileLock will wait up to <timeout> seconds
-    """
-
-    def __init__(self, file_name, timeout=10):
-        self.file = Path(file_name)
-        self.lock = Path(f"{self.file}.lock")
-        self.timeout = timeout
-
-    def wait_file(self):
-        start = time.time()
-        while self.lock.exists():
-            if (time.time() - start) < self.timeout:
-                time.sleep(1)
-                continue
-            else:
-                raise exceptions.BrokerError(
-                    f"Timeout while attempting to open {self.file.absolute()}"
-                )
-        self.lock.touch()
-        return self.file
-
-    def return_file(self):
-        self.lock.unlink()
-
-    def __enter__(self):
-        return self.wait_file()
-
-    def __exit__(self, *tb_info):
-        self.return_file()
 
 
 class Result:
