@@ -1,0 +1,2 @@
+job_xml: "tests/data/beaker/test_job.xml"
+count: 2

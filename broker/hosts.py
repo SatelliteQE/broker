@@ -102,16 +102,15 @@ class Host:
         return res
 
     def to_dict(self):
+        keep_keys = (
+            "hostname", "_broker_provider", "_broker_args", "tower_inventory", "job_id", "_attrs"
+        )
         ret_dict = {
-            "hostname": self.hostname,
             "name": getattr(self, "name", None),
-            "_broker_provider": self._broker_provider,
             "_broker_provider_instance": self._prov_inst.instance,
             "type": "host",
-            "_broker_args": self._broker_args,
         }
-        if hasattr(self, "tower_inventory"):
-            ret_dict["tower_inventory"] = self.tower_inventory
+        ret_dict.update({k: v for k, v in self.__dict__.items() if k in keep_keys})
         return ret_dict
 
     def setup(self):

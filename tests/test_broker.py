@@ -54,14 +54,14 @@ def test_broker_checkin_n_sync_empty_hostname():
     """Test that broker can checkin and sync inventory with a host that has empty hostname"""
     broker_inst = broker.Broker(nick="test_nick")
     broker_inst.checkout()
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"')
     assert len(inventory) == 1
     inventory[0]["hostname"] = None
     # remove the host from the inventory
     helpers.update_inventory(remove="test.host.example.com")
     # add the host back with no hostname
     helpers.update_inventory(add=inventory)
-    hosts = broker_inst.from_inventory()
+    hosts = broker_inst.from_inventory(filter='@inv._broker_provider == "TestProvider"')
     assert len(hosts) == 1
     assert hosts[0].hostname is None
     broker_inst = broker.Broker(hosts=hosts)
