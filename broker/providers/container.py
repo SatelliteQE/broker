@@ -46,6 +46,7 @@ def get_runtime(
     )
 
 
+@Provider.auto_hide
 class Container(Provider):
     _validators = [
         Validator("CONTAINER.runtime", default="podman"),
@@ -210,15 +211,17 @@ class Container(Provider):
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
         return host_inst
 
-    def nick_help(self, **kwargs):
+    def provider_help(
+        self, container_hosts=False, container_host=None, container_apps=False, **kwargs
+    ):
         """Useful information about container images"""
         results_limit = kwargs.get("results_limit", settings.container.results_limit)
-        if image := kwargs.get("container_host"):
+        if container_host:
             logger.info(
-                f"Information for {image} container-host:\n"
-                f"{helpers.yaml_format(self.runtime.image_info(image))}"
+                f"Information for {container_host} container-host:\n"
+                f"{helpers.yaml_format(self.runtime.image_info(container_host))}"
             )
-        elif kwargs.get("container_hosts"):
+        elif container_hosts:
             images = [
                 img.tags[0]
                 for img in self.runtime.images
@@ -229,7 +232,7 @@ class Container(Provider):
                 images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available host images:\n{images}")
-        elif kwargs.get("container_apps"):
+        elif container_apps:
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.eval_filter(images, res_filter, "res")
@@ -260,9 +263,9 @@ class Container(Provider):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
 
-        envars = kwargs.get('environment', {})
+        envars = kwargs.get("environment", {})
         if isinstance(envars, str):
-            envars = {var.split('=')[0]: var.split('=')[1] for var in envars.split(',')}
+            envars = {var.split("=")[0]: var.split("=")[1] for var in envars.split(",")}
         # add some context information about the container's requester
         origin = helpers.find_origin()
 
