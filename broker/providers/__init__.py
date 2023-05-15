@@ -1,7 +1,8 @@
+import inspect
 from abc import ABCMeta, abstractmethod
-import dynaconf
 from pathlib import Path
 
+import dynaconf
 from broker import exceptions
 from broker.settings import settings
 from logzero import logger
@@ -18,6 +19,8 @@ _provider_imports = [
 PROVIDERS = {}
 # action: (InterfaceClass, "method_name")
 PROVIDER_ACTIONS = {}
+# action: (InterfaceClass, "method_name")
+PROVIDER_HELP = {}
 
 
 class ProviderMeta(ABCMeta):
@@ -29,18 +32,44 @@ class ProviderMeta(ABCMeta):
         if name != "Provider":
             PROVIDERS[name] = new_cls
             logger.debug(f"Registered provider {name}")
-            for attr in attrs.values():
-                if hasattr(attr, "_as_action"):
-                    for action in attr._as_action:
-                        PROVIDER_ACTIONS[action] = (new_cls, attr.__name__)
-                        logger.debug(f"Registered action {action} for provider {name}")
+            for attr, obj in attrs.items():
+                if attr == "provider_help":
+                    # register the help options based on the function arguments
+                    for name, param in inspect.signature(obj).parameters.items():
+                        if name not in ("self", "kwargs"):
+                            # {name: (cls, is_flag)}
+                            PROVIDER_HELP[name] = (new_cls, isinstance(param.default, bool))
+                            logger.debug(
+                                f"Registered help option {name} for provider {name}"
+                            )
+                elif hasattr(obj, "_as_action"):
+                    for action in obj._as_action:
+                        PROVIDER_ACTIONS[action] = (new_cls, attr)
+                        logger.debug(
+                            f"Registered action {action} for provider {name}"
+                        )
         return new_cls
 
 
+
 class Provider(metaclass=ProviderMeta):
+    """
+    Abstract base class for all providers.
+
+    This class should be subclassed by all provider implementations. It provides a
+    metaclass that registers provider classes and actions.
+
+    Attributes:
+        _validators (list): A list of Dynaconf Validators specific to the provider.
+        hidden (bool): A flag to hide the provider from the CLI.
+        _checkout_options (list): A list of checkout options to add to each command.
+        _execute_options (list): A list of execute options to add to each command.
+        _fresh_settings (dynaconf.Dynaconf): A clone of the global settings object.
+        _sensitive_attrs (list): A list of sensitive attributes that should not be logged.
+    """
     # Populate with a list of Dynaconf Validators specific to your provider
     _validators = []
-    # Set to true if you don't want your provider shown in the CLI
+    # Used to hide the provider from the CLI
     hidden = False
     # Populate these to add your checkout and execute options to each command
     # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
@@ -112,7 +141,13 @@ class Provider(metaclass=ProviderMeta):
         return host_inst
 
     @abstractmethod
-    def nick_help(self):
+    def provider_help(self):
+        """These are the help options that will be added to the CLI
+
+        Anything other than 'self' and 'kwargs' will be added as a help option
+        To specify a flag, set the default value to a boolean
+        Everything else should default to None
+        """
         pass
 
     @abstractmethod
@@ -134,6 +169,14 @@ class Provider(metaclass=ProviderMeta):
             if not k.startswith("_") and not callable(v)
         )
         return f"{self.__class__.__name__}({inner})"
+
+    @staticmethod
+    def auto_hide(cls):
+        """Decorator to hide providers from the CLI"""
+        if not settings.get(cls.__name__.upper(), False):
+            # import IPython; IPython.embed()
+            cls.hidden = True
+        return cls
 
     @staticmethod
     def register_action(*as_names):

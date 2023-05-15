@@ -1,0 +1,68 @@
+{
+  "id": "1234567",
+  "owner": "test_user@testdom.com",
+  "result": "Pass",
+  "status": "Running",
+  "retention_tag": "scratch",
+  "whiteboard": {
+    "text": "Test Reserve Workflow"
+  },
+  "recipeSet": {
+    "priority": "Normal",
+    "response": "ack",
+    "id": "7654321",
+    "recipe": {
+      "id": "1029384",
+      "job_id": "1234567",
+      "recipe_set_id": "7654321",
+      "result": "Pass",
+      "status": "Running",
+      "distro": "RHEL-8.7.0",
+      "arch": "x86_64",
+      "family": "RedHatEnterpriseLinux8",
+      "variant": "BaseOS",
+      "system": "fake.host.testdom.com",
+      "distroRequires": {
+        "and": {
+          "distro_family": {
+            "op": "=",
+            "value": "RedHatEnterpriseLinux8"
+          },
+          "distro_variant": {
+            "op": "=",
+            "value": "BaseOS"
+          },
+          "distro_name": {
+            "op": "=",
+            "value": "RHEL-8.7.0"
+          },
+          "distro_arch": {
+            "op": "=",
+            "value": "x86_64"
+          }
+        }
+      },
+      "hostRequires": {
+        "system_type": {
+          "value": "Machine"
+        }
+      },
+      "logs": {
+        "log": [
+          {
+            "href": "https: //beakerhost.testdom.com/recipes/1029384/logs/console.log",
+            "name": "console.log"
+          },
+          {
+            "href": "https: //beakerhost.testdom.com/recipes/1029384/logs/anaconda.log",
+            "name": "anaconda.log"
+          },
+          {
+            "href": "https: //beakerhost.testdom.com/recipes/1029384/logs/sys.log",
+            "name": "sys.log"
+          }
+        ]
+      }
+    }
+  }
+}

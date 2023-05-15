@@ -77,8 +77,8 @@ def get_awxkit_and_uname(
     return versions.v2.get(), my_username
 
 
+@Provider.auto_hide
 class AnsibleTower(Provider):
-
     _validators = [
         Validator("ANSIBLETOWER.release_workflow", default="remove-vm"),
         Validator("ANSIBLETOWER.extend_workflow", default="extend-vm"),
@@ -559,7 +559,7 @@ class AnsibleTower(Provider):
         for inv in invs:
             inv_hosts = inv.get_related("hosts", page_size=200).results
             hosts.extend(inv_hosts)
-        with click.progressbar(hosts, label='Compiling host information') as hosts_bar:
+        with click.progressbar(hosts, label="Compiling host information") as hosts_bar:
             compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
         return compiled_host_info
 
@@ -572,7 +572,7 @@ class AnsibleTower(Provider):
         if new_inv := target_vm._broker_args.get("tower_inventory"):
             if new_inv != self._inventory:
                 self._inventory = new_inv
-                if hasattr(self.__dict__, 'inventory'):
+                if hasattr(self.__dict__, "inventory"):
                     del self.inventory  # clear the cached value
         return self.execute(
             workflow=settings.ANSIBLETOWER.extend_workflow,
@@ -581,11 +581,20 @@ class AnsibleTower(Provider):
             or settings.ANSIBLETOWER.get("new_expire_time"),
         )
 
-    @Provider.register_action("template", "inventory")
-    def nick_help(self, **kwargs):
+    def provider_help(
+        self,
+        workflows=False,
+        workflow=None,
+        job_templates=False,
+        job_template=None,
+        templates=False,
+        inventories=False,
+        inventory=None,
+        **kwargs,
+    ):
         """Get a list of extra vars and their defaults from a workflow"""
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
-        if workflow := kwargs.get("workflow"):
+        if workflow:
             wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
             default_inv = self.v2.inventory.get(id=wfjt.inventory).results.pop()
             logger.info(
@@ -593,7 +602,7 @@ class AnsibleTower(Provider):
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
                 f"tower_inventory: {default_inv['name']}"
             )
-        elif kwargs.get("workflows"):
+        elif workflows:
             workflows = [
                 workflow.name
                 for workflow in self.v2.workflow_job_templates.get(
@@ -606,11 +615,11 @@ class AnsibleTower(Provider):
                 workflows = workflows if isinstance(workflows, list) else [workflows]
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
-        elif inventory := kwargs.get("inventory"):
+        elif inventory:
             inv = self.v2.inventory.get(name=inventory, kind="").results.pop()
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
-        elif kwargs.get("inventories"):
+        elif inventories:
             inv = [
                 inv.name
                 for inv in self.v2.inventory.get(kind="", page_size=1000).results
@@ -620,7 +629,7 @@ class AnsibleTower(Provider):
                 inv = inv if isinstance(inv, list) else [inv]
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
-        elif job_template := kwargs.get("job_template"):
+        elif job_template:
             jt = self.v2.job_templates.get(name=job_template).results.pop()
             default_inv = self.v2.inventory.get(id=jt.inventory).results.pop()
             logger.info(
@@ -628,7 +637,7 @@ class AnsibleTower(Provider):
                 f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
                 f"tower_inventory: {default_inv['name']}"
             )
-        elif kwargs.get("job_templates"):
+        elif job_templates:
             job_templates = [
                 job_template.name
                 for job_template in self.v2.job_templates.get(page_size=1000).results
@@ -636,10 +645,14 @@ class AnsibleTower(Provider):
             ]
             if res_filter := kwargs.get("results_filter"):
                 job_templates = eval_filter(job_templates, res_filter, "res")
-                job_templates = job_templates if isinstance(job_templates, list) else [job_templates]
+                job_templates = (
+                    job_templates
+                    if isinstance(job_templates, list)
+                    else [job_templates]
+                )
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
-        elif kwargs.get("templates"):
+        elif templates:
             templates = list(
                 {
                     tmpl
@@ -654,8 +667,6 @@ class AnsibleTower(Provider):
                 templates = templates if isinstance(templates, list) else [templates]
             templates = "\n".join(templates[:results_limit])
             logger.info(f"Available templates:\n{templates}")
-        else:
-            logger.warning("That action is not yet implemented.")
 
     def release(self, name, broker_args=None):
         if broker_args is None:
