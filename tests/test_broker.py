@@ -1,4 +1,4 @@
-from broker import broker
+from broker import broker, helpers
 from broker.providers import test_provider
 import pytest
 
@@ -34,10 +34,11 @@ def test_full_init():
 def test_broker_e2e():
     """Run through the base functionality of broker"""
     broker_inst = broker.Broker(nick="test_nick")
-    broker_inst.checkout()
+    host_checkout = broker_inst.checkout()
     assert len(broker_inst._hosts) == 1
     broker_host = broker_inst._hosts[0]
     assert broker_host.hostname == "test.host.example.com"
+    assert broker_host == host_checkout
     broker_host_dict = broker_host.to_dict()
     assert broker_host_dict["_broker_provider"] == "TestProvider"
     broker_inst.checkin()
@@ -49,6 +50,27 @@ def test_broker_empty_checkin():
     broker_inst = broker.Broker(nick="test_nick")
     assert not broker_inst._hosts
     broker_inst.checkin()
+
+
+def test_broker_checkin_n_sync_empty_hostname():
+    """Test that broker can checkin and sync inventory with a host that has empty hostname"""
+    broker_inst = broker.Broker(nick="test_nick")
+    broker_inst.checkout()
+    inventory = helpers.load_inventory()
+    assert len(inventory) == 1
+    inventory[0]["hostname"] = None
+    # remove the host from the inventory
+    helpers.update_inventory(remove="test.host.example.com")
+    # add the host back with no hostname
+    helpers.update_inventory(add=inventory)
+    hosts = broker_inst.from_inventory()
+    assert len(hosts) == 1
+    assert hosts[0].hostname is None
+    broker_inst = broker.Broker(hosts=hosts)
+    broker_inst.checkin()
+    assert (
+        not broker_inst.from_inventory()
+    ), "Host was not removed from inventory after checkin"
 
 
 def test_mp_checkout():
