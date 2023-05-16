@@ -1,4 +1,5 @@
 import inspect
+from broker import helpers
 from dynaconf import Validator
 from broker.settings import settings
 from broker.providers import Provider
@@ -40,9 +41,12 @@ class TestProvider(Provider):
         )
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        host_params = provider_params.copy()
-        host_params.update(kwargs)
-        host_inst = host_classes[host_params["host_type"]](**host_params)
+        if provider_params:
+            host_params = provider_params.copy()
+            host_params.update(kwargs)
+            host_inst = host_classes[host_params["host_type"]](**host_params)
+        else:  # if we are reconstructing the host from the inventory
+            host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 
@@ -61,8 +65,10 @@ class TestProvider(Provider):
     def extend(self):
         pass
 
-    def get_inventory(self, **kwargs):
-        pass
+    def get_inventory(self, *args, **kwargs):
+        return helpers.load_inventory(
+            filter=f"_broker_provider={self.__class__.__name__}"
+        )
 
     def nick_help(self):
         pass
