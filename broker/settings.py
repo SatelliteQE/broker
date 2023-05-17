@@ -1,6 +1,7 @@
 import os
 import click
 import inspect
+import uuid
 from pathlib import Path
 from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
@@ -91,19 +92,27 @@ vault_vars = {k: v for k, v in os.environ.items() if "VAULT_" in k}
 for k in vault_vars:
     del os.environ[k]
 
-settings = Dynaconf(
-    settings_file=str(settings_path.absolute()),
-    ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
-    validators=validators,
-)
-# to make doubly sure, remove the vault loader if set somehow
-settings._loaders = [loader for loader in settings._loaders if "vault" not in loader]
-
-try:
-    settings.validators.validate()
-except ValidationError as err:
-    raise ConfigurationError(
-        f"Configuration error in {settings_path.absolute()}: {err.args[0]}"
-    )
-
 os.environ.update(vault_vars)
+
+settings = Dynaconf(ENVVAR_PREFIX_FOR_DYNACONF="BROKER", validators=validators)
+settings._loaders = [loader for loader in settings._loaders if "vault" not in loader]
+def load_settings(settings_path):
+    _settings = Dynaconf(
+        settings_file=str(settings_path.absolute()),
+        ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
+        validators=validators,
+    )
+    # to make doubly sure, remove the vault loader if set somehow
+    _settings._loaders = [loader for loader in _settings._loaders if "vault" not in loader]
+
+    try:
+        _settings.validators.validate()
+    except ValidationError as err:
+        raise ConfigurationError(
+            f"Configuration error in {settings_path.absolute()}: {err.args[0]}"
+        )
+    settings.clean()
+    settings.update(_settings.as_dict())
+    settings._broker_settings_id = str(uuid.uuid4())
+
+load_settings(settings_path)

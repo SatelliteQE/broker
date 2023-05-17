@@ -5,7 +5,7 @@ from click.testing import CliRunner
 from broker import Broker
 from broker.commands import cli
 from broker.providers.ansible_tower import AnsibleTower
-from broker.settings import inventory_path
+from broker.settings import inventory_path, settings_path
 
 SCENARIO_DIR = Path("tests/data/cli_scenarios/satlab")
 
@@ -69,21 +69,20 @@ def test_tower_host():
     with Broker(workflow="deploy-base-rhel") as r_host:
         res = r_host.execute("hostname")
         assert res.stdout.strip() == r_host.hostname
-        loc_settings_path = Path("broker_settings.yaml")
         remote_dir = "/tmp/fake"
-        r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+        r_host.session.sftp_write(settings_path, f"{remote_dir}/")
         res = r_host.execute(f"ls {remote_dir}")
-        assert str(loc_settings_path) in res.stdout
+        assert str(settings_path.name) in res.stdout
         with NamedTemporaryFile() as tmp:
-            r_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+            r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", tmp.file.name)
             data = r_host.session.sftp_read(
-                f"{remote_dir}/{loc_settings_path.name}", return_data=True
+                f"{remote_dir}/{settings_path.name}", return_data=True
             )
             assert (
-                loc_settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
+                settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
             ), "Local file is different from the received one"
             assert (
-                loc_settings_path.read_bytes() == data
+                settings_path.read_bytes() == data
             ), "Local file is different from the received one (return_data=True)"
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test the tail_file context manager
@@ -100,21 +99,20 @@ def test_tower_host_mp():
         for r_host in r_hosts:
             res = r_host.execute("hostname")
             assert res.stdout.strip() == r_host.hostname
-            loc_settings_path = Path("broker_settings.yaml")
             remote_dir = "/tmp/fake"
-            r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+            r_host.session.sftp_write(settings_path, f"{remote_dir}/")
             res = r_host.execute(f"ls {remote_dir}")
-            assert str(loc_settings_path) in res.stdout
+            assert str(settings_path.name) in res.stdout
             with NamedTemporaryFile() as tmp:
-                r_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+                r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", tmp.file.name)
                 data = r_host.session.sftp_read(
-                    f"{remote_dir}/{loc_settings_path.name}", return_data=True
+                    f"{remote_dir}/{settings_path.name}", return_data=True
                 )
                 assert (
-                    loc_settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
+                    settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
                 ), "Local file is different from the received one"
                 assert (
-                    loc_settings_path.read_bytes() == data
+                    settings_path.read_bytes() == data
                 ), "Local file is different from the received one (return_data=True)"
                 assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test remote copy from one host to another

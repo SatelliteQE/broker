@@ -72,6 +72,12 @@ class AwxkitApiStub(MockStub):
             return super().pop(item)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _temp_settings_and_inventory(temp_settings_and_inventory):
+    """Temporarily move the local inventory and settings files, then move them back when done"""
+    pass
+
+
 @pytest.fixture(scope="function")
 def api_stub():
     yield AwxkitApiStub()

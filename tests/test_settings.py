@@ -6,6 +6,12 @@ from broker.exceptions import ConfigurationError
 from broker.providers.test_provider import TestProvider
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _temp_settings_and_inventory(temp_settings_and_inventory):
+    """Temporarily move the local inventory and settings files, then move them back when done"""
+    pass
+
+
 def test_default_settings():
     test_provider = TestProvider()
     assert test_provider.instance == "test1"

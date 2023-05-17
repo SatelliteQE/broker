@@ -76,6 +76,7 @@ class Provider(metaclass=ProviderMeta):
     _checkout_options = []
     _execute_options = []
     _fresh_settings = settings.dynaconf_clone()
+    _settings_id = settings._broker_settings_id
     _sensitive_attrs = []
 
     def __init__(self, **kwargs):
@@ -83,6 +84,10 @@ class Provider(metaclass=ProviderMeta):
         cls_name = self.__class__.__name__
         logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
         self.instance = kwargs.pop(f"{cls_name}", None)
+        if not self._settings_id == settings._broker_settings_id:
+            logger.debug("Settings object has been reloaded, reloading provider settings")
+            self._fresh_settings = settings.dynaconf_clone()
+            self._settings_id = settings._broker_settings_id
         self._validate_settings(self.instance)
 
     def _validate_settings(self, instance_name=None):

@@ -12,6 +12,10 @@ BROKER_ARGS_DATA = {
     "my_second_arg": "foo",
 }
 
+@pytest.fixture(scope="module", autouse=True)
+def _temp_settings_and_inventory(temp_settings_and_inventory):
+    """Temporarily move the local inventory and settings files, then move them back when done"""
+    pass
 
 @pytest.fixture
 def tmp_file(tmp_path):

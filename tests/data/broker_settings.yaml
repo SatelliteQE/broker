@@ -10,6 +10,17 @@ host_password: "<password>"
 host_ssh_port: 22
 host_ssh_key_filename: "</path/to/the/ssh-key>"
 # Provider settings
+TestProvider:
+    instances:
+        - test1:
+            foo: "bar"
+            default: True
+        - test2:
+            foo: "baz"
+            override_envars: True
+        - bad:
+            nothing: False
+    config_value: "something"
 AnsibleTower:
     base_url: "https://<ansible tower host>/"
     # Username is required for both token and password-based authentication
@@ -24,28 +35,20 @@ AnsibleTower:
     workflow_timeout: 3600
     results_limit: 50
 Container:
-    instances:
-        - docker:
-            host_username: "<username>"
-            host_password: "<plain text password>"
-            host_port: None
-            default: True
-        - remote:
-            host: "<remote hostname>"
-            host_username: "<username>"
-            host_password: "<plain text password>"
+    host_username: "<username>"
+    host_password: "<plain text password>"
+    host_port: None
+    default: True
     runtime: 'docker'
     # name used to prefix container names, used to distinguish yourself
     # if not set, then your local username will be used
     # name_prefix: test
     results_limit: 50
     auto_map_ports: False
-Beaker:
-    hub_url:
-    max_job_wait: 24h
 # You can set a nickname as a shortcut for arguments
 nicks:
-    rhel7:
-        workflow: "deploy-base-rhel"
-        rhel_version: "7.9"
-        notes: "Requested by broker"
+    test_nick:
+        test_action: "fake"
+        arg1: "abc"
+        arg2: 123
+        arg3: True
