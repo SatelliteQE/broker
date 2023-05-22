@@ -32,6 +32,7 @@ def temp_inventory():
 
 # ----- CLI Scenario Tests -----
 
+
 @pytest.mark.parametrize(
     "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")]
 )
@@ -67,9 +68,10 @@ def test_containerhost_query():
 
 # ----- Broker API Tests -----
 
+
 def test_container_e2e():
     with Broker(container_host="ubi8:latest") as c_host:
-        assert c_host._cont_inst.top()['Processes']
+        assert c_host._cont_inst.top()["Processes"]
         res = c_host.execute("hostname")
         assert res.stdout.strip() == c_host.hostname
         loc_settings_path = Path("broker_settings.yaml")
@@ -78,7 +80,9 @@ def test_container_e2e():
         res = c_host.execute(f"ls {remote_dir}")
         assert str(loc_settings_path) in res.stdout
         with NamedTemporaryFile() as tmp:
-            c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+            c_host.session.sftp_read(
+                f"{remote_dir}/{loc_settings_path.name}", tmp.file.name
+            )
             data = c_host.session.sftp_read(
                 f"{remote_dir}/{loc_settings_path.name}", return_data=True
             )
@@ -88,20 +92,22 @@ def test_container_e2e():
             assert (
                 loc_settings_path.read_bytes() == data
             ), "Local file is different from the received one (return_data=True)"
-            assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+            assert (
+                data == Path(tmp.file.name).read_bytes()
+            ), "Received files do not match"
         # test the tail_file context manager
         tailed_file = f"{remote_dir}/tail_me.txt"
         c_host.execute(f"echo 'hello world' > {tailed_file}")
         with c_host.session.tail_file(tailed_file) as tf:
             c_host.execute(f"echo 'this is a new line' >> {tailed_file}")
-        assert 'this is a new line' in tf.stdout
-        assert 'hello world' not in tf.stdout
+        assert "this is a new line" in tf.stdout
+        assert "hello world" not in tf.stdout
 
 
 def test_container_e2e_mp():
     with Broker(container_host="ubi8:latest", _count=7) as c_hosts:
         for c_host in c_hosts:
-            assert c_host._cont_inst.top()['Processes']
+            assert c_host._cont_inst.top()["Processes"]
             res = c_host.execute("hostname")
             assert res.stdout.strip() == c_host.hostname
             loc_settings_path = Path("broker_settings.yaml")
@@ -110,7 +116,9 @@ def test_container_e2e_mp():
             res = c_host.execute(f"ls {remote_dir}")
             assert str(loc_settings_path) in res.stdout
             with NamedTemporaryFile() as tmp:
-                c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
+                c_host.session.sftp_read(
+                    f"{remote_dir}/{loc_settings_path.name}", tmp.file.name
+                )
                 data = c_host.session.sftp_read(
                     f"{remote_dir}/{loc_settings_path.name}", return_data=True
                 )
@@ -120,4 +128,21 @@ def test_container_e2e_mp():
                 assert (
                     loc_settings_path.read_bytes() == data
                 ), "Local file is different from the received one (return_data=True)"
-                assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+                assert (
+                    data == Path(tmp.file.name).read_bytes()
+                ), "Received files do not match"
+
+
+def test_broker_multi_manager():
+    with Broker.multi_manager(
+        ubi7={"container_host": "ubi7:latest"},
+        ubi8={"container_host": "ubi8:latest", "_count": 2},
+        ubi9={"container_host": "ubi9:latest"},
+    ) as multi_hosts:
+        assert "ubi7" in multi_hosts and "ubi8" in multi_hosts and "ubi9" in multi_hosts
+        assert len(multi_hosts["ubi8"]) == 2
+        assert multi_hosts["ubi7"][0]._cont_inst.top()["Processes"]
+        assert (
+            multi_hosts["ubi8"][1].execute("hostname").stdout.strip()
+            == multi_hosts["ubi8"][1].hostname
+        )
