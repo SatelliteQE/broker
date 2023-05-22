@@ -1,27 +1,25 @@
-from broker import broker, helpers
+from broker import broker, Broker, helpers
 from broker.providers import test_provider
 import pytest
 
 
 def test_empty_init():
     """Broker should be able to init without any arguments"""
-    broker_inst = broker.Broker()
-    assert isinstance(broker_inst, broker.Broker)
+    broker_inst = Broker()
+    assert isinstance(broker_inst, Broker)
 
 
 def test_kwarg_assignment():
     """Broker should copy all kwargs into its _kwargs attribute"""
     broker_kwargs = {"test": "value", "another": 17}
-    broker_inst = broker.Broker(**broker_kwargs)
+    broker_inst = Broker(**broker_kwargs)
     assert broker_inst._kwargs == broker_kwargs
 
 
 def test_full_init():
     """Make sure all init checks and assignments work"""
     broker_hosts = ["test1.example.com", "test2.example.com", "test3.example.com"]
-    broker_inst = broker.Broker(
-        hosts=broker_hosts, test_action="blank", nick="test_nick"
-    )
+    broker_inst = Broker(hosts=broker_hosts, test_action="blank", nick="test_nick")
     assert broker_inst._hosts == broker_hosts
     assert not broker_inst._kwargs.get("hosts")
     assert broker_inst._provider_actions == {
@@ -33,7 +31,7 @@ def test_full_init():
 
 def test_broker_e2e():
     """Run through the base functionality of broker"""
-    broker_inst = broker.Broker(nick="test_nick")
+    broker_inst = Broker(nick="test_nick")
     host_checkout = broker_inst.checkout()
     assert len(broker_inst._hosts) == 1
     broker_host = broker_inst._hosts[0]
@@ -47,7 +45,7 @@ def test_broker_e2e():
 
 def test_broker_empty_checkin():
     """Try to checkin with no hosts on the instance"""
-    broker_inst = broker.Broker(nick="test_nick")
+    broker_inst = Broker(nick="test_nick")
     assert not broker_inst._hosts
     broker_inst.checkin()
 
@@ -80,7 +78,7 @@ def test_mp_checkout():
     # https://github.com/SatelliteQE/broker/pull/53
     # With count like this, I've got reproducibility probability
     # arround 0.5
-    broker_inst = broker.Broker(nick="test_nick", _count=VM_COUNT)
+    broker_inst = Broker(nick="test_nick", _count=VM_COUNT)
     broker_inst.checkout()
     assert len(broker_inst._hosts) == VM_COUNT
     broker_inst.checkin()
@@ -88,7 +86,7 @@ def test_mp_checkout():
 
 
 def test_mp_checkout_twice():
-    broker_inst = broker.Broker(nick="test_nick", _count=2)
+    broker_inst = Broker(nick="test_nick", _count=2)
 
     def cycle():
         assert len(broker_inst.checkout()) == 2
@@ -99,6 +97,20 @@ def test_mp_checkout_twice():
 
     cycle()
     cycle()
+
+
+def test_multi_manager():
+    """Test that we get the proper data structure and names as expected
+    when using Broker.multi_manager.
+    """
+    with Broker.multi_manager(
+        test_1={"nick": "test_nick"}, test_2={"nick": "test_nick", "_count": 2}
+    ) as host_dict:
+        assert "test_1" in host_dict and "test_2" in host_dict
+        assert len(host_dict["test_1"]) == 1
+        assert len(host_dict["test_2"]) == 2
+        assert host_dict["test_1"][0].hostname == "test.host.example.com"
+        assert host_dict["test_2"][1].hostname == "test.host.example.com"
 
 
 class SomeException(Exception):

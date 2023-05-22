@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from logzero import logger
 from broker.providers import PROVIDERS, PROVIDER_ACTIONS, _provider_imports
 from broker.hosts import Host
@@ -22,6 +23,7 @@ class mp_decorator:
 
     The decorated method is expected to return an itearable.
     """
+
     MAX_WORKERS = None
     """ If set to integer, the count of workers will be limited to that amount.
      If set to None, the max workers count of the EXECUTOR will match the count of items."""
@@ -211,7 +213,11 @@ class Broker:
             if not isinstance(hosts, list):
                 hosts = [hosts]
             if in_context:
-                hosts = [host for host in hosts if not getattr(host, '_skip_context_checkin', False)]
+                hosts = [
+                    host
+                    for host in hosts
+                    if not getattr(host, "_skip_context_checkin", False)
+                ]
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
             return
@@ -268,9 +274,7 @@ class Broker:
             logger.debug("Extend called with no hosts, taking no action")
             return
 
-        with ThreadPoolExecutor(
-            max_workers=1 if sequential else len(hosts)
-        ) as workers:
+        with ThreadPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
             completed_extends = as_completed(
                 workers.submit(self._extend, _host) for _host in hosts
             )
@@ -322,6 +326,65 @@ class Broker:
         """
         inv_hosts = helpers.load_inventory(filter=filter)
         return [self.reconstruct_host(inv_host) for inv_host in inv_hosts]
+
+    @classmethod
+    @contextmanager
+    def multi_manager(cls, **multi_dict):
+        """Given a mapping of names to Broker argument dictionaries:
+        create multiple Broker instances, check them out in parallel, yield, then checkin.
+
+        Example:
+            with Broker.multi_mode(
+                rhel7={
+                    "host_class": ContentHost,
+                    "workflow": "deploy_base_rhel",
+                    "deploy_rhel_version": "7",
+                },
+                rhel8={
+                    "host_class": ContentHost,
+                    "workflow": "deploy_base_rhel",
+                    "deploy_rhel_version": "8",
+                }
+            ) as host_dict:
+                pass
+
+        All are checked out at the same time. The user is presented with the hosts in
+        a dictionary by argument name e.g. host_dict["rhel7"] is a ContentHost object
+        """
+        # create all the broker instances and perform checkouts in parallel
+        broker_instances = {name: cls(**kwargs) for name, kwargs in multi_dict.items()}
+        with ThreadPoolExecutor(max_workers=len(broker_instances)) as workers:
+            completed_checkouts = as_completed(
+                workers.submit(broker.checkout) for broker in broker_instances.values()
+            )
+            for completed in completed_checkouts:
+                completed.result()
+        all_hosts = []
+        for broker_inst in broker_instances.values():
+            all_hosts.extend(broker_inst._hosts)
+        # run setup on all hosts in parallel
+        with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
+            completed_setups = as_completed(
+                workers.submit(host.setup) for host in all_hosts
+            )
+            for completed in completed_setups:
+                completed.result()
+        # yield control to the user
+        yield {name: broker._hosts for name, broker in broker_instances.items()}
+        # teardown all hosts in parallel
+        with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
+            completed_teardowns = as_completed(
+                workers.submit(host.teardown) for host in all_hosts
+            )
+            for completed in completed_teardowns:
+                completed.result()
+        # checkin all hosts in parallel
+        with ThreadPoolExecutor(max_workers=len(broker_instances)) as workers:
+            completed_checkins = as_completed(
+                workers.submit(broker.checkin) for broker in broker_instances.values()
+            )
+            for completed in completed_checkins:
+                completed.result()
 
     def __repr__(self):
         inner = ", ".join(
