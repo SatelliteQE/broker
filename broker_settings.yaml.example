@@ -40,6 +40,9 @@ Container:
     # name_prefix: test
     results_limit: 50
     auto_map_ports: False
+Beaker:
+    hub_url:
+    max_job_wait: 24h
 TestProvider:
     instances:
         - test1:
