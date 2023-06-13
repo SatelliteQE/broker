@@ -180,9 +180,8 @@ class AnsibleTower(Provider):
         if prov_inv:
             logger.debug(f"prov_inv: {prov_inv}")
             broker_args["inventory"] = prov_inv
-        caller_host._prov_inst.release(
-            broker_args.get("source_vm", caller_host.name), broker_args
-        )
+        source_vm = broker_args.pop("source_vm", caller_host.name)
+        caller_host._prov_inst.release(source_vm, broker_args)
 
     def _set_attributes(self, host_inst, broker_args=None, misc_attrs=None):
         host_inst.__dict__.update(
