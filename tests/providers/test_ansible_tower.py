@@ -14,7 +14,6 @@ class AwxkitApiStub(MockStub):
      - v2.ping.get().version
      - v2.jobs.get(id=child_id).results.pop()
      - v2.workflow_job_templates.get(name=workflow).results.pop()
-     - v2.workflow_job_templates.get(name=workflow).results.pop()
      - wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
      - job.wait_until_completed()
      - merge_dicts(artifacts, at_object.artifacts)
@@ -94,10 +93,10 @@ def test_execute(tower_stub):
 
 
 def test_host_creation(tower_stub):
-    vmb = Broker()
+    bx = Broker()
     job = tower_stub.execute(workflow="deploy-base-rhel")
-    host = tower_stub.construct_host(job, vmb.host_classes)
-    assert isinstance(host, vmb.host_classes["host"])
+    host = tower_stub.construct_host(job, bx.host_classes)
+    assert isinstance(host, bx.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
     assert host._broker_args["os_distribution_version"] == "7.8"
 
@@ -106,3 +105,12 @@ def test_workflow_lookup_failure(tower_stub):
     with pytest.raises(Broker.ProviderError) as err:
         tower_stub.execute(workflow="this-does-not-exist")
     assert "Workflow not found by name: this-does-not-exist" in err.value.message
+
+
+def test_host_release_dual_params(tower_stub):
+    bx = Broker()
+    job = tower_stub.execute(workflow="deploy-base-rhel")
+    host = tower_stub.construct_host(job, bx.host_classes)
+    host._broker_args["source_vm"] = "fake-physical-host"
+    assert host._broker_args["source_vm"] == host.name
+    host.release()

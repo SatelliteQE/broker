@@ -4,5 +4,11 @@
     "type": "workflow_job_template",
     "url": "/api/v2/workflow_job_templates/34/",
     "name": "deploy-base-rhel"
+  },
+  {
+    "id": 35,
+    "type": "workflow_job_template",
+    "url": "/api/v2/workflow_job_templates/35/",
+    "name": "remove-vm"
   }
 ]
