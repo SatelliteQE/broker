@@ -131,16 +131,17 @@ class Session:
         with sftp.open(destination, FILE_FLAGS, SFTP_MODE) as remote:
             remote.write(data)
 
-    def remote_copy(self, source, dest_host, ensure_dir=True):
+    def remote_copy(self, source, dest_host, dest_path=None, ensure_dir=True):
         """Copy a file from this host to another"""
+        dest_path = dest_path or source
         sftp_down = self.session.sftp_init()
         sftp_up = dest_host.session.session.sftp_init()
         if ensure_dir:
-            dest_host.run(f"mkdir -p {Path(source).absolute().parent}")
+            dest_host.session.run(f"mkdir -p {Path(dest_path).absolute().parent}")
         with sftp_down.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
         ) as download:
-            with sftp_up.open(source, FILE_FLAGS, SFTP_MODE) as upload:
+            with sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload:
                 for size, data in download:
                     upload.write(data)
 
