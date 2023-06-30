@@ -117,3 +117,12 @@ def test_tower_host_mp():
                     loc_settings_path.read_bytes() == data
                 ), "Local file is different from the received one (return_data=True)"
                 assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+        # test remote copy from one host to another
+        r_hosts[0].session.remote_copy(
+            source=f"{remote_dir}/{loc_settings_path.name}",
+            dest_host=r_hosts[1],
+            dest_path=f"/root/{loc_settings_path.name}"
+        )
+        res = r_hosts[1].execute(f"ls /root")
+        assert loc_settings_path.name in res.stdout
+

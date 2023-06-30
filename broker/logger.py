@@ -138,7 +138,8 @@ def setup_logzero(
     path="logs/broker.log",
 ):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    patch_awx_for_verbosity(awxkit.api)
+    if isinstance(level, str) and level.lower() == "trace":
+        patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
     set_file_logging(file_level, path)
     if formatter:
