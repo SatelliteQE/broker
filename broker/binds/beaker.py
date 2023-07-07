@@ -1,15 +1,18 @@
+"""A wrapper around the Beaker CLI."""
 import json
+from pathlib import Path
 import subprocess
 import time
-from logzero import logger
-from pathlib import Path
 from xml.etree import ElementTree as ET
+
+from logzero import logger
+
 from broker import helpers
 from broker.exceptions import BeakerBindError
 
 
 def _elementree_to_dict(etree):
-    """Converts an ElementTree object to a dictionary"""
+    """Convert an ElementTree object to a dictionary."""
     data = {}
     if etree.attrib:
         data.update(etree.attrib)
@@ -32,12 +35,14 @@ def _curate_job_info(job_info_dict):
         # "reservation_id": "current_reservation/recipe_id",
         "whiteboard": "whiteboard/text",
         "hostname": "recipeSet/recipe/system",
-        "distro": "recipeSet/recipe/distro"
+        "distro": "recipeSet/recipe/distro",
     }
     return helpers.dict_from_paths(job_info_dict, curated_info)
 
 
 class BeakerBind:
+    """A bind class providing a basic interface to the Beaker CLI."""
+
     def __init__(self, hub_url, auth="krbv", **kwargs):
         self.hub_url = hub_url
         self._base_args = ["--insecure", f"--hub={self.hub_url}"]
@@ -54,6 +59,11 @@ class BeakerBind:
         self.__dict__.update(kwargs)
 
     def _exec_command(self, *cmd_args, **cmd_kwargs):
+        """Execute a beaker command and return the result.
+
+        cmd_args: Expanded into feature flags for the beaker command
+        cmd_kwargs: Expanded into args and values for the beaker command
+        """
         raise_on_error = cmd_kwargs.pop("raise_on_error", True)
         exec_cmd, cmd_args = ["bkr"], list(cmd_args)
         # check through kwargs and if any are True add to cmd_args
@@ -90,6 +100,7 @@ class BeakerBind:
         return result
 
     def job_submit(self, job_xml, wait=False):
+        """Submit a job to Beaker and optionally wait for it to complete."""
         # wait behavior seems buggy to me, so best to avoid it
         if not Path(job_xml).exists():
             raise FileNotFoundError(f"Job XML file {job_xml} not found")
@@ -102,36 +113,43 @@ class BeakerBind:
                     return line.split("'")[1].replace("J:", "")
 
     def job_watch(self, job_id):
+        """Watch a job via the job-watch command. This can be buggy."""
         job_id = f"J:{job_id}" if not job_id.startswith("J:") else job_id
         return self._exec_command("job-watch", job_id)
 
     def job_results(self, job_id, format="beaker-results-xml", pretty=False):
+        """Get the results of a job in the specified format."""
         job_id = f"J:{job_id}" if not job_id.startswith("J:") else job_id
         return self._exec_command(
             "job-results", job_id, format=format, prettyxml=pretty
         )
 
     def job_clone(self, job_id, wait=False, **kwargs):
+        """Clone a job by the specified job id."""
         job_id = f"J:{job_id}" if not job_id.startswith("J:") else job_id
         return self._exec_command("job-clone", job_id, wait=wait, **kwargs)
 
     def job_list(self, *args, **kwargs):
+        """List jobs matching the criteria specified by args and kwargs."""
         return self._exec_command("job-list", *args, **kwargs)
 
     def job_cancel(self, job_id):
+        """Cancel a job by the specified job id."""
         if not job_id.startswith("J:") and not job_id.startswith("RS:"):
             job_id = f"J:{job_id}"
         return self._exec_command("job-cancel", job_id)
 
     def job_delete(self, job_id):
+        """Delete a job by the specified job id."""
         job_id = f"J:{job_id}" if not job_id.startswith("J:") else job_id
         return self._exec_command("job-delete", job_id)
 
     def system_release(self, system_id):
+        """Release a system by the specified system id."""
         return self._exec_command("system-release", system_id)
 
     def system_list(self, **kwargs):
-        """Due to the number of arguments, we will not validate before submitting
+        """Due to the number of arguments, we will not validate before submitting.
 
         Accepted arguments are:
         available                       available to be used by this user
@@ -152,25 +170,32 @@ class BeakerBind:
         host-filter=NAME                matching pre-defined host filter
         """
         # convert the flags passed in kwargs to arguments
-        args = []
-        for key in {"available", "free", "removed", "mine"}:
-            if kwargs.pop(key, False):
-                args.append(f"--{key}")
+        args = [
+            f"--{key}"
+            for key in ("available", "free", "removed", "mine")
+            if kwargs.pop(key, False)
+        ]
         return self._exec_command("system-list", *args, **kwargs)
 
-    def user_systems(self):  # to be used for inventory sync
-        result =  self.system_list(mine=True, raise_on_error=False)
+    def user_systems(self):
+        """Return a list of system ids owned by the current user.
+
+        This is used for inventory syncing against Beaker.
+        """
+        result = self.system_list(mine=True, raise_on_error=False)
         if result.status != 0:
             return []
         else:
             return result.stdout.splitlines()
 
     def system_details(self, system_id, format="json"):
+        """Get details about a system by the specified system id."""
         return self._exec_command("system-details", system_id, format=format)
 
     def execute_job(self, job, max_wait="24h"):
-        """Submit a job, periodically checking the status until it completes
-        then return a dictionary of the results.
+        """Submit a job, periodically checking the status until it completes.
+
+        return: a dictionary of the results.
         """
         if Path(job).exists():  # job xml path passed in
             job_id = self.job_submit(job, wait=False)
@@ -182,15 +207,20 @@ class BeakerBind:
             time.sleep(60)
             result = self.job_results(job_id, pretty=True)
             if 'result="Pass"' in result.stdout:
-                return _curate_job_info(_elementree_to_dict(ET.fromstring(result.stdout)))
+                return _curate_job_info(
+                    _elementree_to_dict(ET.fromstring(result.stdout))
+                )
             elif 'result="Fail"' in result.stdout or "Exception: " in result.stdout:
                 raise BeakerBindError(f"Job {job_id} failed:\n{result}")
             elif 'result="Warn"' in result.stdout:
                 res_dict = _elementree_to_dict(ET.fromstring(result.stdout))
-                raise BeakerBindError(f"Job {job_id} was resulted in a warning. Status: {res_dict['status']}")
+                raise BeakerBindError(
+                    f"Job {job_id} was resulted in a warning. Status: {res_dict['status']}"
+                )
         raise BeakerBindError(f"Job {job_id} did not complete within {max_wait}")
 
     def system_details_curated(self, system_id):
+        """Return a curated dictionary of system details."""
         full_details = json.loads(self.system_details(system_id).stdout)
         curated_details = {
             "hostname": full_details["fqdn"],
@@ -216,9 +246,11 @@ class BeakerBind:
         return curated_details
 
     def jobid_from_system(self, system_hostname):
-        """Return the job id for the current reservation on the system"""
+        """Return the job id for the current reservation on the system."""
         for job_id in json.loads(self.job_list(mine=True).stdout):
             job_result = self.job_results(job_id, pretty=True)
-            job_detail = _curate_job_info(_elementree_to_dict(ET.fromstring(job_result.stdout)))
+            job_detail = _curate_job_info(
+                _elementree_to_dict(ET.fromstring(job_result.stdout))
+            )
             if job_detail["hostname"] == system_hostname:
                 return job_id
