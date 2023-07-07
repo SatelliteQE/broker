@@ -1,19 +1,21 @@
+"""Defines the CLI commands for Broker."""
 from functools import wraps
 import signal
 import sys
+
 import click
 from logzero import logger
+
 from broker import exceptions, helpers, settings
 from broker.broker import Broker
 from broker.logger import LOG_LEVEL
-from broker.providers import PROVIDERS, PROVIDER_HELP
-
+from broker.providers import PROVIDER_HELP, PROVIDERS
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
 
 def loggedcli(group=None, *cli_args, **cli_kwargs):
-    """Updates the group command wrapper function in order to add logging"""
+    """Update the group command wrapper function in order to add logging."""
     if not group:
         group = cli  # default to the main cli group
 
@@ -35,14 +37,15 @@ def loggedcli(group=None, *cli_args, **cli_kwargs):
 
 
 class ExceptionHandler(click.Group):
-    """Wraps click group to catch and handle raised exceptions"""
+    """Wraps click group to catch and handle raised exceptions."""
 
     def __call__(self, *args, **kwargs):
+        """Override the __call__ method to catch and handle exceptions."""
         try:
             res = self.main(*args, **kwargs)
             helpers.emit(return_code=0)
             return res
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             if not isinstance(err, exceptions.BrokerError):
                 err = exceptions.BrokerError(err)
             helpers.emit(return_code=err.error_code, error_message=str(err.message))
@@ -50,8 +53,7 @@ class ExceptionHandler(click.Group):
 
 
 def provider_options(command):
-    """Applies provider-specific decorators to each command this decorates"""
-    # import IPython; IPython.embed()
+    """Apply provider-specific decorators to each command this decorates."""
     for prov in PROVIDERS.values():
         if prov.hidden:
             continue
@@ -61,8 +63,9 @@ def provider_options(command):
 
 
 def populate_providers(click_group):
-    """Populates the subcommands for providers subcommand using provider information
-    Providers become subcommands and their actions become arguments to their subcommand
+    """Populate the subcommands for providers subcommand using provider information.
+
+    Providers become subcommands and their actions become arguments to their subcommand.
 
     Example:
         Usage: broker providers AnsibleTower [OPTIONS]
@@ -87,7 +90,7 @@ def populate_providers(click_group):
         )
         @click.pass_context
         def provider_cmd(ctx, *args, **kwargs):  # the actual subcommand
-            """Get information about a provider's actions"""
+            """Get information about a provider's actions."""
             # add additional args flags to the kwargs
             for arg in ctx.args:
                 if arg.startswith("--"):
@@ -107,7 +110,7 @@ def populate_providers(click_group):
         for option, (p_cls, is_flag) in PROVIDER_HELP.items():
             if p_cls is not prov_class:
                 continue
-            option = option.replace("_", "-")
+            option = option.replace("_", "-")  # noqa: PLW2901
             if is_flag:
                 provider_cmd = click.option(
                     f"--{option}", is_flag=True, help=f"Get available {option}"
@@ -151,27 +154,28 @@ def populate_providers(click_group):
     help="Get broker system-level information",
 )
 def cli(version):
+    """Command-line interface for interacting with providers."""
     if version:
         import pkg_resources
 
         broker_version = pkg_resources.get_distribution("broker").version
         # check the latest version publish to PyPi
         try:
-            import requests
             from packaging.version import Version
+            import requests
 
             latest_version = Version(
-                requests.get("https://pypi.org/pypi/broker/json").json()["info"][
-                    "version"
-                ]
+                requests.get("https://pypi.org/pypi/broker/json", timeout=60).json()[
+                    "info"
+                ]["version"]
             )
             if latest_version > Version(broker_version):
                 click.secho(
                     f"A newer version of broker is available: {latest_version}",
                     fg="yellow",
                 )
-        except:
-            pass
+        except requests.exceptions.RequestException as err:
+            logger.warning(f"Unable to check for latest version: {err}")
         click.echo(f"Version: {broker_version}")
         broker_directory = settings.BROKER_DIRECTORY.absolute()
         click.echo(f"Broker Directory: {broker_directory}")
@@ -194,7 +198,7 @@ def cli(version):
 @provider_options
 @click.pass_context
 def checkout(ctx, background, nick, count, args_file, **kwargs):
-    """Checkout or "create" a Virtual Machine broker instance
+    """Checkout or "create" a Virtual Machine broker instance.
 
     COMMAND: broker checkout --workflow "workflow-name" --workflow_arg1 something
 
@@ -222,7 +226,7 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
 
 @cli.group(cls=ExceptionHandler)
 def providers():
-    """Get information about a provider and its actions"""
+    """Get information about a provider and its actions."""
     pass
 
 
@@ -238,7 +242,7 @@ populate_providers(providers)
     "--filter", type=str, help="Checkin only what matches the specified filter"
 )
 def checkin(vm, background, all_, sequential, filter):
-    """Checkin or "remove" a VM or series of VM broker instances
+    """Checkin or "remove" a VM or series of VM broker instances.
 
     COMMAND: broker checkin <vm hostname>|<local id>|--all
     """
@@ -268,8 +272,9 @@ def checkin(vm, background, all_, sequential, filter):
     "--filter", type=str, help="Display only what matches the specified filter"
 )
 def inventory(details, sync, filter):
-    """Get a list of all VMs you've checked out showing hostname and local id
-    hostname pulled from list of dictionaries
+    """Get a list of all VMs you've checked out showing hostname and local id.
+
+    hostname pulled from list of dictionaries.
     """
     if sync:
         Broker.sync_inventory(provider=sync)
@@ -297,7 +302,7 @@ def inventory(details, sync, filter):
 )
 @provider_options
 def extend(vm, background, all_, sequential, filter, **kwargs):
-    """Extend a host's lease time
+    """Extend a host's lease time.
 
     COMMAND: broker extend <vm hostname>|<vm name>|<local id>|--all
     """
@@ -325,7 +330,7 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     "--filter", type=str, help="Duplicate only what matches the specified filter"
 )
 def duplicate(vm, background, count, all_, filter):
-    """Duplicate a broker-procured vm
+    """Duplicate a broker-procured vm.
 
     COMMAND: broker duplicate <vm hostname>|<local id>|all
     """
@@ -366,7 +371,7 @@ def duplicate(vm, background, count, all_, filter):
 @provider_options
 @click.pass_context
 def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs):
-    """Execute an arbitrary provider action
+    """Execute an arbitrary provider action.
 
     COMMAND: broker execute --workflow "workflow-name" --workflow_arg1 something
 
@@ -392,8 +397,8 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
     result = Broker(**broker_args).execute()
     helpers.emit({"output": result})
     if output_format == "raw":
-        print(result)
+        click.echo(result)
     elif output_format == "log":
         logger.info(result)
     elif output_format == "yaml":
-        print(helpers.yaml_format(result))
+        click.echo(helpers.yaml_format(result))

@@ -1,37 +1,37 @@
-"""Miscellaneous helpers live here"""
-import threading
-import click
+"""Miscellaneous helpers live here."""
 import collections
-import getpass
-import inspect
-import json
-import os
-import sys
-import tarfile
-import time
-import yaml
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 from copy import deepcopy
-from logzero import logger
+import getpass
+import inspect
+import json
+import os
 from pathlib import Path
+import sys
+import tarfile
+import threading
+import time
 from uuid import uuid4
 
-from broker import exceptions, settings
-from broker import logger as b_log
+import click
+from logzero import logger
+import yaml
+
+from broker import exceptions, logger as b_log, settings
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
 
 
 def clean_dict(in_dict):
-    """Remove entries from a dict where value is None"""
+    """Remove entries from a dict where value is None."""
     return {k: v for k, v in in_dict.items() if v is not None}
 
 
 def merge_dicts(dict1, dict2):
-    """Merge two nested dictionaries together
+    """Merge two nested dictionaries together.
 
     :return: merged dictionary
     """
@@ -51,7 +51,8 @@ def merge_dicts(dict1, dict2):
 
 
 def flatten_dict(nested_dict, parent_key="", separator="_"):
-    """Flatten a nested dictionary, keeping nested notation in key
+    """Flatten a nested dictionary, keeping nested notation in key.
+
     {
         'key': 'value1',
         'another': {
@@ -66,11 +67,10 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
         "another_nested2": [1, 2],
         "another_nested2_deep": "value3"
     }
-    note that dictionaries nested in lists will be removed from the list
+    note that dictionaries nested in lists will be removed from the list.
 
     :return: dictionary
     """
-
     flattened = []
     for key, value in nested_dict.items():
         new_key = f"{parent_key}{separator}{key}" if parent_key else key
@@ -78,7 +78,8 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
             flattened.extend(flatten_dict(value, new_key, separator).items())
         elif isinstance(value, list):
             to_remove = []
-            value = value.copy()  # avoid mutating nested structures
+            # avoid mutating nested structures
+            value = value.copy()  # noqa: PLW2901
             for index, val in enumerate(value):
                 if isinstance(val, dict):
                     flattened.extend(flatten_dict(val, new_key, separator).items())
@@ -92,9 +93,9 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
 
 
 def dict_from_paths(source_dict, paths):
-    """Given a dictionary of desired keys and nested paths, return a new dictionary
+    """Given a dictionary of desired keys and nested paths, return a new dictionary.
 
-    example:
+    Example:
         source_dict = {
             "key1": "value1",
             "key2": {
@@ -123,24 +124,25 @@ def dict_from_paths(source_dict, paths):
     return result
 
 
-
 def eval_filter(filter_list, raw_filter, filter_key="inv"):
-    """Run each filter through an eval to get the results"""
+    """Run each filter through an eval to get the results."""
     filter_list = [
         MockStub(item) if isinstance(item, dict) else item for item in filter_list
     ]
     for raw_f in raw_filter.split("|"):
         if f"@{filter_key}[" in raw_f:
             # perform a list filter on the inventory
-            filter_list = eval(
+            filter_list = eval(  # noqa: S307
                 raw_f.replace(f"@{filter_key}", filter_key), {filter_key: filter_list}
             )
-            filter_list = filter_list if isinstance(filter_list, list) else [filter_list]
+            filter_list = (
+                filter_list if isinstance(filter_list, list) else [filter_list]
+            )
         elif f"@{filter_key}" in raw_f:
             # perform an attribute filter on each host
             filter_list = list(
                 filter(
-                    lambda item: eval(
+                    lambda item: eval(  # noqa: S307
                         raw_f.replace(f"@{filter_key}", filter_key), {filter_key: item}
                     ),
                     filter_list,
@@ -150,7 +152,7 @@ def eval_filter(filter_list, raw_filter, filter_key="inv"):
 
 
 def resolve_nick(nick):
-    """Checks if the nickname exists. Used to define broker arguments
+    """Check if the nickname exists. Used to define broker arguments.
 
     :param nick: String representing the name of a nick
 
@@ -162,7 +164,7 @@ def resolve_nick(nick):
 
 
 def load_file(file, warn=True):
-    """Verifies existence and loads data from json and yaml files"""
+    """Verify the existence of and load data from json and yaml files."""
     file = Path(file)
     if not file.exists() or file.suffix not in (".json", ".yaml", ".yml"):
         if warn:
@@ -180,8 +182,9 @@ def load_file(file, warn=True):
 
 
 def resolve_file_args(broker_args):
-    """Check for files being passed in as values to arguments,
-    then attempt to resolve them. If not resolved, keep arg/value pair intact.
+    """Check for files being passed in as values to arguments then attempt to resolve them.
+
+    If not resolved, keep arg/value pair intact.
     """
     final_args = {}
     # parse the eventual args_file first
@@ -212,7 +215,7 @@ def resolve_file_args(broker_args):
 
 
 def load_inventory(filter=None):
-    """Loads all local hosts in inventory
+    """Load all local hosts in inventory.
 
     :return: list of dictionaries
     """
@@ -221,7 +224,7 @@ def load_inventory(filter=None):
 
 
 def update_inventory(add=None, remove=None):
-    """Updates list of local hosts in the checkout interface
+    """Update list of local hosts in the checkout interface.
 
     :param add: list of dictionaries representing new hosts
 
@@ -245,10 +248,9 @@ def update_inventory(add=None, remove=None):
                 if host["hostname"] in remove or host.get("name") in remove:
                     # iterate through new hosts and update with old host data if it would nullify
                     for new_host in add:
-                        if (
-                            host["hostname"] == new_host["hostname"]
-                            or host.get("name") == new_host.get("name")
-                        ):
+                        if host["hostname"] == new_host["hostname"] or host.get(
+                            "name"
+                        ) == new_host.get("name"):
                             # update missing data in the new_host with the old_host data
                             new_host.update(merge_dicts(new_host, host))
                     inv_data.remove(host)
@@ -261,7 +263,7 @@ def update_inventory(add=None, remove=None):
 
 
 def yaml_format(in_struct):
-    """Convert a yaml-compatible structure to a yaml dumped string
+    """Convert a yaml-compatible structure to a yaml dumped string.
 
     :param in_struct: yaml-compatible structure or string containing structure
 
@@ -273,23 +275,26 @@ def yaml_format(in_struct):
 
 
 class Emitter:
-    """This class provides a simple interface to emit messages to a
-    json-formatted file. This file also has an instance of this class
-    called "emit" that should be used instead of this class directly.
+    """Class that provides a simple interface to emit messages to a json-formatted file.
+
+    This module also has an instance of this class called "emit" that should be used
+    instead of this class directly.
 
     Usage examples:
         helpers.emit(key=value, another=5)
         helpers.emit({"key": "value", "another": 5})
     """
+
     EMIT_LOCK = threading.Lock()
 
     def __init__(self, emit_file=None):
-        """Can empty init and set the file later"""
+        """Can empty init and set the file later."""
         self.file = None
         if emit_file:
             self.file = self.set_file(emit_file)
 
     def set_file(self, file_path):
+        """Set the file to emit to."""
         if file_path:
             self.file = Path(file_path)
             self.file.parent.mkdir(exist_ok=True, parents=True)
@@ -298,13 +303,14 @@ class Emitter:
             self.file.touch()
 
     def emit_to_file(self, *args, **kwargs):
+        """Emit data to the file, keeping existing data in-place."""
         if not self.file:
             return
         for arg in args:
             if not isinstance(arg, dict):
                 raise exceptions.BrokerError(f"Received an invalid data emission {arg}")
             kwargs.update(arg)
-        for key in kwargs.keys():
+        for key in kwargs:
             if getattr(kwargs[key], "json", None):
                 kwargs[key] = kwargs[key].json
         with self.EMIT_LOCK:
@@ -313,6 +319,7 @@ class Emitter:
             self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
 
     def __call__(self, *args, **kwargs):
+        """Allow emit to be used like a function."""
         return self.emit_to_file(*args, **kwargs)
 
 
@@ -320,10 +327,10 @@ emit = Emitter()
 
 
 class MockStub(UserDict):
-    """Test helper class. Allows for both arbitrary mocking and stubbing"""
+    """Test helper class. Allows for both arbitrary mocking and stubbing."""
 
     def __init__(self, in_dict=None):
-        """Initialize the class and all nested dictionaries"""
+        """Initialize the class and all nested dictionaries."""
         if in_dict is None:
             in_dict = {}
         for key, value in in_dict.items():
@@ -340,9 +347,15 @@ class MockStub(UserDict):
         super().__init__(in_dict)
 
     def __getattr__(self, name):
+        """Fallback to returning self if attribute doesn't exist."""
         return self
 
     def __getitem__(self, key):
+        """Get an item from the dictionary-like object.
+
+        If the key is a string, this method will attempt to get an attribute with that name.
+        If the key is not found, this method will return the object itself.
+        """
         if isinstance(key, str):
             item = getattr(self, key, self)
         try:
@@ -352,31 +365,42 @@ class MockStub(UserDict):
         return item
 
     def __call__(self, *args, **kwargs):
+        """Allow MockStub to be used like a function."""
         return self
 
     def __hash__(self):
+        """Return a hash value for the object.
+
+        The hash value is computed using the hash value of all hashable attributes of the object.
+        """
         return hash(
             tuple(
-                (
-                    kp
-                    for kp in self.__dict__.items()
-                    if isinstance(kp[1], collections.abc.Hashable)
-                )
+                kp
+                for kp in self.__dict__.items()
+                if isinstance(kp[1], collections.abc.Hashable)
             )
         )
 
 
 def update_log_level(ctx, param, value):
+    """Update the log level and file logging settings for the Broker.
+
+    Args:
+        ctx: The Click context object.
+        param: The Click parameter object.
+        value: The new log level value.
+    """
     b_log.set_log_level(value)
     b_log.set_file_logging(value)
 
 
 def set_emit_file(ctx, param, value):
-    global emit
+    """Update the file that the Broker emits data to."""
     emit.set_file(value)
 
 
 def fork_broker():
+    """Fork the Broker process to run in the background."""
     pid = os.fork()
     if pid:
         logger.info(f"Running broker in the background with pid: {pid}")
@@ -385,12 +409,16 @@ def fork_broker():
 
 
 def handle_keyboardinterrupt(*args):
+    """Handle keyboard interrupts gracefully.
+
+    Offer the user a choice between keeping Broker alive in the background or killing it.
+    """
     choice = click.prompt(
         "\nEnding Broker while running won't end processes being monitored.\n"
         "Would you like to switch Broker to run in the background?\n"
         "[y/n]: ",
         type=click.Choice(["y", "n"]),
-        default="n"
+        default="n",
     )
     if choice == "y":
         fork_broker()
@@ -399,10 +427,9 @@ def handle_keyboardinterrupt(*args):
 
 
 def translate_timeout(timeout):
-    """Allows for flexible timeout definitions, converts other units to ms
+    """Allow for flexible timeout definitions, converts other units to ms.
 
     acceptable units are (s)econds, (m)inutes, (h)ours, (d)ays
-
     """
     if isinstance(timeout, str):
         timeout, unit = int(timeout[:-1]), timeout[-1]
@@ -421,12 +448,12 @@ def translate_timeout(timeout):
 
 
 def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeout=1):
-    """Re(Try) a function given its args and kwargs up until a max timeout"""
+    """Re(Try) a function given its args and kwargs up until a max timeout."""
     cmd_args = cmd_args if cmd_args else []
     cmd_kwargs = cmd_kwargs if cmd_kwargs else {}
     try:
         return cmd(*cmd_args, **cmd_kwargs)
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 - Could be anything
         new_wait = _cur_timeout * 2
         if new_wait > max_timeout:
             raise err
@@ -439,16 +466,18 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
 
 
 class Result:
-    """Dummy result class for presenting results in dot access"""
+    """Dummy result class for presenting results in dot access."""
 
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
     def __repr__(self):
+        """Return a string representation of the object."""
         return f"stdout:\n{self.stdout}\nstderr:\n{self.stderr}\nstatus: {self.status}"
 
     @classmethod
     def from_ssh(cls, stdout, channel):
+        """Create a Result object from an SSH channel."""
         return cls(
             stdout=stdout,
             status=channel.get_exit_status(),
@@ -457,6 +486,7 @@ class Result:
 
     @classmethod
     def from_duplexed_exec(cls, duplex_exec):
+        """Create a Result object from a duplexed exec object from the docker library."""
         if duplex_exec.output[0]:
             stdout = duplex_exec.output[0].decode("utf-8")
         else:
@@ -473,6 +503,7 @@ class Result:
 
     @classmethod
     def from_nonduplexed_exec(cls, nonduplex_exec):
+        """Create a Result object from a nonduplexed exec object from the docker library."""
         return cls(
             status=nonduplex_exec.exit_code,
             stdout=nonduplex_exec.output.decode("utf-8"),
@@ -482,6 +513,7 @@ class Result:
 
 def find_origin():
     """Move up the call stack to find tests, fixtures, or cli invocations.
+
     Additionally, return the jenkins url, if it exists.
     """
     prev, jenkins_url = None, os.environ.get("BUILD_URL")
@@ -494,7 +526,7 @@ def find_origin():
             return f"{frame.function}:{frame.filename}", jenkins_url
         if frame.function == "call_fixture_func":
             # attempt to find the test name from the fixture's request object
-            if request := _frame.frame.f_locals.get("request"):
+            if request := _frame.frame.f_locals.get("request"):  # noqa: F821
                 return f"{prev} for {request.node._nodeid}", jenkins_url
             # otherwise, return the fixture name and filename
             return prev or "Uknown fixture", jenkins_url
@@ -504,7 +536,7 @@ def find_origin():
 
 @contextmanager
 def data_to_tempfile(data, path=None, as_tar=False):
-    """Write data to a temporary file and return the path"""
+    """Write data to a temporary file and return the path."""
     path = Path(path or uuid4().hex[-10])
     logger.debug(f"Creating temporary file {path.absolute()}")
     if isinstance(data, bytes):
@@ -524,7 +556,7 @@ def data_to_tempfile(data, path=None, as_tar=False):
 
 @contextmanager
 def temporary_tar(paths):
-    """Create a temporary tar file and return the path"""
+    """Create a temporary tar file and return the path."""
     temp_tar = Path(f"{uuid4().hex[-10]}.tar")
     with tarfile.open(temp_tar, mode="w") as tar:
         for path in paths:

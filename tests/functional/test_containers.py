@@ -139,7 +139,9 @@ def test_broker_multi_manager():
         ubi8={"container_host": "ubi8:latest", "_count": 2},
         ubi9={"container_host": "ubi9:latest"},
     ) as multi_hosts:
-        assert "ubi7" in multi_hosts and "ubi8" in multi_hosts and "ubi9" in multi_hosts
+        assert "ubi7" in multi_hosts
+        assert "ubi8" in multi_hosts
+        assert "ubi9" in multi_hosts
         assert len(multi_hosts["ubi8"]) == 2
         assert multi_hosts["ubi7"][0]._cont_inst.top()["Processes"]
         assert (

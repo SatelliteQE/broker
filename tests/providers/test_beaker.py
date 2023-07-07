@@ -50,14 +50,14 @@ class BeakerBindStub(MockStub):
 
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def bind_stub():
-    yield BeakerBindStub()
+    return BeakerBindStub()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def beaker_stub(bind_stub):
-    yield Beaker(bind=bind_stub)
+    return Beaker(bind=bind_stub)
 
 
 def test_empty_init():
