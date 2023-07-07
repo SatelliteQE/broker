@@ -55,14 +55,14 @@ class ContainerApiStub(MockStub):
                 return MockStub(container)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api_stub():
-    yield ContainerApiStub()
+    return ContainerApiStub()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def container_stub(api_stub):
-    yield Container(bind=api_stub)
+    return Container(bind=api_stub)
 
 
 def test_empty_init():

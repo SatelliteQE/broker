@@ -1,2 +1,2 @@
 workflow: deploy-base-rhel
-deploy_rhel_version: "7.8"
+deploy_rhel_version: "9.1"

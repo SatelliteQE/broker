@@ -106,7 +106,8 @@ def test_multi_manager():
     with Broker.multi_manager(
         test_1={"nick": "test_nick"}, test_2={"nick": "test_nick", "_count": 2}
     ) as host_dict:
-        assert "test_1" in host_dict and "test_2" in host_dict
+        assert "test_1" in host_dict
+        assert "test_2" in host_dict
         assert len(host_dict["test_1"]) == 1
         assert len(host_dict["test_2"]) == 2
         assert host_dict["test_1"][0].hostname == "test.host.example.com"

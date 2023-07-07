@@ -1,12 +1,23 @@
+"""Module providing classes to establish ssh or ssh-like connections to hosts.
+
+Classes:
+    Session - Wrapper around ssh2-python's auth/connection system.
+    InteractiveShell - Wrapper around ssh2-python's non-blocking channel system.
+    ContainerSession - Wrapper around docker-py's exec system.
+
+Note: You typically want to use a Host object instance to create sessions,
+      not these classes directly.
+"""
 from contextlib import contextmanager
-import os
+from pathlib import Path
 import socket
 import tempfile
-from pathlib import Path
+
 from logzero import logger
-from ssh2.session import Session as ssh2_Session
 from ssh2 import sftp as ssh2_sftp
-from broker import helpers
+from ssh2.session import Session as ssh2_Session
+
+from broker import exceptions, helpers
 
 SESSIONS = {}
 
@@ -19,13 +30,24 @@ SFTP_MODE = (
 FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
 
 
-class AuthException(Exception):
-    pass
-
-
 class Session:
+    """Wrapper around ssh2-python's auth/connection system."""
+
     def __init__(self, **kwargs):
-        """Wrapper around ssh2-python's auth/connection system"""
+        """Initialize a Session object.
+
+        kwargs:
+            hostname (str): The hostname or IP address of the remote host. Defaults to 'localhost'.
+            username (str): The username to authenticate with. Defaults to 'root'.
+            timeout (float): The timeout for the connection in seconds. Defaults to 60.
+            port (int): The port number to connect to. Defaults to 22.
+            key_filename (str): The path to the private key file to use for authentication.
+            password (str): The password to use for authentication.
+
+        Raises:
+            AuthException: If no password or key file is provided.
+            FileNotFoundError: If the key file is not found.
+        """
         host = kwargs.get("hostname", "localhost")
         user = kwargs.get("username", "root")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,11 +65,11 @@ class Session:
         elif kwargs.get("password"):
             self.session.userauth_password(user, kwargs["password"])
         else:
-            raise AuthException("No password or key file provided.")
+            raise exceptions.AuthenticationError("No password or key file provided.")
 
     @staticmethod
     def _read(channel):
-        """read the contents of a channel"""
+        """Read the contents of a channel."""
         size, data = channel.read()
         results = ""
         while size > 0:
@@ -62,7 +84,7 @@ class Session:
         )
 
     def run(self, command, timeout=0):
-        """run a command on the host and return the results"""
+        """Run a command on the host and return the results."""
         self.session.set_timeout(helpers.translate_timeout(timeout))
         channel = self.session.open_session()
         channel.execute(
@@ -75,15 +97,15 @@ class Session:
         return results
 
     def shell(self, pty=False):
-        """Create and return an interactive shell instance"""
+        """Create and return an interactive shell instance."""
         channel = self.session.open_session()
         return InteractiveShell(channel, pty)
 
     @contextmanager
     def tail_file(self, filename):
-        """Simulate tailing a file on the remote host
+        """Simulate tailing a file on the remote host.
 
-        example:
+        Example:
             with my_host.session.tail_file("/var/log/messages") as res:
                 # do something that creates new messages
             print(res.stdout)
@@ -97,7 +119,7 @@ class Session:
         res.__dict__.update(result.__dict__)
 
     def sftp_read(self, source, destination=None, return_data=False):
-        """read a remote file into a local destination or return a bytes object if return_data is True"""
+        """Read a remote file into a local destination or return a bytes object if return_data is True."""
         if not return_data:
             if not destination:
                 destination = source
@@ -111,15 +133,15 @@ class Session:
         with sftp.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
         ) as remote:
-            captured_data = bytes()
-            for rc, data in remote:
+            captured_data = b""
+            for _rc, data in remote:
                 captured_data += data
             if return_data:
                 return captured_data
             destination.write_bytes(data)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
-        """sftp write a local file to a remote destination"""
+        """Sftp write a local file to a remote destination."""
         if not destination:
             destination = source
         elif destination.endswith("/"):
@@ -132,7 +154,7 @@ class Session:
             remote.write(data)
 
     def remote_copy(self, source, dest_host, dest_path=None, ensure_dir=True):
-        """Copy a file from this host to another"""
+        """Copy a file from this host to another."""
         dest_path = dest_path or source
         sftp_down = self.session.sftp_init()
         sftp_up = dest_host.session.session.sftp_init()
@@ -140,18 +162,17 @@ class Session:
             dest_host.session.run(f"mkdir -p {Path(dest_path).absolute().parent}")
         with sftp_down.open(
             source, ssh2_sftp.LIBSSH2_FXF_READ, ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
-        ) as download:
-            with sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload:
-                for size, data in download:
-                    upload.write(data)
+        ) as download, sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload:
+            for _size, data in download:
+                upload.write(data)
 
     def scp_write(self, source, destination=None, ensure_dir=True):
-        """scp write a local file to a remote destination"""
+        """SCP write a local file to a remote destination."""
         if not destination:
             destination = source
         elif destination.endswith("/"):
             destination = destination + Path(source).name
-        fileinfo = os.stat(source)
+        fileinfo = (source := Path(source).stat())
         chan = self.session.scp_send64(
             destination,
             fileinfo.st_mode & 0o777,
@@ -161,19 +182,21 @@ class Session:
         )
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
-        with open(source, "rb") as local:
+        with source.open("rb") as local:
             for data in local:
                 chan.write(data)
 
     def __enter__(self):
+        """Return the session object."""
         return self
 
     def __exit__(self, *args):
+        """Close the session."""
         self.session.disconnect()
 
 
 class InteractiveShell:
-    """A helper class that provides an interactive shell interface
+    """A helper class that provides an interactive shell interface.
 
     Preferred use of this class is via its context manager
 
@@ -192,28 +215,29 @@ class InteractiveShell:
         self._chan.shell()
 
     def __enter__(self):
+        """Return the shell object."""
         return self
 
     def __exit__(self, *exc_args):
-        """Close the channel and read stdout/stderr and status"""
+        """Close the channel and read stdout/stderr and status."""
         self._chan.close()
         self.result = Session._read(self._chan)
 
     def __getattribute__(self, name):
-        """Expose non-duplicate attributes from the channel"""
+        """Expose non-duplicate attributes from the channel."""
         try:
             return object.__getattribute__(self, name)
         except AttributeError:
             return getattr(self._chan, name)
 
     def send(self, cmd):
-        """Send a command to the channel, ensuring a newline character"""
+        """Send a command to the channel, ensuring a newline character."""
         if not cmd.endswith("\n"):
             cmd += "\n"
         self._chan.write(cmd)
 
     def stdout(self):
-        """read the contents of a channel's stdout"""
+        """Read the contents of a channel's stdout."""
         if not self._chan.eof():
             _, data = self._chan.read(65535)
             results = data.decode("utf-8")
@@ -227,13 +251,13 @@ class InteractiveShell:
 
 
 class ContainerSession:
-    """An approximation of ssh-based functionality from the Session class"""
+    """An approximation of ssh-based functionality from the Session class."""
 
     def __init__(self, cont_inst):
         self._cont_inst = cont_inst
 
     def run(self, command, demux=True, **kwargs):
-        """This is the container approximation of Session.run"""
+        """Container approximation of Session.run."""
         kwargs.pop("timeout", None)  # Timeouts are set at the client level
         kwargs["demux"] = demux
         if "'" in command:
@@ -242,7 +266,7 @@ class ContainerSession:
                 tmp.seek(0)
                 command = f"/bin/bash {tmp.name}"
                 self.sftp_write(tmp.name)
-        if any([s in command for s in "|&><"]):
+        if any(s in command for s in "|&><"):
             # Containers don't handle pipes, redirects, etc well in a bare exec_run
             command = f"/bin/bash -c '{command}'"
         result = self._cont_inst._cont_inst.exec_run(command, **kwargs)
@@ -253,12 +277,11 @@ class ContainerSession:
         return result
 
     def disconnect(self):
-        """Needed for simple compatability with Session"""
-        pass
+        """Needed for simple compatability with Session."""
 
     @contextmanager
     def tail_file(self, filename):
-        """Simulate tailing a file on the remote host"""
+        """Simulate tailing a file on the remote host."""
         initial_size = int(self.run(f"stat -c %s {filename}").stdout.strip())
         yield (res := helpers.Result())
         # get the contents of the file from the initial size to the end
@@ -266,7 +289,7 @@ class ContainerSession:
         res.__dict__.update(result.__dict__)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
-        """Add one of more files to the container"""
+        """Add one of more files to the container."""
         # ensure source is a list of Path objects
         if not isinstance(source, list):
             source = [Path(source)]
@@ -290,7 +313,7 @@ class ContainerSession:
             self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
 
     def sftp_read(self, source, destination=None, return_data=False):
-        """Get a file or directory from the container"""
+        """Get a file or directory from the container."""
         destination = Path(destination or source)
         logger.debug(f"{self._cont_inst.hostname} getting file {source}")
         data, status = self._cont_inst._cont_inst.get_archive(source)
@@ -316,11 +339,12 @@ class ContainerSession:
                 )
 
     def shell(self, pty=False):
-        """Create and return an interactive shell instance"""
+        """Create and return an interactive shell instance."""
         raise NotImplementedError("ContainerSession.shell has not been implemented")
 
     def __enter__(self):
+        """Return the session object."""
         return self
 
     def __exit__(self, *args):
-        pass
+        """Do nothing on exit."""

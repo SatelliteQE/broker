@@ -72,19 +72,19 @@ class AwxkitApiStub(MockStub):
             return super().pop(item)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api_stub():
-    yield AwxkitApiStub()
+    return AwxkitApiStub()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def config_stub():
-    yield MockStub()
+    return MockStub()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def tower_stub(api_stub, config_stub):
-    yield AnsibleTower(root=api_stub, config=config_stub)
+    return AnsibleTower(root=api_stub, config=config_stub)
 
 
 def test_execute(tower_stub):
