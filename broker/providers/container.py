@@ -1,18 +1,21 @@
+"""Container provider implementation."""
 from functools import cache
 import getpass
 import inspect
 from uuid import uuid4
+
 import click
-from logzero import logger
 from dynaconf import Validator
-from broker import exceptions
-from broker import helpers
-from broker.settings import settings
-from broker.providers import Provider
+from logzero import logger
+
+from broker import exceptions, helpers
 from broker.binds import containers
+from broker.providers import Provider
+from broker.settings import settings
 
 
 def container_info(container_inst):
+    """Return a dict of container information."""
     return {
         "_broker_provider": "Container",
         "name": container_inst.name,
@@ -37,6 +40,7 @@ def _host_release():
 def get_runtime(
     runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None
 ):
+    """Return a runtime instance."""
     return runtime_cls(
         host=host,
         username=username,
@@ -48,6 +52,8 @@ def get_runtime(
 
 @Provider.auto_hide
 class Container(Provider):
+    """Container provider class providing a Broker interface around the container binds."""
+
     _validators = [
         Validator("CONTAINER.runtime", default="podman"),
         Validator("CONTAINER.host", default="localhost"),
@@ -101,7 +107,7 @@ class Container(Provider):
         self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
 
     def _ensure_image(self, name):
-        """Check if an image exists on the provider, attempt a pull if not"""
+        """Check if an image exists on the provider, attempt a pull if not."""
         for image in self.runtime.images:
             if name in image.tags:
                 return
@@ -109,18 +115,18 @@ class Container(Provider):
                 return
         try:
             self.runtime.pull_image(name)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 - This could be a few things
             raise exceptions.ProviderError(
                 "Container", f"Unable to find image: {name}\n{err}"
-            )
+            ) from err
 
     @staticmethod
-    def _find_ssh_port(port_map):
-        """Go through container port map and find the mapping that corresponds to port 22"""
+    def _find_ssh_port(port_map, ssh_port=22):
+        """Go through container port map and find the mapping that corresponds to port 22."""
         if isinstance(port_map, list):
             # [{'hostPort': 1337, 'containerPort': 22, 'protocol': 'tcp', 'hostIP': ''},
             for pm in port_map:
-                if pm["containerPort"] == 22:
+                if pm["containerPort"] == ssh_port:
                     return pm["hostPort"]
         elif isinstance(port_map, dict):
             # {'22/tcp': [{'HostIp': '', 'HostPort': '1337'}],
@@ -141,13 +147,15 @@ class Container(Provider):
         )
 
     def _port_mapping(self, image, **kwargs):
-        """
-        22
-        22:1337
-        22/tcp
-        22/tcp:1337
-        22,23
-        22:1337 23:1335
+        """Create a mapping of ports to expose on the container.
+
+        Accepted `ports` formats:
+            22
+            22:1337
+            22/tcp
+            22/tcp:1337
+            22,23
+            22:1337 23:1335.
         """
         mapping = {}
         if ports := kwargs.pop("ports", None):
@@ -172,14 +180,14 @@ class Container(Provider):
         return mapping
 
     def _cont_inst_by_name(self, cont_name):
-        """Attempt to find and return a container by its name"""
+        """Attempt to find and return a container by its name."""
         for cont_inst in self.runtime.containers:
             if cont_inst.name == cont_name:
                 return cont_inst
         logger.error(f"Unable to find container by name {cont_name}")
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        """Constructs broker host from a container instance
+        """Construct a broker host from a container instance.
 
         :param provider_params: a container instance object
 
@@ -214,7 +222,7 @@ class Container(Provider):
     def provider_help(
         self, container_hosts=False, container_host=None, container_apps=False, **kwargs
     ):
-        """Useful information about container images"""
+        """Return useful information about container images."""
         results_limit = kwargs.get("results_limit", settings.container.results_limit)
         if container_host:
             logger.info(
@@ -241,7 +249,7 @@ class Container(Provider):
             logger.info(f"Available app images:\n{images}")
 
     def get_inventory(self, name_prefix):
-        """Get all containers that have a matching name prefix"""
+        """Get all containers that have a matching name prefix."""
         name_prefix = name_prefix or self._name_prefix
         return [
             container_info(cont)
@@ -250,14 +258,15 @@ class Container(Provider):
         ]
 
     def extend(self):
-        pass
+        """There is no need to extend a continer-ased host."""
 
     def release(self, host_obj):
+        """Remove a container-based host from the container host."""
         host_obj._cont_inst.remove(force=True)
 
     @Provider.register_action("container_host")
     def run_container(self, container_host, **kwargs):
-        """Start a container based on an image name (container_host)"""
+        """Start a container based on an image name (container_host)."""
         self._ensure_image(container_host)
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
@@ -282,10 +291,11 @@ class Container(Provider):
 
     @Provider.register_action("container_app")
     def execute(self, container_app, **kwargs):
-        """Run a container and return the raw results"""
+        """Run a container and return the raw results."""
         return self.runtime.execute(container_app, **kwargs)
 
     def run_wait_container(self, image_name, **kwargs):
+        """Run a container and wait for it to exit."""
         cont_inst = self.run_container(image_name, **kwargs)
         cont_inst.wait(condition="excited")
         return self.runtime.get_logs(cont_inst)

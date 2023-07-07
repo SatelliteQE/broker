@@ -1,9 +1,11 @@
+"""A test provider for use in unit tests."""
 import inspect
-from broker import helpers
-from dynaconf import Validator
-from broker.settings import settings
-from broker.providers import Provider
 
+from dynaconf import Validator
+
+from broker import helpers
+from broker.providers import Provider
+from broker.settings import settings
 
 HOST_PROPERTIES = {
     "basic": {
@@ -16,6 +18,8 @@ HOST_PROPERTIES = {
 
 
 class TestProvider(Provider):
+    """Basic TestProvider class to test the Provider interface."""
+
     __test__ = False  # don't use for testing
     hidden = True  # hide from click command generation
     _validators = [Validator("TESTPROVIDER.foo", must_exist=True)]
@@ -41,6 +45,7 @@ class TestProvider(Provider):
         )
 
     def construct_host(self, provider_params, host_classes, **kwargs):
+        """Construct a host object from the provider_params and kwargs."""
         if provider_params:
             host_params = provider_params.copy()
             host_params.update(kwargs)
@@ -52,6 +57,7 @@ class TestProvider(Provider):
 
     @Provider.register_action()
     def test_action(self, **kwargs):
+        """A dummy action for testing."""
         action = kwargs.get("test_action")
         if action == "release":
             return "released", kwargs
@@ -60,15 +66,17 @@ class TestProvider(Provider):
         return HOST_PROPERTIES["basic"]
 
     def release(self, host_obj):
+        """Release a host ;) ."""
         return self.test_action(test_action="release", **host_obj.to_dict())
 
     def extend(self):
-        pass
+        """No current implementation for this provider."""
 
     def get_inventory(self, *args, **kwargs):
+        """Load a filtered local inventory."""
         return helpers.load_inventory(
             filter=f'@inv._broker_provider == "{self.__class__.__name__}"'
         )
 
     def provider_help(self):
-        pass
+        """No current implementation for this provider."""

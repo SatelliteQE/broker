@@ -1,9 +1,22 @@
-import os
-import click
+"""Broker settings module.
+
+Useful items:
+    settings: The settings object.
+    init_settings: Function to initialize the settings file.
+    validate_settings: Function to validate the settings file.
+    interactive_mode: Whether or not Broker is running in interactive mode.
+    BROKER_DIRECTORY: The directory where Broker looks for its files.
+    settings_path: The path to the settings file.
+    inventory_path: The path to the inventory file.
+"""
 import inspect
+import os
 from pathlib import Path
+
+import click
 from dynaconf import Dynaconf, Validator
 from dynaconf.validator import ValidationError
+
 from broker.exceptions import ConfigurationError
 
 
@@ -22,7 +35,7 @@ def init_settings(settings_path, interactive=False):
         import requests
 
         click.echo(f"Downloading example file from: {raw_url}")
-        raw_file = requests.get(raw_url)
+        raw_file = requests.get(raw_url, timeout=60)
         settings_path.write_text(raw_file.text)
         if interative_mode:
             try:
@@ -40,7 +53,7 @@ def init_settings(settings_path, interactive=False):
 
 interative_mode = False
 # GitHub action context
-if not "GITHUB_WORKFLOW" in os.environ:
+if "GITHUB_WORKFLOW" not in os.environ:
     # determine if we're being ran from a CLI
     for frame in inspect.stack()[::-1]:
         if "/bin/broker" in frame.filename:
@@ -104,6 +117,6 @@ try:
 except ValidationError as err:
     raise ConfigurationError(
         f"Configuration error in {settings_path.absolute()}: {err.args[0]}"
-    )
+    ) from err
 
 os.environ.update(vault_vars)

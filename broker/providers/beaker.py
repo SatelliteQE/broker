@@ -1,7 +1,10 @@
-import click
+"""Beaker provider implementation."""
 import inspect
+
+import click
 from dynaconf import Validator
 from logzero import logger
+
 from broker import helpers
 from broker.binds.beaker import BeakerBind
 from broker.exceptions import BrokerError, ProviderError
@@ -9,8 +12,10 @@ from broker.hosts import Host
 from broker.providers import Provider
 from broker.settings import settings
 
+
 @Provider.auto_hide
 class Beaker(Provider):
+    """Beaker provider class providing a Broker interface around the Beaker bind."""
 
     _validators = [
         Validator("beaker.hub_url", must_exist=True),
@@ -42,7 +47,6 @@ class Beaker(Provider):
             help="Number of hours to extend the job. Must be between 1 and 99",
         )
     ]
-
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -91,7 +95,7 @@ class Beaker(Provider):
         return curated_host_info
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        """Constructs broker host from a beaker system information
+        """Construct a broker host from a beaker system information.
 
         :param provider_params: a beaker system information dictionary
 
@@ -107,13 +111,16 @@ class Beaker(Provider):
             # cont_inst = self._cont_inst_by_name(host_inst.name)
             self._set_attributes(host_inst, broker_args=kwargs)
         else:
-            host_info = self._compile_host_info(provider_params["hostname"], broker_info=False)
+            host_info = self._compile_host_info(
+                provider_params["hostname"], broker_info=False
+            )
             host_inst = host_classes[kwargs.get("type", "host")](**provider_params)
             self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=host_info)
         return host_inst
 
     @Provider.register_action("job_xml", "job_id")
     def submit_job(self, max_wait=None, **kwargs):
+        """Submit a job to Beaker and wait for it to complete."""
         job = kwargs.get("job_xml") or kwargs.get("job_id")
         max_wait = max_wait or settings.beaker.get("max_job_wait")
         result = self.runtime.execute_job(job, max_wait)
@@ -121,6 +128,7 @@ class Beaker(Provider):
         return result
 
     def provider_help(self, jobs=False, job=None, **kwargs):
+        """Print useful information from the Beaker provider."""
         results_limit = kwargs.get("results_limit", settings.container.results_limit)
         if job:
             if not job.startswith("J:"):
@@ -133,12 +141,13 @@ class Beaker(Provider):
             result = "\n".join(result[:results_limit])
             logger.info(f"Available jobs:\n{result}")
 
-
     def release(self, host_name, job_id):
+        """Release a hosts reserved from Beaker by cancelling the job."""
         return self.runtime.job_cancel(job_id)
         # return self.runtime.system_release(host_name)
 
     def extend(self, host_name, extend_duration=99):
+        """Extend the duration of a Beaker reservation."""
         try:
             Host(hostname=host_name).execute(
                 f"/usr/bin/extendtesttime.sh {extend_duration}"
@@ -147,10 +156,11 @@ class Beaker(Provider):
             raise ProviderError(
                 f"Failed to extend host {host_name}: {err}\n"
                 f"Try running: root@{host_name} /usr/bin/extendtesttime.sh {extend_duration}"
-            )
+            ) from err
 
     def get_inventory(self, *args):
+        """Get a list of hosts and their information from Beaker."""
         hosts = self.runtime.user_systems()
-        with click.progressbar(hosts, label='Compiling host information') as hosts_bar:
+        with click.progressbar(hosts, label="Compiling host information") as hosts_bar:
             compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
         return compiled_host_info
