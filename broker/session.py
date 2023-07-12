@@ -302,9 +302,7 @@ class ContainerSession:
         destination = destination or f"{source[0].parent}/"
         # Files need to be added to a tarfile
         with helpers.temporary_tar(source) as tar:
-            logger.debug(
-                f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
-            )
+            logger.debug(f"{self._cont_inst.hostname} adding file(s) {source} to {destination}")
             if ensure_dir:
                 if destination.endswith("/"):
                     self.run(f"mkdir -m 666 -p {destination}")
@@ -334,9 +332,7 @@ class ContainerSession:
                     destination.write_bytes(f.read())
             else:
                 logger.warning("More than one member was found in the tar file.")
-                tar.extractall(
-                    destination.parent if destination.is_file() else destination
-                )
+                tar.extractall(destination.parent if destination.is_file() else destination)
 
     def shell(self, pty=False):
         """Create and return an interactive shell instance."""

@@ -69,8 +69,7 @@ class mp_decorator:
             max_workers_count = self.MAX_WORKERS or count
             with self.EXECUTOR(max_workers=max_workers_count) as workers:
                 completed_futures = as_completed(
-                    workers.submit(self.func, instance, *args, **kwargs)
-                    for _ in range(count)
+                    workers.submit(self.func, instance, *args, **kwargs) for _ in range(count)
                 )
                 for f in completed_futures:
                     results.extend(f.result())
@@ -122,9 +121,7 @@ class Broker:
             }
         )
         method_obj = getattr(provider_inst, method)
-        logger.debug(
-            f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}."
-        )
+        logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
         result = method_obj(**self._kwargs)
         logger.debug(f"Action {result=}")
         if result and checkout:
@@ -238,9 +235,7 @@ class Broker:
                 hosts = [hosts]
             if in_context:
                 hosts = [
-                    host
-                    for host in hosts
-                    if not getattr(host, "_skip_context_checkin", False)
+                    host for host in hosts if not getattr(host, "_skip_context_checkin", False)
                 ]
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
@@ -255,9 +250,7 @@ class Broker:
             for completed in completed_checkins:
                 _host = completed.result()
                 self._hosts = [h for h in self._hosts if h.to_dict() != _host.to_dict()]
-                logger.debug(
-                    f"Completed checkin process for {_host.hostname or _host.name}"
-                )
+                logger.debug(f"Completed checkin process for {_host.hostname or _host.name}")
         helpers.update_inventory(remove=[h.hostname for h in hosts])
 
     def _extend(self, host):
@@ -297,9 +290,7 @@ class Broker:
             return
 
         with ThreadPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
-            completed_extends = as_completed(
-                workers.submit(self._extend, _host) for _host in hosts
-            )
+            completed_extends = as_completed(workers.submit(self._extend, _host) for _host in hosts)
             for completed in completed_extends:
                 _host = completed.result()
                 logger.info(f"Completed extend for {_host.hostname or _host.name}")
@@ -320,9 +311,7 @@ class Broker:
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
             hostname if (hostname := host.get("hostname")) else host.get("name")
-            for host in helpers.load_inventory(
-                filter=f'@inv._broker_provider == "{provider}"'
-            )
+            for host in helpers.load_inventory(filter=f'@inv._broker_provider == "{provider}"')
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
@@ -390,18 +379,14 @@ class Broker:
             all_hosts.extend(broker_inst._hosts)
         # run setup on all hosts in parallel
         with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
-            completed_setups = as_completed(
-                workers.submit(host.setup) for host in all_hosts
-            )
+            completed_setups = as_completed(workers.submit(host.setup) for host in all_hosts)
             for completed in completed_setups:
                 completed.result()
         # yield control to the user
         yield {name: broker._hosts for name, broker in broker_instances.items()}
         # teardown all hosts in parallel
         with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
-            completed_teardowns = as_completed(
-                workers.submit(host.teardown) for host in all_hosts
-            )
+            completed_teardowns = as_completed(workers.submit(host.teardown) for host in all_hosts)
             for completed in completed_teardowns:
                 completed.result()
         # checkin all hosts in parallel

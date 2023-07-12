@@ -67,9 +67,7 @@ def patch_awx_for_verbosity(api):
         func = getattr(cls, name)
 
         def the_patch(self, *args, **kwargs):
-            awx_log.log(
-                LOG_LEVEL.TRACE.value, f"Calling {self=} {func=}(*{args=}, **{kwargs=}"
-            )
+            awx_log.log(LOG_LEVEL.TRACE.value, f"Calling {self=} {func=}(*{args=}, **{kwargs=}")
             retval = func(self, *args, **kwargs)
             awx_log.log(
                 LOG_LEVEL.TRACE.value,
@@ -96,8 +94,7 @@ def formatter_factory(log_level, color=True):
     """Create a logzero formatter based on the log level."""
     log_fmt = "%(color)s[%(levelname)s %(asctime)s]%(end_color)s %(message)s"
     debug_fmt = (
-        "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d]"
-        "%(end_color)s %(message)s"
+        "%(color)s[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d]%(end_color)s %(message)s"
     )
     formatter = logzero.LogFormatter(
         fmt=debug_fmt if log_level <= LOG_LEVEL.DEBUG else log_fmt, color=color

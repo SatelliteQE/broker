@@ -50,17 +50,13 @@ class Host:
             import inspect
 
             if any(f.function == "reconstruct_host" for f in inspect.stack()):
-                logger.debug(
-                    "Ignoring missing hostname and ip for checkin reconstruction."
-                )
+                logger.debug("Ignoring missing hostname and ip for checkin reconstruction.")
             else:
                 raise HostError("Host must be constructed with a hostname or ip")
         self.name = kwargs.pop("name", None)
         self.username = kwargs.pop("username", settings.HOST_USERNAME)
         self.password = kwargs.pop("password", settings.HOST_PASSWORD)
-        self.timeout = kwargs.pop(
-            "connection_timeout", settings.HOST_CONNECTION_TIMEOUT
-        )
+        self.timeout = kwargs.pop("connection_timeout", settings.HOST_CONNECTION_TIMEOUT)
         self.port = kwargs.pop("port", settings.HOST_SSH_PORT)
         self.key_filename = kwargs.pop("key_filename", settings.HOST_SSH_KEY_FILENAME)
         self.__dict__.update(kwargs)  # Make every other kwarg an attribute
@@ -88,9 +84,7 @@ class Host:
                 self.connect()
         return self._session
 
-    def connect(
-        self, username=None, password=None, timeout=None, port=22, key_filename=None
-    ):
+    def connect(self, username=None, password=None, timeout=None, port=22, key_filename=None):
         """Connect to the host using SSH.
 
         Args:

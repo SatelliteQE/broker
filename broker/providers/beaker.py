@@ -103,17 +103,13 @@ class Beaker(Provider):
 
         :return: constructed broker host object
         """
-        logger.debug(
-            f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}"
-        )
+        logger.debug(f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}")
         if not provider_params:
             host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
             # cont_inst = self._cont_inst_by_name(host_inst.name)
             self._set_attributes(host_inst, broker_args=kwargs)
         else:
-            host_info = self._compile_host_info(
-                provider_params["hostname"], broker_info=False
-            )
+            host_info = self._compile_host_info(provider_params["hostname"], broker_info=False)
             host_inst = host_classes[kwargs.get("type", "host")](**provider_params)
             self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=host_info)
         return host_inst
@@ -149,9 +145,7 @@ class Beaker(Provider):
     def extend(self, host_name, extend_duration=99):
         """Extend the duration of a Beaker reservation."""
         try:
-            Host(hostname=host_name).execute(
-                f"/usr/bin/extendtesttime.sh {extend_duration}"
-            )
+            Host(hostname=host_name).execute(f"/usr/bin/extendtesttime.sh {extend_duration}")
         except BrokerError as err:
             raise ProviderError(
                 f"Failed to extend host {host_name}: {err}\n"
