@@ -66,9 +66,7 @@ def test_broker_checkin_n_sync_empty_hostname():
     assert hosts[0].hostname is None
     broker_inst = broker.Broker(hosts=hosts)
     broker_inst.checkin()
-    assert (
-        not broker_inst.from_inventory()
-    ), "Host was not removed from inventory after checkin"
+    assert not broker_inst.from_inventory(), "Host was not removed from inventory after checkin"
 
 
 def test_mp_checkout():

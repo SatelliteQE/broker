@@ -21,6 +21,7 @@ class BeakerBindStub(MockStub):
      - self.runtime.job_list(**kwargs).stdout.splitlines()
      - self.runtime.user_systems()
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.job_id = "1234567"
@@ -39,7 +40,7 @@ class BeakerBindStub(MockStub):
             "reservation_id": "1267",
             "reserved_on": "2023-01-01 00:00:00",
             "expires_on": "2025-01-01 00:00:00",
-            "reserved_for": "anotheruser <auser@test.com>"
+            "reserved_for": "anotheruser <auser@test.com>",
         }
 
     def execute_job(self, job_xml, max_wait):
@@ -47,7 +48,6 @@ class BeakerBindStub(MockStub):
 
     def user_systems(self):
         return ["test.example.com", "test2.example.com"]
-
 
 
 @pytest.fixture

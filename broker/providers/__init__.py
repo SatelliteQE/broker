@@ -42,9 +42,7 @@ from broker.settings import settings
 
 # populate a list of all provider module names
 _provider_imports = [
-    f.stem
-    for f in Path(__file__).parent.glob("*.py")
-    if f.is_file() and f.stem != "__init__"
+    f.stem for f in Path(__file__).parent.glob("*.py") if f.is_file() and f.stem != "__init__"
 ]
 
 # ProviderName: ProviderClassObject
@@ -74,9 +72,7 @@ class ProviderMeta(ABCMeta):
                                 new_cls,
                                 isinstance(param.default, bool),
                             )
-                            logger.debug(
-                                f"Registered help option {name} for provider {name}"
-                            )
+                            logger.debug(f"Registered help option {name} for provider {name}")
                 elif hasattr(obj, "_as_action"):
                     for action in obj._as_action:
                         PROVIDER_ACTIONS[action] = (new_cls, attr)
@@ -139,10 +135,7 @@ class Provider(metaclass=ProviderMeta):
                 if instance_name in candidate:
                     instance = candidate
                     break
-                elif (
-                    candidate.values()[0].get("default")
-                    or len(fresh_settings.instances) == 1
-                ):
+                elif candidate.values()[0].get("default") or len(fresh_settings.instances) == 1:
                     instance = candidate
             self.instance, *_ = instance  # store the instance name on the provider
             fresh_settings.update(inst_vals := instance.values()[0])

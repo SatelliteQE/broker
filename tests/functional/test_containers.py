@@ -23,9 +23,7 @@ def temp_inventory():
     """Temporarily move the local inventory, then move it back when done"""
     backup_path = inventory_path.rename(f"{inventory_path.absolute()}.bak")
     yield
-    CliRunner().invoke(
-        cli, ["checkin", "--all", "--filter", "_broker_provider<Container"]
-    )
+    CliRunner().invoke(cli, ["checkin", "--all", "--filter", "_broker_provider<Container"])
     inventory_path.unlink()
     backup_path.rename(inventory_path)
 
@@ -60,9 +58,7 @@ def test_containerhosts_list():
 
 
 def test_containerhost_query():
-    result = CliRunner().invoke(
-        cli, ["providers", "Container", "--container-host", "ubi8:latest"]
-    )
+    result = CliRunner().invoke(cli, ["providers", "Container", "--container-host", "ubi8:latest"])
     assert result.exit_code == 0
 
 
@@ -80,9 +76,7 @@ def test_container_e2e():
         res = c_host.execute(f"ls {remote_dir}")
         assert str(loc_settings_path) in res.stdout
         with NamedTemporaryFile() as tmp:
-            c_host.session.sftp_read(
-                f"{remote_dir}/{loc_settings_path.name}", tmp.file.name
-            )
+            c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
             data = c_host.session.sftp_read(
                 f"{remote_dir}/{loc_settings_path.name}", return_data=True
             )
@@ -92,9 +86,7 @@ def test_container_e2e():
             assert (
                 loc_settings_path.read_bytes() == data
             ), "Local file is different from the received one (return_data=True)"
-            assert (
-                data == Path(tmp.file.name).read_bytes()
-            ), "Received files do not match"
+            assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test the tail_file context manager
         tailed_file = f"{remote_dir}/tail_me.txt"
         c_host.execute(f"echo 'hello world' > {tailed_file}")
@@ -116,9 +108,7 @@ def test_container_e2e_mp():
             res = c_host.execute(f"ls {remote_dir}")
             assert str(loc_settings_path) in res.stdout
             with NamedTemporaryFile() as tmp:
-                c_host.session.sftp_read(
-                    f"{remote_dir}/{loc_settings_path.name}", tmp.file.name
-                )
+                c_host.session.sftp_read(f"{remote_dir}/{loc_settings_path.name}", tmp.file.name)
                 data = c_host.session.sftp_read(
                     f"{remote_dir}/{loc_settings_path.name}", return_data=True
                 )
@@ -128,9 +118,7 @@ def test_container_e2e_mp():
                 assert (
                     loc_settings_path.read_bytes() == data
                 ), "Local file is different from the received one (return_data=True)"
-                assert (
-                    data == Path(tmp.file.name).read_bytes()
-                ), "Received files do not match"
+                assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
 
 
 def test_broker_multi_manager():

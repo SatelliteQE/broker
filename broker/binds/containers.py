@@ -39,9 +39,7 @@ class ContainerBind:
                 "id": image.short_id,
                 "tags": image.tags,
                 "size": image.attrs["Size"],
-                "config": {
-                    k: v for k, v in image.attrs["Config"].items() if k != "Env"
-                },
+                "config": {k: v for k, v in image.attrs["Config"].items() if k != "Env"},
             }
 
     def create_container(self, image, command=None, **kwargs):
@@ -51,9 +49,7 @@ class ContainerBind:
 
     def execute(self, image, command=None, remove=True, **kwargs):
         """Run a container and return the raw result."""
-        return self.client.containers.run(
-            image, command=command, remove=remove, **kwargs
-        ).decode()
+        return self.client.containers.run(image, command=command, remove=remove, **kwargs).decode()
 
     def remove_container(self, container=None):
         """Remove a container from the container host."""
@@ -102,11 +98,7 @@ class PodmanBind(ContainerBind):
         if self.host == "localhost":
             self.uri = "unix:///run/user/1000/podman/podman.sock"
         else:
-            self.uri = (
-                "http+ssh://{username}@{host}:{port}/run/podman/podman.sock".format(
-                    **kwargs
-                )
-            )
+            self.uri = "http+ssh://{username}@{host}:{port}/run/podman/podman.sock".format(**kwargs)
 
     def _sanitize_create_args(self, kwargs):
         from podman.domain.containers_create import CreateMixin
