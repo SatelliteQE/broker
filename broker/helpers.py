@@ -126,18 +126,14 @@ def dict_from_paths(source_dict, paths):
 
 def eval_filter(filter_list, raw_filter, filter_key="inv"):
     """Run each filter through an eval to get the results."""
-    filter_list = [
-        MockStub(item) if isinstance(item, dict) else item for item in filter_list
-    ]
+    filter_list = [MockStub(item) if isinstance(item, dict) else item for item in filter_list]
     for raw_f in raw_filter.split("|"):
         if f"@{filter_key}[" in raw_f:
             # perform a list filter on the inventory
             filter_list = eval(  # noqa: S307
                 raw_f.replace(f"@{filter_key}", filter_key), {filter_key: filter_list}
             )
-            filter_list = (
-                filter_list if isinstance(filter_list, list) else [filter_list]
-            )
+            filter_list = filter_list if isinstance(filter_list, list) else [filter_list]
         elif f"@{filter_key}" in raw_f:
             # perform an attribute filter on each host
             filter_list = list(
@@ -189,9 +185,7 @@ def resolve_file_args(broker_args):
     final_args = {}
     # parse the eventual args_file first
     if val := broker_args.pop("args_file", None):
-        if isinstance(val, Path) or (
-            isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
-        ):
+        if isinstance(val, Path) or (isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")):
             if data := load_file(val):
                 if isinstance(data, dict):
                     final_args.update(data)
@@ -202,9 +196,7 @@ def resolve_file_args(broker_args):
                 raise exceptions.BrokerError(f"No data loaded from {val}")
 
     for key, val in broker_args.items():
-        if isinstance(val, Path) or (
-            isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")
-        ):
+        if isinstance(val, Path) or (isinstance(val, str) and val[-4:] in ("json", "yaml", ".yml")):
             if data := load_file(val):
                 final_args.update({key: data})
             else:
@@ -374,11 +366,7 @@ class MockStub(UserDict):
         The hash value is computed using the hash value of all hashable attributes of the object.
         """
         return hash(
-            tuple(
-                kp
-                for kp in self.__dict__.items()
-                if isinstance(kp[1], collections.abc.Hashable)
-            )
+            tuple(kp for kp in self.__dict__.items() if isinstance(kp[1], collections.abc.Hashable))
         )
 
 
@@ -553,9 +541,7 @@ def find_origin():
     """
     prev, jenkins_url = None, os.environ.get("BUILD_URL")
     for frame in inspect.stack():
-        if frame.function == "checkout" and frame.filename.endswith(
-            "broker/commands.py"
-        ):
+        if frame.function == "checkout" and frame.filename.endswith("broker/commands.py"):
             return f"broker_cli:{getpass.getuser()}", jenkins_url
         if frame.function.startswith("test_"):
             return f"{frame.function}:{frame.filename}", jenkins_url

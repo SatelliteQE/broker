@@ -165,9 +165,9 @@ def cli(version):
             import requests
 
             latest_version = Version(
-                requests.get("https://pypi.org/pypi/broker/json", timeout=60).json()[
-                    "info"
-                ]["version"]
+                requests.get("https://pypi.org/pypi/broker/json", timeout=60).json()["info"][
+                    "version"
+                ]
             )
             if latest_version > Version(broker_version):
                 click.secho(
@@ -187,9 +187,7 @@ def cli(version):
 @loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
-@click.option(
-    "-c", "--count", type=int, help="Number of times broker repeats the checkout"
-)
+@click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
 @click.option(
     "--args-file",
     type=click.Path(exists=True),
@@ -238,9 +236,7 @@ populate_providers(providers)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
 @click.option("--sequential", is_flag=True, help="Run checkins sequentially")
-@click.option(
-    "--filter", type=str, help="Checkin only what matches the specified filter"
-)
+@click.option("--filter", type=str, help="Checkin only what matches the specified filter")
 def checkin(vm, background, all_, sequential, filter):
     """Checkin or "remove" a VM or series of VM broker instances.
 
@@ -251,12 +247,7 @@ def checkin(vm, background, all_, sequential, filter):
     inventory = helpers.load_inventory(filter=filter)
     to_remove = []
     for num, host in enumerate(inventory):
-        if (
-            str(num) in vm
-            or host.get("hostname") in vm
-            or host.get("name") in vm
-            or all_
-        ):
+        if str(num) in vm or host.get("hostname") in vm or host.get("name") in vm or all_:
             to_remove.append(Broker().reconstruct_host(host))
     Broker(hosts=to_remove).checkin(sequential=sequential)
 
@@ -268,9 +259,7 @@ def checkin(vm, background, all_, sequential, filter):
     type=str,
     help="Class-style name of a supported broker provider. (AnsibleTower)",
 )
-@click.option(
-    "--filter", type=str, help="Display only what matches the specified filter"
-)
+@click.option("--filter", type=str, help="Display only what matches the specified filter")
 def inventory(details, sync, filter):
     """Get a list of all VMs you've checked out showing hostname and local id.
 
@@ -297,9 +286,7 @@ def inventory(details, sync, filter):
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
 @click.option("--sequential", is_flag=True, help="Run extends sequentially")
-@click.option(
-    "--filter", type=str, help="Extend only what matches the specified filter"
-)
+@click.option("--filter", type=str, help="Extend only what matches the specified filter")
 @provider_options
 def extend(vm, background, all_, sequential, filter, **kwargs):
     """Extend a host's lease time.
@@ -319,16 +306,10 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
 
 @loggedcli()
 @click.argument("vm", type=str, nargs=-1)
-@click.option(
-    "-b", "--background", is_flag=True, help="Run duplicate in the background"
-)
-@click.option(
-    "-c", "--count", type=int, help="Number of times broker repeats the duplicate"
-)
+@click.option("-b", "--background", is_flag=True, help="Run duplicate in the background")
+@click.option("-c", "--count", type=int, help="Number of times broker repeats the duplicate")
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
-@click.option(
-    "--filter", type=str, help="Duplicate only what matches the specified filter"
-)
+@click.option("--filter", type=str, help="Duplicate only what matches the specified filter")
 def duplicate(vm, background, count, all_, filter):
     """Duplicate a broker-procured vm.
 
@@ -347,17 +328,13 @@ def duplicate(vm, background, count, all_, filter):
                 broker_inst = Broker(**broker_args)
                 broker_inst.checkout()
             else:
-                logger.warning(
-                    f"Unable to duplicate {host['hostname']}, no _broker_args found"
-                )
+                logger.warning(f"Unable to duplicate {host['hostname']}, no _broker_args found")
 
 
 @loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
-@click.option(
-    "--output-format", "-o", type=click.Choice(["log", "raw", "yaml"]), default="log"
-)
+@click.option("--output-format", "-o", type=click.Choice(["log", "raw", "yaml"]), default="log")
 @click.option(
     "--artifacts",
     type=click.Choice(["merge", "last"]),

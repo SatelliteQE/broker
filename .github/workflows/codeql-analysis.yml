@@ -20,11 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11"]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
@@ -35,14 +35,12 @@ jobs:
         uses: github/codeql-action/analyze@v2
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Run Ruff Checks
-        uses: chartboost/ruff-action@v1
-        with:
-          src: ./broker
+      - name: Pre Commit Checks
+        uses: pre-commit/action@v3.0.0
 
       - name: Setup Temp Directory
         run: mkdir broker_dir
@@ -52,7 +50,7 @@ jobs:
           BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
         run: |
           pip install -U pip
-          pip install -U .[test,docker]
+          pip install -U .[dev,docker]
           ls -l "$BROKER_DIRECTORY"
           broker --version
           pytest -v tests/ --ignore tests/functional

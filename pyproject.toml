@@ -1,3 +1,84 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "wheel", "twine"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "broker"
+description = "The infrastructure middleman."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE", name = "GNU General Public License v3"}
+keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker"]
+authors = [
+    {name = "Jacob J Callahan", email = "jacob.callahan05@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "awxkit",
+    "click",
+    "dynaconf<4.0.0",
+    "logzero",
+    "pyyaml",
+    "setuptools",
+    "ssh2-python",
+]
+dynamic = ["version"]  # dynamic fields to update on build - version via setuptools_scm
+
+[project.urls]
+Repository = "https://github.com/SatelliteQE/broker"
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "ruff"
+]
+docker = [
+    "docker",
+    "paramiko"
+]
+podman = ["podman-py"]
+beaker = ["beaker-client"]
+
+[project.scripts]
+broker = "broker.commands:cli"
+
+[tool.setuptools]
+platforms = ["any"]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["broker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-v", "-l", "--color=yes", "--code-highlight=yes"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | build
+  | dist
+  | tests/data
+)/
+'''
+
+[tool.ruff]
+exclude = ["tests/"]
 target-version = "py311"
 fixable = ["ALL"]
 
@@ -81,18 +162,18 @@ ignore = [
     "D107", # Missing docstring in __init__
 ]
 
-[flake8-pytest-style]
+[tool.ruff.flake8-pytest-style]
 fixture-parentheses = false
 
-[isort]
+[tool.ruff.isort]
 force-sort-within-sections = true
 known-first-party = [
     "broker",
 ]
 combine-as-imports = true
 
-[per-file-ignores]
+[tool.ruff.per-file-ignores]
 # None at this time
 
-[mccabe]
+[tool.ruff.mccabe]
 max-complexity = 25

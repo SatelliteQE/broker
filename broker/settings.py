@@ -22,7 +22,9 @@ from broker.exceptions import ConfigurationError
 
 def init_settings(settings_path, interactive=False):
     """Initialize the broker settings file."""
-    raw_url = "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
+    raw_url = (
+        "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
+    )
     if (
         not interactive
         or click.prompt(
@@ -46,9 +48,7 @@ def init_settings(settings_path, interactive=False):
                     fg="yellow",
                 )
     else:
-        raise ConfigurationError(
-            f"Broker settings file not found at {settings_path.absolute()}."
-        )
+        raise ConfigurationError(f"Broker settings file not found at {settings_path.absolute()}.")
 
 
 interative_mode = False
@@ -75,9 +75,7 @@ settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 if not settings_path.exists():
-    click.secho(
-        f"Broker settings file not found at {settings_path.absolute()}.", fg="red"
-    )
+    click.secho(f"Broker settings file not found at {settings_path.absolute()}.", fg="red")
     init_settings(settings_path, interactive=interative_mode)
 
 validators = [

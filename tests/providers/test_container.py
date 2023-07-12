@@ -22,9 +22,7 @@ class ContainerApiStub(MockStub):
     def __init__(self, **kwargs):
         in_dict = {
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
-            "containers": [
-                MockStub({"tags": "f37d3058317f"})
-            ],  # self.runtime.containers
+            "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
             "name": "f37d3058317f",  # self.runtime.get_attrs(cont_inst)["name"]
         }
         if "job_id" in kwargs:

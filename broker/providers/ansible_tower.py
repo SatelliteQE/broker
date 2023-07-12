@@ -26,9 +26,7 @@ from broker.providers import Provider
 
 
 @cache
-def get_awxkit_and_uname(
-    config=None, root=None, url=None, token=None, uname=None, pword=None
-):
+def get_awxkit_and_uname(config=None, root=None, url=None, token=None, uname=None, pword=None):
     """Return an awxkit api object and resolved username."""
     # Prefer token if its set, otherwise use username/password
     # auth paths for the API taken from:
@@ -43,9 +41,7 @@ def get_awxkit_and_uname(
         logger.info("Using token authentication")
         config.token = token
         try:
-            root.connection.login(
-                username=None, password=None, token=token, auth_type="Bearer"
-            )
+            root.connection.login(username=None, password=None, token=token, auth_type="Bearer")
         except awxkit.exceptions.Unauthorized as err:
             raise exceptions.AuthenticationError(err.args[0]) from err
         versions = root.get().available_versions
@@ -109,9 +105,7 @@ class AnsibleTower(Provider):
             type=str,
             help="AnsibleTower inventory to checkout a host on",
         ),
-        click.option(
-            "--workflow", type=str, help="Name of a workflow used to checkout a host"
-        ),
+        click.option("--workflow", type=str, help="Name of a workflow used to checkout a host"),
     ]
     _execute_options = [
         click.option(
@@ -120,9 +114,7 @@ class AnsibleTower(Provider):
             help="AnsibleTower inventory to execute against",
         ),
         click.option("--workflow", type=str, help="Name of a workflow to execute"),
-        click.option(
-            "--job-template", type=str, help="Name of a job template to execute"
-        ),
+        click.option("--job-template", type=str, help="Name of a job template to execute"),
     ]
     _extend_options = [
         click.option(
@@ -148,9 +140,7 @@ class AnsibleTower(Provider):
         self.uname = settings.ANSIBLETOWER.get("username")
         self.pword = settings.ANSIBLETOWER.get("password")
         self.token = settings.ANSIBLETOWER.get("token")
-        self._inventory = (
-            kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
-        )
+        self._inventory = kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
         # Init the class itself
         config = kwargs.get("config")
         root = kwargs.get("root")
@@ -271,9 +261,7 @@ class AnsibleTower(Provider):
             children = at_object.get_related("workflow_nodes").results
             # filter out children with no associated job
             children = list(
-                filter(
-                    lambda child: getattr(child.summary_fields, "job", None), children
-                )
+                filter(lambda child: getattr(child.summary_fields, "job", None), children)
             )
             children.sort(key=lambda child: child.summary_fields.job.id)
             if strategy == "last":
@@ -286,8 +274,7 @@ class AnsibleTower(Provider):
                     if child_obj:
                         child_obj = child_obj.pop()
                         artifacts = (
-                            self._merge_artifacts(child_obj, strategy, artifacts)
-                            or artifacts
+                            self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
                         )
                     else:
                         logger.warning(
@@ -303,14 +290,10 @@ class AnsibleTower(Provider):
             children = workflow.get_related("workflow_nodes").results
             # filter out children with no associated job
             children = list(
-                filter(
-                    lambda child: getattr(child.summary_fields, "job", None), children
-                )
+                filter(lambda child: getattr(child.summary_fields, "job", None), children)
             )
             # filter out children that didn't fail
-            children = list(
-                filter(lambda child: child.summary_fields.job.failed, children)
-            )
+            children = list(filter(lambda child: child.summary_fields.job.failed, children))
             children.sort(key=lambda child: child.summary_fields.job.id)
             for child in children[::-1]:
                 if child.type == "workflow_job_node":
@@ -334,9 +317,7 @@ class AnsibleTower(Provider):
                             # get all failed job_events for each job (filter failed=true)
                             failed_events = [
                                 ev
-                                for ev in child_obj.get_related(
-                                    "job_events", page_size=200
-                                ).results
+                                for ev in child_obj.get_related("job_events", page_size=200).results
                                 if ev.failed
                             ]
                             # find the one(s) with event_data['res']['msg']
@@ -363,10 +344,7 @@ class AnsibleTower(Provider):
     def _get_expire_date(self, host_id):
         try:
             time_stamp = (
-                self.v2.hosts.get(id=host_id)
-                .results[0]
-                .related.ansible_facts.get()
-                .expire_date
+                self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
             )
             return str(datetime.fromtimestamp(int(time_stamp)))
         except Exception as err:  # noqa: BLE001
@@ -391,9 +369,7 @@ class AnsibleTower(Provider):
         if expire_time:
             host_info["expire_time"] = expire_time
         try:
-            create_job = self.v2.jobs.get(
-                id=host.get_related("job_events").results[0].job
-            )
+            create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
             create_job = create_job.results[0].get_related("source_workflow_job")
             host_info["_broker_args"]["workflow"] = create_job.name
         except IndexError:
@@ -406,18 +382,12 @@ class AnsibleTower(Provider):
                     ).summary_fields.source_workflow_job.name
                 except Exception as err:  # noqa: BLE001
                     logger.debug(f"Tell Jake that the exception here is: {err}!")
-                    logger.warning(
-                        f"Unable to determine workflow for {host_info['hostname']}"
-                    )
+                    logger.warning(f"Unable to determine workflow for {host_info['hostname']}")
             else:
                 return host_info
         create_vars = json.loads(create_job.extra_vars)
         host_info["_broker_args"].update(
-            {
-                arg: val
-                for arg, val in create_vars.items()
-                if val and isinstance(val, str)
-            }
+            {arg: val for arg, val in create_vars.items() if val and isinstance(val, str)}
         )
         # temporary workaround for OSP hosts that have lost their hostname
         if not host_info["hostname"] and host.variables.get("openstack"):
@@ -448,9 +418,7 @@ class AnsibleTower(Provider):
         misc_attrs = {}  # used later to add misc attributes to host object
         if provider_params:
             job = provider_params
-            job_attrs = self._merge_artifacts(
-                job, strategy=kwargs.get("strategy", "last")
-            )
+            job_attrs = self._merge_artifacts(job, strategy=kwargs.get("strategy", "last"))
             # pull information about the job arguments
             job_extra_vars = json.loads(job.extra_vars)
             # and update them if they have resolved values
@@ -476,9 +444,7 @@ class AnsibleTower(Provider):
             if not hostname:
                 logger.warning(f"No hostname found in job attributes:\n{job_attrs}")
             logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
-            host_inst = host_classes[host_type](
-                **{**kwargs, "hostname": hostname, "name": name}
-            )
+            host_inst = host_classes[host_type](**{**kwargs, "hostname": hostname, "name": name})
         else:
             host_inst = host_classes[kwargs.get("type")](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=misc_attrs)
@@ -520,28 +486,21 @@ class AnsibleTower(Provider):
         payload = {}
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
-            logger.info(
-                f"Using tower inventory: {self._translate_inventory(inventory)}"
-            )
+            logger.info(f"Using tower inventory: {self._translate_inventory(inventory)}")
         elif self.inventory:
             payload["inventory"] = self.inventory
-            logger.info(
-                f"Using tower inventory: {self._translate_inventory(self.inventory)}"
-            )
+            logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
         payload["extra_vars"] = str(kwargs)
         logger.debug(
-            f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n"
-            f"{payload=}"
+            f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n{payload=}"
         )
         job = target.launch(payload=payload)
         job_number = job.url.rstrip("/").split("/")[-1]
         job_api_url = url_parser.urljoin(self.url, str(job.url))
         if self._is_aap:
-            job_ui_url = url_parser.urljoin(
-                self.url, f"/#/jobs/{subject}/{job_number}/output"
-            )
+            job_ui_url = url_parser.urljoin(self.url, f"/#/jobs/{subject}/{job_number}/output")
         else:
             job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
@@ -592,8 +551,7 @@ class AnsibleTower(Provider):
         return self.execute(
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
-            new_expire_time=new_expire_time
-            or settings.ANSIBLETOWER.get("new_expire_time"),
+            new_expire_time=new_expire_time or settings.ANSIBLETOWER.get("new_expire_time"),
         )
 
     def provider_help(
@@ -620,9 +578,7 @@ class AnsibleTower(Provider):
         elif workflows:
             workflows = [
                 workflow.name
-                for workflow in self.v2.workflow_job_templates.get(
-                    page_size=1000
-                ).results
+                for workflow in self.v2.workflow_job_templates.get(page_size=1000).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
             if res_filter := kwargs.get("results_filter"):
@@ -635,10 +591,7 @@ class AnsibleTower(Provider):
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
         elif inventories:
-            inv = [
-                inv.name
-                for inv in self.v2.inventory.get(kind="", page_size=1000).results
-            ]
+            inv = [inv.name for inv in self.v2.inventory.get(kind="", page_size=1000).results]
             if res_filter := kwargs.get("results_filter"):
                 inv = eval_filter(inv, res_filter, "res")
                 inv = inv if isinstance(inv, list) else [inv]
@@ -661,18 +614,16 @@ class AnsibleTower(Provider):
             if res_filter := kwargs.get("results_filter"):
                 job_templates = eval_filter(job_templates, res_filter, "res")
                 job_templates = (
-                    job_templates
-                    if isinstance(job_templates, list)
-                    else [job_templates]
+                    job_templates if isinstance(job_templates, list) else [job_templates]
                 )
             job_templates = "\n".join(job_templates[:results_limit])
             logger.info(f"Available job templates:\n{job_templates}")
         elif templates:
             templates = list(
                 set(
-                    self.execute(workflow="list-templates", artifacts="last")[
-                        "data_out"
-                    ]["list_templates"]
+                    self.execute(workflow="list-templates", artifacts="last")["data_out"][
+                        "list_templates"
+                    ]
                 )
             )
             templates.sort(reverse=True)

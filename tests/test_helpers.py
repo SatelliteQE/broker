@@ -151,25 +151,15 @@ def test_eval_filter_chain(fake_inventory):
     filtered = helpers.eval_filter(fake_inventory, "@inv[:3] | 'sat-jenkins' in @inv.name")
     assert len(filtered) == 1
 
+
 def test_dict_from_paths_nested():
     source_dict = {
         "person": {
             "name": "John",
             "age": 30,
-            "address": {
-                "street": "123 Main St",
-                "city": "Anytown",
-                "state": "CA",
-                "zip": "12345"
-            }
+            "address": {"street": "123 Main St", "city": "Anytown", "state": "CA", "zip": "12345"},
         }
     }
-    paths = {
-        "person_name": "person/name",
-        "person_zip": "person/address/zip"
-    }
+    paths = {"person_name": "person/name", "person_zip": "person/address/zip"}
     result = helpers.dict_from_paths(source_dict, paths)
-    assert result == {
-        "person_name": "John",
-        "person_zip": "12345"
-    }
+    assert result == {"person_name": "John", "person_zip": "12345"}
