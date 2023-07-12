@@ -92,9 +92,7 @@ class BeakerBind:
         )
         if result.status != 0 and raise_on_error:
             raise BeakerBindError(
-                f"Beaker command failed:\n"
-                f"Command={' '.join(exec_cmd)}\n"
-                f"Result={result}",
+                f"Beaker command failed:\nCommand={' '.join(exec_cmd)}\nResult={result}",
             )
         logger.debug(f"Beaker command result: {result.stdout}")
         return result
@@ -120,9 +118,7 @@ class BeakerBind:
     def job_results(self, job_id, format="beaker-results-xml", pretty=False):
         """Get the results of a job in the specified format."""
         job_id = f"J:{job_id}" if not job_id.startswith("J:") else job_id
-        return self._exec_command(
-            "job-results", job_id, format=format, prettyxml=pretty
-        )
+        return self._exec_command("job-results", job_id, format=format, prettyxml=pretty)
 
     def job_clone(self, job_id, wait=False, **kwargs):
         """Clone a job by the specified job id."""
@@ -171,9 +167,7 @@ class BeakerBind:
         """
         # convert the flags passed in kwargs to arguments
         args = [
-            f"--{key}"
-            for key in ("available", "free", "removed", "mine")
-            if kwargs.pop(key, False)
+            f"--{key}" for key in ("available", "free", "removed", "mine") if kwargs.pop(key, False)
         ]
         return self._exec_command("system-list", *args, **kwargs)
 
@@ -207,9 +201,7 @@ class BeakerBind:
             time.sleep(60)
             result = self.job_results(job_id, pretty=True)
             if 'result="Pass"' in result.stdout:
-                return _curate_job_info(
-                    _elementree_to_dict(ET.fromstring(result.stdout))
-                )
+                return _curate_job_info(_elementree_to_dict(ET.fromstring(result.stdout)))
             elif 'result="Fail"' in result.stdout or "Exception: " in result.stdout:
                 raise BeakerBindError(f"Job {job_id} failed:\n{result}")
             elif 'result="Warn"' in result.stdout:
@@ -249,8 +241,6 @@ class BeakerBind:
         """Return the job id for the current reservation on the system."""
         for job_id in json.loads(self.job_list(mine=True).stdout):
             job_result = self.job_results(job_id, pretty=True)
-            job_detail = _curate_job_info(
-                _elementree_to_dict(ET.fromstring(job_result.stdout))
-            )
+            job_detail = _curate_job_info(_elementree_to_dict(ET.fromstring(job_result.stdout)))
             if job_detail["hostname"] == system_hostname:
                 return job_id

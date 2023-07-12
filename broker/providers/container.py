@@ -29,17 +29,13 @@ def container_info(container_inst):
 def _host_release():
     caller_host = inspect.stack()[1][0].f_locals["host"]
     if not caller_host._cont_inst:
-        caller_host._cont_inst = caller_host._prov_inst._cont_inst_by_name(
-            caller_host.name
-        )
+        caller_host._cont_inst = caller_host._prov_inst._cont_inst_by_name(caller_host.name)
     caller_host._cont_inst.remove(v=True, force=True)
     caller_host._checked_in = True
 
 
 @cache
-def get_runtime(
-    runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None
-):
+def get_runtime(runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None):
     """Return a runtime instance."""
     return runtime_cls(
         host=host,
@@ -173,9 +169,7 @@ class Container(Provider):
         elif settings.container.auto_map_ports:
             mapping = {
                 k: v or None
-                for k, v in self.runtime.image_info(image)["config"][
-                    "ExposedPorts"
-                ].items()
+                for k, v in self.runtime.image_info(image)["config"]["ExposedPorts"].items()
             }
         return mapping
 
@@ -195,9 +189,7 @@ class Container(Provider):
 
         :return: broker object of constructed host instance
         """
-        logger.debug(
-            f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}"
-        )
+        logger.debug(f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}")
         if not provider_params:
             host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
             cont_inst = self._cont_inst_by_name(host_inst.name)
@@ -213,9 +205,7 @@ class Container(Provider):
             raise Exception(f"Could not determine container hostname:\n{cont_attrs}")
         name = cont_attrs["name"]
         logger.debug(f"hostname: {hostname}, name: {name}, host type: host")
-        host_inst = host_classes["host"](
-            **{**kwargs, "hostname": hostname, "name": name}
-        )
+        host_inst = host_classes["host"](**{**kwargs, "hostname": hostname, "name": name})
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
         return host_inst
 

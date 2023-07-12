@@ -23,9 +23,7 @@ def temp_inventory():
     """Temporarily move the local inventory, then move it back when done"""
     backup_path = inventory_path.rename(f"{inventory_path.absolute()}.bak")
     yield
-    CliRunner().invoke(
-        cli, ["checkin", "--all", "--filter", '@inv._broker_provider == "Beaker"']
-    )
+    CliRunner().invoke(cli, ["checkin", "--all", "--filter", '@inv._broker_provider == "Beaker"'])
     inventory_path.unlink()
     backup_path.rename(inventory_path)
 
@@ -66,6 +64,7 @@ def test_jobs_list():
 
 # ----- Broker API Tests -----
 
+
 def test_beaker_host():
     with Broker(job_xml="tests/data/beaker/test_job.xml") as r_host:
         res = r_host.execute("hostname")
@@ -76,9 +75,7 @@ def test_beaker_host():
         assert str(settings_path.name) in res.stdout
         with NamedTemporaryFile() as tmp:
             r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", tmp.file.name)
-            data = r_host.session.sftp_read(
-                f"{remote_dir}/{settings_path.name}", return_data=True
-            )
+            data = r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", return_data=True)
             assert (
                 settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
             ), "Local file is different from the received one"
@@ -91,5 +88,5 @@ def test_beaker_host():
         r_host.execute(f"echo 'hello world' > {tailed_file}")
         with r_host.session.tail_file(tailed_file) as tf:
             r_host.execute(f"echo 'this is a new line' >> {tailed_file}")
-        assert 'this is a new line' in tf.stdout
-        assert 'hello world' not in tf.stdout
+        assert "this is a new line" in tf.stdout
+        assert "hello world" not in tf.stdout
