@@ -1,0 +1,54 @@
+# Broker settings
+# different log levels for file and stdout
+logging:
+    console_level: info
+    file_level: debug
+# Host Settings
+# These can be left alone if you're not using Broker as a library
+host_username: root
+host_password: "<password>"
+host_ssh_port: 22
+host_ssh_key_filename: "</path/to/the/ssh-key>"
+# Provider settings
+TestProvider:
+    instances:
+        - test1:
+            foo: "bar"
+            default: True
+        - test2:
+            foo: "baz"
+            override_envars: True
+        - bad:
+            nothing: False
+    config_value: "something"
+AnsibleTower:
+    base_url: "https://<ansible tower host>/"
+    # Username is required for both token and password-based authentication
+    username: "<username>"
+    # token is the preferred authentication method
+    token: "<AT personal access token>"
+    # password: "<plain text password>"
+    inventory: "inventory name"
+    release_workflow: "remove-vm"
+    extend_workflow: "extend-vm"
+    new_expire_time: "+172800"
+    workflow_timeout: 3600
+    results_limit: 50
+Container:
+    host_username: "<username>"
+    host_password: "<plain text password>"
+    host_port: None
+    default: True
+    runtime: 'docker'
+    # name used to prefix container names, used to distinguish yourself
+    # if not set, then your local username will be used
+    # name_prefix: test
+    results_limit: 50
+    auto_map_ports: False
+# You can set a nickname as a shortcut for arguments
+nicks:
+    test_nick:
+        test_action: "fake"
+        arg1: "abc"
+        arg2: 123
+        arg3: True
