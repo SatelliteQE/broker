@@ -274,10 +274,13 @@ def inventory(details, sync, filter):
         emit_data.append(host)
         if (display_name := host.get("hostname")) is None:
             display_name = host.get("name")
+        # if we're filtering, then don't show an index.
+        # Otherwise, a user might perform an action on the incorrect (unfiltered) index.
+        index = f"{num}: " if filter is None else ""
         if details:
-            logger.info(f"{num}: {display_name}:\n{helpers.yaml_format(host)}")
+            logger.info(f"{index}{display_name}:\n{helpers.yaml_format(host)}")
         else:
-            logger.info(f"{num}: {display_name}")
+            logger.info(f"{index}{display_name}")
     helpers.emit({"inventory": emit_data})
 
 
