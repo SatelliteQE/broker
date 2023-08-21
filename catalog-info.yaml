@@ -21,5 +21,5 @@ metadata:
     github.com/project-slug: SatelliteQE/broker
 spec:
   type: library
-  owner: satelliteqe
-  lifecycle: beta
+  owner: group:redhat/satelliteqe
+  lifecycle: preproduction
