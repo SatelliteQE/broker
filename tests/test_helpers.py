@@ -74,9 +74,11 @@ def test_emitter(tmp_file):
 
 
 def test_lock_file_created(tmp_file):
-    with helpers.FileLock(tmp_file) as tf:
-        assert isinstance(tf, Path)
-        assert Path(f"{tf}.lock").exists()
+    lock_file = helpers.FileLock(tmp_file)
+    with lock_file:
+        assert isinstance(lock_file.lock, Path)
+        assert lock_file.lock.exists()
+    assert not lock_file.lock.exists()
 
 
 def test_lock_timeout(tmp_file):
@@ -85,7 +87,7 @@ def test_lock_timeout(tmp_file):
     with pytest.raises(exceptions.BrokerError) as exc:
         with helpers.FileLock(tmp_file, timeout=1):
             pass
-    assert str(exc.value).startswith("Timeout while attempting to open")
+    assert str(exc.value).startswith("Timeout while waiting for lock release: ")
 
 
 def test_find_origin_simple():
