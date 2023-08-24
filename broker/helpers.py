@@ -402,38 +402,34 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
 
 class FileLock:
     """Basic file locking class that acquires and releases locks
-    recommended usage is the context manager which will handle everythign for you
+    recommended usage is the context manager which will handle everything for you
 
-    with FileLock("basic_file.txt") as basic_file:
-        basic_file.write("some text")
+    with FileLock("basic_file.txt"):
+        Path("basic_file.txt").write_text("some text")
 
-    basic_file is a Path object of the desired file
     If a lock is already in place, FileLock will wait up to <timeout> seconds
     """
 
     def __init__(self, file_name, timeout=10):
-        self.file = Path(file_name)
-        self.lock = Path(f"{self.file}.lock")
+        self.lock = Path(f"{file_name}.lock")
         self.timeout = timeout
 
     def wait_file(self):
-        start = time.time()
+        timeout_after = time.time() + self.timeout
         while self.lock.exists():
-            if (time.time() - start) < self.timeout:
+            if time.time() <= timeout_after:
                 time.sleep(1)
-                continue
             else:
                 raise exceptions.BrokerError(
-                    f"Timeout while attempting to open {self.file.absolute()}"
+                    f"Timeout while waiting for lock release: {self.lock.absolute()}"
                 )
         self.lock.touch()
-        return self.file
 
     def return_file(self):
         self.lock.unlink()
 
     def __enter__(self):
-        return self.wait_file()
+        self.wait_file()
 
     def __exit__(self, *tb_info):
         self.return_file()
