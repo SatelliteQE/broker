@@ -1,3 +1,0 @@
-workflow: test-workflow
-artifacts: last
-output-format: yaml

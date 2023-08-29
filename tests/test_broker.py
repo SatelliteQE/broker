@@ -54,21 +54,19 @@ def test_broker_checkin_n_sync_empty_hostname():
     """Test that broker can checkin and sync inventory with a host that has empty hostname"""
     broker_inst = broker.Broker(nick="test_nick")
     broker_inst.checkout()
-    inventory = helpers.load_inventory()
+    inventory = helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"')
     assert len(inventory) == 1
     inventory[0]["hostname"] = None
     # remove the host from the inventory
     helpers.update_inventory(remove="test.host.example.com")
     # add the host back with no hostname
     helpers.update_inventory(add=inventory)
-    hosts = broker_inst.from_inventory()
+    hosts = broker_inst.from_inventory(filter='@inv._broker_provider == "TestProvider"')
     assert len(hosts) == 1
     assert hosts[0].hostname is None
     broker_inst = broker.Broker(hosts=hosts)
     broker_inst.checkin()
-    assert (
-        not broker_inst.from_inventory()
-    ), "Host was not removed from inventory after checkin"
+    assert not broker_inst.from_inventory(), "Host was not removed from inventory after checkin"
 
 
 def test_mp_checkout():
@@ -106,7 +104,8 @@ def test_multi_manager():
     with Broker.multi_manager(
         test_1={"nick": "test_nick"}, test_2={"nick": "test_nick", "_count": 2}
     ) as host_dict:
-        assert "test_1" in host_dict and "test_2" in host_dict
+        assert "test_1" in host_dict
+        assert "test_2" in host_dict
         assert len(host_dict["test_1"]) == 1
         assert len(host_dict["test_2"]) == 2
         assert host_dict["test_1"][0].hostname == "test.host.example.com"

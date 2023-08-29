@@ -23,9 +23,7 @@ def temp_inventory():
     """Temporarily move the local inventory, then move it back when done"""
     backup_path = inventory_path.rename(f"{inventory_path.absolute()}.bak")
     yield
-    CliRunner().invoke(
-        cli, ["checkin", "--all", "--filter", "_broker_provider<AnsibleTower"]
-    )
+    CliRunner().invoke(cli, ["checkin", "--all", "--filter", "_broker_provider<AnsibleTower"])
     inventory_path.unlink()
     backup_path.rename(inventory_path)
 
@@ -57,13 +55,12 @@ def test_workflows_list():
 
 
 def test_workflow_query():
-    result = CliRunner().invoke(
-        cli, ["providers", "AnsibleTower", "--workflow", "list-templates"]
-    )
+    result = CliRunner().invoke(cli, ["providers", "AnsibleTower", "--workflow", "list-templates"])
     assert result.exit_code == 0
 
 
 # ----- Broker API Tests -----
+
 
 def test_tower_host():
     with Broker(workflow="deploy-base-rhel") as r_host:
@@ -91,8 +88,8 @@ def test_tower_host():
         r_host.execute(f"echo 'hello world' > {tailed_file}")
         with r_host.session.tail_file(tailed_file) as tf:
             r_host.execute(f"echo 'this is a new line' >> {tailed_file}")
-        assert 'this is a new line' in tf.stdout
-        assert 'hello world' not in tf.stdout
+        assert "this is a new line" in tf.stdout
+        assert "hello world" not in tf.stdout
 
 
 def test_tower_host_mp():
@@ -117,3 +114,11 @@ def test_tower_host_mp():
                     loc_settings_path.read_bytes() == data
                 ), "Local file is different from the received one (return_data=True)"
                 assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+        # test remote copy from one host to another
+        r_hosts[0].session.remote_copy(
+            source=f"{remote_dir}/{loc_settings_path.name}",
+            dest_host=r_hosts[1],
+            dest_path=f"/root/{loc_settings_path.name}",
+        )
+        res = r_hosts[1].execute(f"ls /root")
+        assert loc_settings_path.name in res.stdout
