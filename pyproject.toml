@@ -47,6 +47,10 @@ docker = [
 ]
 podman = ["podman-py"]
 beaker = ["beaker-client"]
+setup = [
+    "build",
+    "twine",
+]
 
 [project.scripts]
 broker = "broker.commands:cli"

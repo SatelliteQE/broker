@@ -23,7 +23,7 @@ jobs:
 
     - name: Setup and Build
       run: |
-        pip install -U pip build
+        pip install -U pip .[setup]
         python -m build
         python -m twine check dist/*
 
