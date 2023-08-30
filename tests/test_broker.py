@@ -1,6 +1,15 @@
-from broker import broker, Broker, helpers
+from broker import broker, Broker, helpers, settings
 from broker.providers import test_provider
 import pytest
+
+
+@pytest.fixture(scope="module")
+def temp_inventory():
+    """Temporarily move the local inventory, then move it back when done"""
+    backup_path = settings.inventory_path.rename(f"{settings.inventory_path.absolute()}.bak")
+    yield
+    settings.inventory_path.unlink()
+    backup_path.rename(settings.inventory_path)
 
 
 def test_empty_init():
@@ -50,7 +59,7 @@ def test_broker_empty_checkin():
     broker_inst.checkin()
 
 
-def test_broker_checkin_n_sync_empty_hostname():
+def test_broker_checkin_n_sync_empty_hostname(temp_inventory):
     """Test that broker can checkin and sync inventory with a host that has empty hostname"""
     broker_inst = broker.Broker(nick="test_nick")
     broker_inst.checkout()
