@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm", "wheel", "twine"]
+requires = ["setuptools", "setuptools-scm[toml]", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -62,6 +62,8 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["broker"]
+
+[tool.setuptools_scm]  # same as use_scm_version=True in setup.py
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
