@@ -23,9 +23,8 @@ jobs:
 
     - name: Setup and Build
       run: |
-        pip install -U pip
-        pip install .[setup]
-        python setup.py sdist bdist_wheel
+        pip install -U pip build
+        python -m build
         python -m twine check dist/*
 
     - name: Build and publish
