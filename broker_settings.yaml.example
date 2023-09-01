@@ -17,7 +17,7 @@ AnsibleTower:
     # token is the preferred authentication method
     token: "<AT personal access token>"
     # password: "<plain text password>"
-    inventory: "inventory name"
+    # inventory: "<inventory name>"
     release_workflow: "remove-vm"
     extend_workflow: "extend-vm"
     new_expire_time: "+172800"
