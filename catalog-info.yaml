@@ -19,7 +19,8 @@ metadata:
   namespace: quality-community   
   annotations:
     github.com/project-slug: SatelliteQE/broker
+    backstage.io/techdocs-ref: https://github.com/SatelliteQE/broker/wiki
 spec:
   type: library
-  owner: group:redhat/satelliteqe
+  owner: group:redhat/satellite-qe
   lifecycle: preproduction
