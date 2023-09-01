@@ -1,18 +1,21 @@
+"""Container provider implementation."""
 from functools import cache
 import getpass
 import inspect
 from uuid import uuid4
+
 import click
-from logzero import logger
 from dynaconf import Validator
-from broker import exceptions
-from broker import helpers
-from broker.settings import settings
-from broker.providers import Provider
+from logzero import logger
+
+from broker import exceptions, helpers
 from broker.binds import containers
+from broker.providers import Provider
+from broker.settings import settings
 
 
 def container_info(container_inst):
+    """Return a dict of container information."""
     return {
         "_broker_provider": "Container",
         "name": container_inst.name,
@@ -26,17 +29,14 @@ def container_info(container_inst):
 def _host_release():
     caller_host = inspect.stack()[1][0].f_locals["host"]
     if not caller_host._cont_inst:
-        caller_host._cont_inst = caller_host._prov_inst._cont_inst_by_name(
-            caller_host.name
-        )
+        caller_host._cont_inst = caller_host._prov_inst._cont_inst_by_name(caller_host.name)
     caller_host._cont_inst.remove(v=True, force=True)
     caller_host._checked_in = True
 
 
 @cache
-def get_runtime(
-    runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None
-):
+def get_runtime(runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None):
+    """Return a runtime instance."""
     return runtime_cls(
         host=host,
         username=username,
@@ -46,7 +46,10 @@ def get_runtime(
     )
 
 
+@Provider.auto_hide
 class Container(Provider):
+    """Container provider class providing a Broker interface around the container binds."""
+
     _validators = [
         Validator("CONTAINER.runtime", default="podman"),
         Validator("CONTAINER.host", default="localhost"),
@@ -100,7 +103,7 @@ class Container(Provider):
         self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
 
     def _ensure_image(self, name):
-        """Check if an image exists on the provider, attempt a pull if not"""
+        """Check if an image exists on the provider, attempt a pull if not."""
         for image in self.runtime.images:
             if name in image.tags:
                 return
@@ -108,18 +111,18 @@ class Container(Provider):
                 return
         try:
             self.runtime.pull_image(name)
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001 - This could be a few things
             raise exceptions.ProviderError(
                 "Container", f"Unable to find image: {name}\n{err}"
-            )
+            ) from err
 
     @staticmethod
-    def _find_ssh_port(port_map):
-        """Go through container port map and find the mapping that corresponds to port 22"""
+    def _find_ssh_port(port_map, ssh_port=22):
+        """Go through container port map and find the mapping that corresponds to port 22."""
         if isinstance(port_map, list):
             # [{'hostPort': 1337, 'containerPort': 22, 'protocol': 'tcp', 'hostIP': ''},
             for pm in port_map:
-                if pm["containerPort"] == 22:
+                if pm["containerPort"] == ssh_port:
                     return pm["hostPort"]
         elif isinstance(port_map, dict):
             # {'22/tcp': [{'HostIp': '', 'HostPort': '1337'}],
@@ -140,13 +143,15 @@ class Container(Provider):
         )
 
     def _port_mapping(self, image, **kwargs):
-        """
-        22
-        22:1337
-        22/tcp
-        22/tcp:1337
-        22,23
-        22:1337 23:1335
+        """Create a mapping of ports to expose on the container.
+
+        Accepted `ports` formats:
+            22
+            22:1337
+            22/tcp
+            22/tcp:1337
+            22,23
+            22:1337 23:1335.
         """
         mapping = {}
         if ports := kwargs.pop("ports", None):
@@ -164,21 +169,19 @@ class Container(Provider):
         elif settings.container.auto_map_ports:
             mapping = {
                 k: v or None
-                for k, v in self.runtime.image_info(image)["config"][
-                    "ExposedPorts"
-                ].items()
+                for k, v in self.runtime.image_info(image)["config"]["ExposedPorts"].items()
             }
         return mapping
 
     def _cont_inst_by_name(self, cont_name):
-        """Attempt to find and return a container by its name"""
+        """Attempt to find and return a container by its name."""
         for cont_inst in self.runtime.containers:
             if cont_inst.name == cont_name:
                 return cont_inst
         logger.error(f"Unable to find container by name {cont_name}")
 
     def construct_host(self, provider_params, host_classes, **kwargs):
-        """Constructs broker host from a container instance
+        """Construct a broker host from a container instance.
 
         :param provider_params: a container instance object
 
@@ -186,9 +189,7 @@ class Container(Provider):
 
         :return: broker object of constructed host instance
         """
-        logger.debug(
-            f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}"
-        )
+        logger.debug(f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}")
         if not provider_params:
             host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
             cont_inst = self._cont_inst_by_name(host_inst.name)
@@ -204,21 +205,21 @@ class Container(Provider):
             raise Exception(f"Could not determine container hostname:\n{cont_attrs}")
         name = cont_attrs["name"]
         logger.debug(f"hostname: {hostname}, name: {name}, host type: host")
-        host_inst = host_classes["host"](
-            **{**kwargs, "hostname": hostname, "name": name}
-        )
+        host_inst = host_classes["host"](**{**kwargs, "hostname": hostname, "name": name})
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
         return host_inst
 
-    def nick_help(self, **kwargs):
-        """Useful information about container images"""
+    def provider_help(
+        self, container_hosts=False, container_host=None, container_apps=False, **kwargs
+    ):
+        """Return useful information about container images."""
         results_limit = kwargs.get("results_limit", settings.container.results_limit)
-        if image := kwargs.get("container_host"):
+        if container_host:
             logger.info(
-                f"Information for {image} container-host:\n"
-                f"{helpers.yaml_format(self.runtime.image_info(image))}"
+                f"Information for {container_host} container-host:\n"
+                f"{helpers.yaml_format(self.runtime.image_info(container_host))}"
             )
-        elif kwargs.get("container_hosts"):
+        elif container_hosts:
             images = [
                 img.tags[0]
                 for img in self.runtime.images
@@ -229,7 +230,7 @@ class Container(Provider):
                 images = images if isinstance(images, list) else [images]
             images = "\n".join(images[:results_limit])
             logger.info(f"Available host images:\n{images}")
-        elif kwargs.get("container_apps"):
+        elif container_apps:
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.eval_filter(images, res_filter, "res")
@@ -238,7 +239,7 @@ class Container(Provider):
             logger.info(f"Available app images:\n{images}")
 
     def get_inventory(self, name_prefix):
-        """Get all containers that have a matching name prefix"""
+        """Get all containers that have a matching name prefix."""
         name_prefix = name_prefix or self._name_prefix
         return [
             container_info(cont)
@@ -247,22 +248,23 @@ class Container(Provider):
         ]
 
     def extend(self):
-        pass
+        """There is no need to extend a continer-ased host."""
 
     def release(self, host_obj):
+        """Remove a container-based host from the container host."""
         host_obj._cont_inst.remove(force=True)
 
     @Provider.register_action("container_host")
     def run_container(self, container_host, **kwargs):
-        """Start a container based on an image name (container_host)"""
+        """Start a container based on an image name (container_host)."""
         self._ensure_image(container_host)
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
 
-        envars = kwargs.get('environment', {})
+        envars = kwargs.get("environment", {})
         if isinstance(envars, str):
-            envars = {var.split('=')[0]: var.split('=')[1] for var in envars.split(',')}
+            envars = {var.split("=")[0]: var.split("=")[1] for var in envars.split(",")}
         # add some context information about the container's requester
         origin = helpers.find_origin()
 
@@ -279,10 +281,11 @@ class Container(Provider):
 
     @Provider.register_action("container_app")
     def execute(self, container_app, **kwargs):
-        """Run a container and return the raw results"""
+        """Run a container and return the raw results."""
         return self.runtime.execute(container_app, **kwargs)
 
     def run_wait_container(self, image_name, **kwargs):
+        """Run a container and wait for it to exit."""
         cont_inst = self.run_container(image_name, **kwargs)
         cont_inst.wait(condition="excited")
         return self.runtime.get_logs(cont_inst)

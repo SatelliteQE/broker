@@ -1,0 +1,26 @@
+<job retention_tag="scratch">
+  <whiteboard>Test Reserve Workflow</whiteboard>
+  <recipeSet priority="High">
+    <recipe whiteboard="" role="RECIPE_MEMBERS" ks_meta="" kernel_options="" kernel_options_post="">
+      <watchdog panic="ignore"/>
+      <packages/>
+      <ks_appends/>
+      <repos/>
+      <distroRequires>
+        <and>
+          <distro_family op="=" value="RedHatEnterpriseLinux8"/>
+          <distro_variant op="=" value="BaseOS"/>
+          <distro_arch op="=" value="x86_64"/>
+        </and>
+      </distroRequires>
+      <hostRequires/>
+      <partitions/>
+      <task name="/distribution/check-install" role="STANDALONE"/>
+      <task name="/distribution/reservesys" role="STANDALONE">
+        <params>
+          <param name="RESERVETIME" value="1261440000"/>
+        </params>
+      </task>
+    </recipe>
+  </recipeSet>
+</job>

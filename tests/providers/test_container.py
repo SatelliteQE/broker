@@ -22,9 +22,7 @@ class ContainerApiStub(MockStub):
     def __init__(self, **kwargs):
         in_dict = {
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
-            "containers": [
-                MockStub({"tags": "f37d3058317f"})
-            ],  # self.runtime.containers
+            "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
             "name": "f37d3058317f",  # self.runtime.get_attrs(cont_inst)["name"]
         }
         if "job_id" in kwargs:
@@ -55,14 +53,14 @@ class ContainerApiStub(MockStub):
                 return MockStub(container)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def api_stub():
-    yield ContainerApiStub()
+    return ContainerApiStub()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def container_stub(api_stub):
-    yield Container(bind=api_stub)
+    return Container(bind=api_stub)
 
 
 def test_empty_init():

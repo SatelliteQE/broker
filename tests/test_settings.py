@@ -36,9 +36,7 @@ def test_nested_envar(set_envars):
     assert test_provider.foo == "baz"
 
 
-@pytest.mark.parametrize(
-    "set_envars", [("BROKER_TESTPROVIDER__foo", "envar")], indirect=True
-)
+@pytest.mark.parametrize("set_envars", [("BROKER_TESTPROVIDER__foo", "envar")], indirect=True)
 def test_default_envar(set_envars):
     """Set a top-level instance value via environment variable
     then verify that the value is not overriden when the provider is selected by default.
@@ -48,9 +46,7 @@ def test_default_envar(set_envars):
     assert test_provider.foo == "envar"
 
 
-@pytest.mark.parametrize(
-    "set_envars", [("BROKER_TESTPROVIDER__foo", "override me")], indirect=True
-)
+@pytest.mark.parametrize("set_envars", [("BROKER_TESTPROVIDER__foo", "override me")], indirect=True)
 def test_nondefault_envar(set_envars):
     """Set a top-level instance value via environment variable
     then verify that the value has been overriden when the provider is specified.
@@ -60,9 +56,7 @@ def test_nondefault_envar(set_envars):
     assert test_provider.foo == "baz"
 
 
-@pytest.mark.parametrize(
-    "set_envars", [("VAULT_ENABLED_FOR_DYNACONF", "1")], indirect=True
-)
+@pytest.mark.parametrize("set_envars", [("VAULT_ENABLED_FOR_DYNACONF", "1")], indirect=True)
 def test_purge_vault_envars(set_envars):
     """Set dynaconf vault envars and verify that they have no effect"""
     sys.modules.pop("broker.settings")

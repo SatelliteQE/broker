@@ -74,9 +74,11 @@ def test_emitter(tmp_file):
 
 
 def test_lock_file_created(tmp_file):
-    with helpers.FileLock(tmp_file) as tf:
-        assert isinstance(tf, Path)
-        assert Path(f"{tf}.lock").exists()
+    lock_file = helpers.FileLock(tmp_file)
+    with lock_file:
+        assert isinstance(lock_file.lock, Path)
+        assert lock_file.lock.exists()
+    assert not lock_file.lock.exists()
 
 
 def test_lock_timeout(tmp_file):
@@ -85,7 +87,7 @@ def test_lock_timeout(tmp_file):
     with pytest.raises(exceptions.BrokerError) as exc:
         with helpers.FileLock(tmp_file, timeout=1):
             pass
-    assert str(exc.value).startswith("Timeout while attempting to open")
+    assert str(exc.value).startswith("Timeout while waiting for lock release: ")
 
 
 def test_find_origin_simple():
@@ -148,3 +150,16 @@ def test_eval_filter_chain(fake_inventory):
     """Test that a user can chain multiple filters together"""
     filtered = helpers.eval_filter(fake_inventory, "@inv[:3] | 'sat-jenkins' in @inv.name")
     assert len(filtered) == 1
+
+
+def test_dict_from_paths_nested():
+    source_dict = {
+        "person": {
+            "name": "John",
+            "age": 30,
+            "address": {"street": "123 Main St", "city": "Anytown", "state": "CA", "zip": "12345"},
+        }
+    }
+    paths = {"person_name": "person/name", "person_zip": "person/address/zip"}
+    result = helpers.dict_from_paths(source_dict, paths)
+    assert result == {"person_name": "John", "person_zip": "12345"}

@@ -1,9 +1,30 @@
-from contextlib import contextmanager
-from logzero import logger
-from broker.providers import PROVIDERS, PROVIDER_ACTIONS, _provider_imports
-from broker.hosts import Host
-from broker import exceptions, helpers
+"""Main interface for the Broker API.
+
+This module provides the main interface for the Broker API, which allows users to
+manage cloud resources across multiple providers.
+
+It defines the `Host` class, which represents a cloud resource, and the `Broker` class,
+which provides methods for managing hosts.
+
+The `Broker` class is decorated with `mp_decorator`, which enables multiprocessing for
+certain methods. The `Host` class is defined in the `broker.hosts` module,
+and the provider classes are defined in the `broker.providers` module.
+
+Exceptions are defined in the `broker.exceptions` module,
+and helper functions are defined in the `broker.helpers` module.
+
+Note:
+    This module (or parent directory) should be used as the main entry point for the Broker API.
+
+"""
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
+
+from logzero import logger
+
+from broker import exceptions, helpers
+from broker.hosts import Host
+from broker.providers import PROVIDER_ACTIONS, PROVIDERS, _provider_imports
 
 # load all the provider class so they are registered
 for _import in _provider_imports:
@@ -11,15 +32,16 @@ for _import in _provider_imports:
 
 
 def _try_teardown(host_obj):
-    """Try a host's teardown method and return an exception message if needed"""
+    """Try a host's teardown method and return an exception message if needed."""
     try:
         host_obj.teardown()
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001
+        logger.debug(f"Tell Jake the exception was: {err}")
         return exceptions.HostError(host_obj, f"error during teardown:\n{err}")
 
 
 class mp_decorator:
-    """This decorator wraps Broker methods to enable multiprocessing
+    """Decorator wrapping Broker methods to enable multiprocessing.
 
     The decorated method is expected to return an itearable.
     """
@@ -34,6 +56,7 @@ class mp_decorator:
         self.func = func
 
     def __get__(self, instance, owner):
+        """Support instance methods."""
         if not instance:
             return self.func
 
@@ -46,8 +69,7 @@ class mp_decorator:
             max_workers_count = self.MAX_WORKERS or count
             with self.EXECUTOR(max_workers=max_workers_count) as workers:
                 completed_futures = as_completed(
-                    workers.submit(self.func, instance, *args, **kwargs)
-                    for _ in range(count)
+                    workers.submit(self.func, instance, *args, **kwargs) for _ in range(count)
                 )
                 for f in completed_futures:
                     results.extend(f.result())
@@ -57,6 +79,8 @@ class mp_decorator:
 
 
 class Broker:
+    """Main Broker class to be used as the primary interface for the Broker API."""
+
     # map exceptions for easier access when used as a library
     BrokerError = exceptions.BrokerError
     AuthenticationError = exceptions.AuthenticationError
@@ -86,7 +110,7 @@ class Broker:
         self._kwargs = kwargs
 
     def _act(self, provider, method, checkout=False):
-        """Perform a general action against a provider's method"""
+        """Perform a general action against a provider's method."""
         logger.debug(f"Resolving action {method} on provider {provider}.")
         provider_inst = provider(**self._kwargs)
         helpers.emit(
@@ -97,9 +121,7 @@ class Broker:
             }
         )
         method_obj = getattr(provider_inst, method)
-        logger.debug(
-            f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}."
-        )
+        logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
         result = method_obj(**self._kwargs)
         logger.debug(f"Action {result=}")
         if result and checkout:
@@ -117,7 +139,7 @@ class Broker:
 
     @mp_decorator
     def _checkout(self):
-        """checkout one or more VMs
+        """Checkout one or more VMs.
 
         :return: List of Host objects
         """
@@ -125,7 +147,7 @@ class Broker:
         logger.debug(f"Doing _checkout(): {self._provider_actions=}")
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
-        for action in self._provider_actions.keys():
+        for action in self._provider_actions:
             provider, method = PROVIDER_ACTIONS[action]
             logger.info(f"Using provider {provider.__name__} to checkout")
             try:
@@ -138,7 +160,7 @@ class Broker:
         return hosts
 
     def checkout(self):
-        """checkout one or more VMs
+        """Checkout one or more VMs.
 
         :return: Host obj or list of Host objects
         """
@@ -152,11 +174,11 @@ class Broker:
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
         if err:
-            raise err
-        return hosts if not len(hosts) == 1 else hosts[0]
+            raise self.BrokerError(f"Error during checkout from {self}") from err
+        return hosts if len(hosts) != 1 else hosts[0]
 
     def execute(self, **kwargs):
-        """execute a provider action
+        """Execute a provider action.
 
         :return: Any results given back by the provider
         """
@@ -164,17 +186,16 @@ class Broker:
         self._kwargs.update(kwargs)
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
-        for action, arg in self._provider_actions.items():
+        for action, _arg in self._provider_actions.items():
             provider, method = PROVIDER_ACTIONS[action]
         logger.info(f"Using provider {provider.__name__} for execution")
         return self._act(provider, method)
 
-    def nick_help(self):
-        """Use a provider's nick_help method to get argument information"""
-        if self._provider_actions:
-            provider, _ = PROVIDER_ACTIONS[[*self._provider_actions.keys()][0]]
-            logger.info(f"Querying provider {provider.__name__}")
-            self._act(provider, "nick_help", checkout=False)
+    def provider_help(self, provider_name):
+        """Use a provider's provider_help method to get argument information."""
+        provider = PROVIDERS[provider_name]
+        logger.info(f"Querying provider {provider.__name__}")
+        self._act(provider, "provider_help", checkout=False)
 
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
@@ -188,7 +209,7 @@ class Broker:
         return host
 
     def checkin(self, sequential=False, host=None, in_context=False):
-        """checkin one or more VMs
+        """Checkin one or more VMs.
 
         :param host: can be one of:
             None - Will use the contents of self._hosts
@@ -214,9 +235,7 @@ class Broker:
                 hosts = [hosts]
             if in_context:
                 hosts = [
-                    host
-                    for host in hosts
-                    if not getattr(host, "_skip_context_checkin", False)
+                    host for host in hosts if not getattr(host, "_skip_context_checkin", False)
                 ]
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
@@ -230,16 +249,12 @@ class Broker:
             )
             for completed in completed_checkins:
                 _host = completed.result()
-                self._hosts = [
-                    h for h in self._hosts if not (h.to_dict() == _host.to_dict())
-                ]
-                logger.debug(
-                    f"Completed checkin process for {_host.hostname or _host.name}"
-                )
+                self._hosts = [h for h in self._hosts if h.to_dict() != _host.to_dict()]
+                logger.debug(f"Completed checkin process for {_host.hostname or _host.name}")
         helpers.update_inventory(remove=[h.hostname for h in hosts])
 
     def _extend(self, host):
-        """extend a single VM"""
+        """Extend a single VM."""
         logger.info(f"Extending host {host.hostname}")
         provider = PROVIDERS[host._broker_provider]
         self._kwargs["target_vm"] = host
@@ -247,7 +262,7 @@ class Broker:
         return host
 
     def extend(self, sequential=False, host=None):
-        """extend one or more VMs
+        """Extend one or more VMs.
 
         :param host: can be one of:
             None - Will use the contents of self._hosts
@@ -275,16 +290,14 @@ class Broker:
             return
 
         with ThreadPoolExecutor(max_workers=1 if sequential else len(hosts)) as workers:
-            completed_extends = as_completed(
-                workers.submit(self._extend, _host) for _host in hosts
-            )
+            completed_extends = as_completed(workers.submit(self._extend, _host) for _host in hosts)
             for completed in completed_extends:
                 _host = completed.result()
                 logger.info(f"Completed extend for {_host.hostname or _host.name}")
 
     @staticmethod
     def sync_inventory(provider):
-        """Acquire a list of hosts from a provider and update our inventory"""
+        """Acquire a list of hosts from a provider and update our inventory."""
         additional_arg, instance = None, {}
         if "::" in provider:
             provider, instance = provider.split("::")
@@ -298,12 +311,12 @@ class Broker:
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
         curr_inventory = [
             hostname if (hostname := host.get("hostname")) else host.get("name")
-            for host in helpers.load_inventory(filter=f"_broker_provider={provider}")
+            for host in helpers.load_inventory(filter=f'@inv._broker_provider == "{provider}"')
         ]
         helpers.update_inventory(add=prov_inventory, remove=curr_inventory)
 
     def reconstruct_host(self, host_export_data):
-        """reconstruct a host from export data"""
+        """Reconstruct a host from export data."""
         logger.debug(f"reconstructing host with export: {host_export_data}")
         provider = PROVIDERS.get(host_export_data.get("_broker_provider"))
         if not provider:
@@ -320,7 +333,7 @@ class Broker:
         return host
 
     def from_inventory(self, filter=None):
-        """Reconstruct one or more hosts from the local inventory
+        """Reconstruct one or more hosts from the local inventory.
 
         :param filter: A broker-spec filter string
         """
@@ -330,8 +343,10 @@ class Broker:
     @classmethod
     @contextmanager
     def multi_manager(cls, **multi_dict):
-        """Given a mapping of names to Broker argument dictionaries:
-        create multiple Broker instances, check them out in parallel, yield, then checkin.
+        """Allow a user to check out multiple hosts at once.
+
+        Given a mapping of names to Broker argument dictionaries:
+            create multiple Broker instances, check them out in parallel, yield, then checkin.
 
         Example:
             with Broker.multi_mode(
@@ -364,18 +379,14 @@ class Broker:
             all_hosts.extend(broker_inst._hosts)
         # run setup on all hosts in parallel
         with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
-            completed_setups = as_completed(
-                workers.submit(host.setup) for host in all_hosts
-            )
+            completed_setups = as_completed(workers.submit(host.setup) for host in all_hosts)
             for completed in completed_setups:
                 completed.result()
         # yield control to the user
         yield {name: broker._hosts for name, broker in broker_instances.items()}
         # teardown all hosts in parallel
         with ThreadPoolExecutor(max_workers=len(all_hosts)) as workers:
-            completed_teardowns = as_completed(
-                workers.submit(host.teardown) for host in all_hosts
-            )
+            completed_teardowns = as_completed(workers.submit(host.teardown) for host in all_hosts)
             for completed in completed_teardowns:
                 completed.result()
         # checkin all hosts in parallel
@@ -387,6 +398,7 @@ class Broker:
                 completed.result()
 
     def __repr__(self):
+        """Return a string representation of the Broker instance."""
         inner = ", ".join(
             f"{k}={v}"
             for k, v in self.__dict__.items()
@@ -395,6 +407,7 @@ class Broker:
         return f"{self.__class__.__name__}({inner})"
 
     def __enter__(self):
+        """Checkout hosts and return them to the user."""
         try:
             hosts = self.checkout()
             if not hosts:
@@ -411,6 +424,7 @@ class Broker:
             raise err
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
+        """Teardown and checkin hosts."""
         last_exception = None
         for host in self._hosts:
             last_exception = _try_teardown(host)

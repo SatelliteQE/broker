@@ -19,6 +19,8 @@ Copy the example settings file to `broker_settings.yaml` and edit it.
 
 (optional) If you are using the Container provider, install the extra dependency based on your container runtime of choice with either `pip install broker[podman]` or `pip install broker[docker]`.
 
+(optional) If you are using the Beaker provider, install the extra dependency with `dnf install krb5-devel` and then `pip install broker[beaker]`.
+
 To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
 
 Configure the `broker_settings.yaml` file to set configuration values for broker's interaction with its providers.
