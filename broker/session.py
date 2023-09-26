@@ -64,6 +64,11 @@ class Session:
             self.session.userauth_publickey_fromfile(user, key_filename)
         elif kwargs.get("password"):
             self.session.userauth_password(user, kwargs["password"])
+        elif user:
+            try:
+                self.session.agent_auth(user)
+            except Exception as err:
+                raise exceptions.AuthenticationError("Agent-based authentication failed.") from err
         else:
             raise exceptions.AuthenticationError("No password or key file provided.")
 
