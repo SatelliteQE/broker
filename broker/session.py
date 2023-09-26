@@ -54,6 +54,7 @@ class Session:
         sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
         key_filename = kwargs.get("key_filename")
+        password = kwargs.get("password")
         timeout = kwargs.get("timeout", 60)
         helpers.simple_retry(sock.connect, [(host, port)], max_timeout=timeout)
         self.session = ssh2_Session()
@@ -61,9 +62,15 @@ class Session:
         if key_filename:
             if not Path(key_filename).exists():
                 raise FileNotFoundError(f"Key not found in '{key_filename}'")
-            self.session.userauth_publickey_fromfile(user, key_filename)
-        elif kwargs.get("password"):
-            self.session.userauth_password(user, kwargs["password"])
+            try:
+                self.session.userauth_publickey_fromfile(user, key_filename)
+            except Exception as err:
+                raise exceptions.AuthenticationError("Key-based authentication failed.") from err
+        elif password:
+            try:
+                self.session.userauth_password(user, password)
+            except Exception as err:
+                raise exceptions.AuthenticationError("Password-based authentication failed.") from err
         elif user:
             try:
                 self.session.agent_auth(user)
