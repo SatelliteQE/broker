@@ -210,13 +210,16 @@ class AnsibleTower(Provider):
         elif isinstance(inventory, str):
             if inventory_info := self.v2.inventory.get(search=inventory):
                 if inventory_info.count > 1:
+                    # let's try to manually narrow down to one result if the api returns multiple
+                    filtered = [inv for inv in inventory_info.results if inv.name == inventory]
+                    if len(filtered) == 1:
+                        return filtered[0].id
                     raise exceptions.ProviderError(
                         provider="AnsibleTower",
                         message=f"Ambigious AnsibleTower inventory name {inventory}",
                     )
                 elif inventory_info.count == 1:
-                    inv_struct = inventory_info.results.pop()
-                    return inv_struct.id
+                    return inventory_info.results.pop().id
                 else:
                     raise exceptions.ProviderError(
                         provider="AnsibleTower",
