@@ -156,14 +156,13 @@ def populate_providers(click_group):
 def cli(version):
     """Command-line interface for interacting with providers."""
     if version:
+        from packaging.version import Version
         import pkg_resources
+        import requests
 
         broker_version = pkg_resources.get_distribution("broker").version
         # check the latest version publish to PyPi
         try:
-            from packaging.version import Version
-            import requests
-
             latest_version = Version(
                 requests.get("https://pypi.org/pypi/broker/json", timeout=60).json()["info"][
                     "version"

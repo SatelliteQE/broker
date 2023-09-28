@@ -26,6 +26,7 @@ dependencies = [
     "click",
     "dynaconf<4.0.0",
     "logzero",
+    "packaging",
     "pyyaml",
     "setuptools",
     "ssh2-python",
