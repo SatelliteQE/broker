@@ -54,18 +54,29 @@ class Session:
         sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
         key_filename = kwargs.get("key_filename")
+        password = kwargs.get("password")
         timeout = kwargs.get("timeout", 60)
         helpers.simple_retry(sock.connect, [(host, port)], max_timeout=timeout)
         self.session = ssh2_Session()
         self.session.handshake(sock)
-        if key_filename:
-            if not Path(key_filename).exists():
-                raise FileNotFoundError(f"Key not found in '{key_filename}'")
-            self.session.userauth_publickey_fromfile(user, key_filename)
-        elif kwargs.get("password"):
-            self.session.userauth_password(user, kwargs["password"])
-        else:
-            raise exceptions.AuthenticationError("No password or key file provided.")
+        try:
+            if key_filename:
+                auth_type = "Key"
+                if not Path(key_filename).exists():
+                    raise FileNotFoundError(f"Key not found in '{key_filename}'")
+                self.session.userauth_publickey_fromfile(user, key_filename)
+            elif password:
+                auth_type = "Password"
+                self.session.userauth_password(user, password)
+            elif user:
+                auth_type = "Session"
+                self.session.agent_auth(user)
+            else:
+                raise exceptions.AuthenticationError("No password or key file provided.")
+        except Exception as err:  # noqa: BLE001
+            raise exceptions.AuthenticationError(
+                f"{auth_type}-based authentication failed."
+            ) from err
 
     @staticmethod
     def _read(channel):
