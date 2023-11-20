@@ -164,7 +164,7 @@ class Container(Provider):
                     if "/" in p:
                         p, s = p.split("/")
                     else:
-                        p, s = p, "tcp"
+                        s = "tcp"
                     mapping[f"{p}/{s}"] = int(h) if h else None
         elif settings.container.auto_map_ports:
             mapping = {
