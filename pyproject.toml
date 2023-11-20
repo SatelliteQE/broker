@@ -70,21 +70,8 @@ include = ["broker"]
 testpaths = ["tests"]
 addopts = ["-v", "-l", "--color=yes", "--code-highlight=yes"]
 
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311"]
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | build
-  | dist
-  | tests/data
-)/
-'''
-
 [tool.ruff]
+line-length = 100
 exclude = ["tests/"]
 target-version = "py311"
 fixable = ["ALL"]

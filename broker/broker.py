@@ -186,7 +186,7 @@ class Broker:
         self._kwargs.update(kwargs)
         if not self._provider_actions:
             raise self.BrokerError("Could not determine an appropriate provider")
-        for action, _arg in self._provider_actions.items():
+        for action in self._provider_actions:
             provider, method = PROVIDER_ACTIONS[action]
         logger.info(f"Using provider {provider.__name__} for execution")
         return self._act(provider, method)
