@@ -6,6 +6,6 @@ metadata:
   namespace: quality-community
   description: A root collection of all QE Broker configurations for Backstage.
 spec:
-  owner: user:redhat/rushinde
+  owner: group:redhat/quality-community
   targets:
     - ./catalog/system/broker.yaml
