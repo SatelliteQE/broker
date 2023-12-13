@@ -1,0 +1,25 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: broker
+  title: Broker
+  namespace: quality-community
+  description: The infrastructure middleman!
+  annotations:
+    github.com/project-slug: 'SatelliteQE/broker'
+  tags:
+    - python
+    - infrastructure
+    - click
+    - ansible-tower
+    - aap
+    - docker
+    - podman
+  links:
+    - title: PyPi
+      url: https://pypi.org/project/broker
+spec:
+  owner: group:redhat/satellite-qe
+  domain: quality-community/quality-community
+
