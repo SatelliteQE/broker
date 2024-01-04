@@ -350,8 +350,8 @@ class AnsibleTower(Provider):
                 self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
             )
             return str(datetime.fromtimestamp(int(time_stamp)))
-        except Exception as err:  # noqa: BLE001
-            logger.debug(f"Tell Jake that the exception here is: {err}!")
+        except AttributeError:
+            logger.debug(f"Unable to find expire_date for host {host_id}")
 
     def _compile_host_info(self, host):
         # attempt to get the hostname from the host variables and then facts
@@ -375,7 +375,7 @@ class AnsibleTower(Provider):
             create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
             create_job = create_job.results[0].get_related("source_workflow_job")
             host_info["_broker_args"]["workflow"] = create_job.name
-        except IndexError:
+        except (IndexError, awxkit.exceptions.Unknown):  # Unknown is a Gateway Timeout
             if "last_job" in host.related:
                 # potentially not create job, but easier processing below
                 create_job = host.get_related("last_job")
