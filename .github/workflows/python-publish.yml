@@ -9,6 +9,7 @@ jobs:
   publish:
     name: Build and Deploy to PyPi
     runs-on: ubuntu-latest
+    if: github.repository == 'SatelliteQE/broker'
     strategy:
       matrix:
         # build/push in lowest support python version

@@ -97,3 +97,4 @@ ENV/
 # project
 *settings.yaml
 inventory.yaml
+*.bak
