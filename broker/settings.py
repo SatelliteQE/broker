@@ -4,7 +4,7 @@ Useful items:
     settings: The settings object.
     init_settings: Function to initialize the settings file.
     validate_settings: Function to validate the settings file.
-    interactive_mode: Whether or not Broker is running in interactive mode.
+    INTERACTIVE_MODE: Whether or not Broker is running in interactive mode.
     BROKER_DIRECTORY: The directory where Broker looks for its files.
     settings_path: The path to the settings file.
     inventory_path: The path to the inventory file.
@@ -25,21 +25,29 @@ def init_settings(settings_path, interactive=False):
     raw_url = (
         "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
     )
-    if (
-        not interactive
-        or click.prompt(
-            f"Download example file from GitHub?\n{raw_url}",
-            type=click.Choice(["y", "n"]),
-        )
-        == "y"
-    ):
+    proceed = not False
+    if interactive:
+        try:
+            proceed = (
+                click.prompt(
+                    f"Download example file from GitHub?\n{raw_url}",
+                    type=click.Choice(["y", "n"]),
+                    default="y",
+                )
+                == "y"
+            )
+        except click.core.Abort:
+            # We're likely in a different non-interactive environment (container?)
+            global INTERACTIVE_MODE
+            proceed, INTERACTIVE_MODE = True, False
+    if proceed:
         # download example file from github
         import requests
 
         click.echo(f"Downloading example file from: {raw_url}")
         raw_file = requests.get(raw_url, timeout=60)
         settings_path.write_text(raw_file.text)
-        if interative_mode:
+        if INTERACTIVE_MODE:
             try:
                 click.edit(filename=str(settings_path.absolute()))
             except click.exceptions.ClickException:
@@ -51,13 +59,13 @@ def init_settings(settings_path, interactive=False):
         raise ConfigurationError(f"Broker settings file not found at {settings_path.absolute()}.")
 
 
-interative_mode = False
+INTERACTIVE_MODE = False
 # GitHub action context
 if "GITHUB_WORKFLOW" not in os.environ:
     # determine if we're being ran from a CLI
     for frame in inspect.stack()[::-1]:
         if "/bin/broker" in frame.filename:
-            interative_mode = True
+            INTERACTIVE_MODE = True
             break
 
 
@@ -76,7 +84,7 @@ inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 if not settings_path.exists():
     click.secho(f"Broker settings file not found at {settings_path.absolute()}.", fg="red")
-    init_settings(settings_path, interactive=interative_mode)
+    init_settings(settings_path, interactive=INTERACTIVE_MODE)
 
 validators = [
     Validator("HOST_USERNAME", default="root"),

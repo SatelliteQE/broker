@@ -8,6 +8,7 @@ jobs:
   broker_container:
     name: Update Broker container image on Quay.
     runs-on: ubuntu-latest
+    if: github.repository == 'SatelliteQE/broker'
 
     steps:
       - name: Checkout
@@ -29,6 +30,6 @@ jobs:
       - name: Build and push image to Quay
         uses: docker/build-push-action@v5
         with:
-          file: ./Dockerfile
+          context: .
           push: true
           tags: ${{ secrets.QUAY_SERVER }}/${{ secrets.QUAY_NAMESPACE }}/broker:latest
