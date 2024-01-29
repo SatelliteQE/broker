@@ -35,13 +35,15 @@ class Host:
         """Create a Host instance.
 
         Expected kwargs:
-          hostname: str - Hostname or IP address of the host, required
-          name: str - Name of the host
-          username: str - Username to use for SSH connection
-          password: str - Password to use for SSH connection
-          connection_timeout: int - Timeout for SSH connection
-          port: int - Port to use for SSH connection
-          key_filename: str - Path to SSH key file to use for SSH connection
+            hostname: (str) - Hostname or IP address of the host, required
+            name: (str) - Name of the host
+            username: (str) - Username to use for SSH connection
+            password: (str) - Password to use for SSH connection
+            connection_timeout: (int) - Timeout for SSH connection
+            port: (int) - Port to use for SSH connection
+            key_filename: (str) - Path to SSH key file to use for SSH connection
+            ipv6 (bool): Whether or not to use IPv6. Defaults to False.
+            ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
         """
         logger.debug(f"Constructing host using {kwargs=}")
         self.hostname = kwargs.get("hostname") or kwargs.get("ip")
@@ -59,6 +61,8 @@ class Host:
         self.timeout = kwargs.pop("connection_timeout", settings.HOST_CONNECTION_TIMEOUT)
         self.port = kwargs.pop("port", settings.HOST_SSH_PORT)
         self.key_filename = kwargs.pop("key_filename", settings.HOST_SSH_KEY_FILENAME)
+        self.ipv6 = kwargs.pop("ipv6", settings.HOST_IPV6)
+        self.ipv4_fallback = kwargs.pop("ipv4_fallback", settings.HOST_IPV4_FALLBACK)
         self.__dict__.update(kwargs)  # Make every other kwarg an attribute
         self._session = None
 
@@ -84,7 +88,16 @@ class Host:
                 self.connect()
         return self._session
 
-    def connect(self, username=None, password=None, timeout=None, port=22, key_filename=None):
+    def connect(
+        self,
+        username=None,
+        password=None,
+        timeout=None,
+        port=22,
+        key_filename=None,
+        ipv6=False,
+        ipv4_fallback=True,
+    ):
         """Connect to the host using SSH.
 
         Args:
@@ -93,6 +106,8 @@ class Host:
             timeout (int): The timeout for the SSH connection in seconds.
             port (int): The port to use for the SSH connection. Defaults to 22.
             key_filename (str): The path to the private key file to use for the SSH connection.
+            ipv6 (bool): Whether or not to use IPv6. Defaults to False.
+            ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
         """
         username = username or self.username
         password = password or self.password
@@ -103,6 +118,8 @@ class Host:
         if ":" in self.hostname:
             _hostname, port = self.hostname.split(":")
             _port = int(port)
+        ipv6 = ipv6 or self.ipv6
+        ipv4_fallback = ipv4_fallback or self.ipv4_fallback
         self.close()
         self._session = Session(
             hostname=_hostname,
@@ -111,6 +128,8 @@ class Host:
             port=_port,
             key_filename=key_filename,
             timeout=timeout,
+            ipv6=ipv6,
+            ipv4_fallback=ipv4_fallback,
         )
 
     def close(self):

@@ -30,6 +30,54 @@ SFTP_MODE = (
 FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
 
 
+def _create_connect_socket(host, port, timeout, ipv6=False, ipv4_fallback=True, sock=None):
+    """Create a socket and establish a connection to the specified host and port.
+
+    Args:
+        host (str): The hostname or IP address of the remote server.
+        port (int): The port number to connect to.
+        timeout (float): The timeout value in seconds for the socket connection.
+        ipv6 (bool, optional): Whether to use IPv6. Defaults to False.
+        ipv4_fallback (bool, optional): Whether to fallback to IPv4 if IPv6 fails. Defaults to True.
+        sock (socket.socket, optional): An existing socket object to use. Defaults to None.
+
+    Returns:
+        socket.socket: The connected socket object.
+        bool: True if IPv6 was used, False otherwise.
+
+    Raises:
+        exceptions.ConnectionError: If unable to establish a connection to the host.
+    """
+    if ipv6 and not sock:
+        try:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        except OSError as err:
+            if ipv4_fallback:
+                logger.warning(f"IPv6 failed with {err}. Falling back to IPv4.")
+                return _create_connect_socket(host, port, timeout, ipv6=False)
+            else:
+                raise exceptions.ConnectionError(
+                    f"Unable to establish IPv6 connection to {host}."
+                ) from err
+    elif not sock:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    if ipv6:
+        try:
+            sock.connect((host, port))
+        except socket.gaierror as err:
+            if ipv4_fallback:
+                logger.warning(f"IPv6 connection failed to {host}. Falling back to IPv4.")
+                return _create_connect_socket(host, port, timeout, ipv6=False, sock=sock)
+            else:
+                raise exceptions.ConnectionError(
+                    f"Unable to establish IPv6 connection to {host}."
+                ) from err
+    else:
+        sock.connect((host, port))
+    return sock, ipv6
+
+
 class Session:
     """Wrapper around ssh2-python's auth/connection system."""
 
@@ -43,22 +91,30 @@ class Session:
             port (int): The port number to connect to. Defaults to 22.
             key_filename (str): The path to the private key file to use for authentication.
             password (str): The password to use for authentication.
+            ipv6 (bool): Whether or not to use IPv6. Defaults to False.
+            ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
 
         Raises:
             AuthException: If no password or key file is provided.
+            ConnectionError: If the connection fails.
             FileNotFoundError: If the key file is not found.
         """
         host = kwargs.get("hostname", "localhost")
         user = kwargs.get("username", "root")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(kwargs.get("timeout"))
         port = kwargs.get("port", 22)
         key_filename = kwargs.get("key_filename")
         password = kwargs.get("password")
         timeout = kwargs.get("timeout", 60)
-        helpers.simple_retry(sock.connect, [(host, port)], max_timeout=timeout)
+        # create the socket
+        self.sock, self.is_ipv6 = _create_connect_socket(
+            host,
+            port,
+            timeout,
+            ipv6=kwargs.get("ipv6", False),
+            ipv4_fallback=kwargs.get("ipv4_fallback", True),
+        )
         self.session = ssh2_Session()
-        self.session.handshake(sock)
+        self.session.handshake(self.sock)
         try:
             if key_filename:
                 auth_type = "Key"
