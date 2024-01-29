@@ -92,6 +92,8 @@ validators = [
     Validator("HOST_CONNECTION_TIMEOUT", default=60),
     Validator("HOST_SSH_PORT", default=22),
     Validator("HOST_SSH_KEY_FILENAME", default=None),
+    Validator("HOST_IPV6", default=False),
+    Validator("HOST_IPV4_FALLBACK", default=True),
     Validator("LOGGING", is_type_of=dict),
     Validator(
         "LOGGING.CONSOLE_LEVEL",
