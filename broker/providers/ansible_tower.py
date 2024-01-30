@@ -344,15 +344,6 @@ class AnsibleTower(Provider):
         else:
             return failure_messages
 
-    def _get_expire_date(self, host_id):
-        try:
-            time_stamp = (
-                self.v2.hosts.get(id=host_id).results[0].related.ansible_facts.get().expire_date
-            )
-            return str(datetime.fromtimestamp(int(time_stamp)))
-        except AttributeError:
-            logger.debug(f"Unable to find expire_date for host {host_id}")
-
     def _compile_host_info(self, host):
         # attempt to get the hostname from the host variables and then facts
         if not (hostname := host.variables.get("fqdn")):
@@ -368,9 +359,6 @@ class AnsibleTower(Provider):
             "_broker_provider_instance": self.instance,
             "_broker_args": getattr(host, "_broker_args", {}),
         }
-        expire_time = self._get_expire_date(host.id)
-        if expire_time:
-            host_info["expire_time"] = expire_time
         try:
             create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
             create_job = create_job.results[0].get_related("source_workflow_job")
