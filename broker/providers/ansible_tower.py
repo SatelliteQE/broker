@@ -364,15 +364,15 @@ class AnsibleTower(Provider):
             "_broker_provider": "AnsibleTower",
             "_broker_provider_instance": self.instance,
             # Get _broker_args from host facts if present
-            "_broker_args": getattr(host_facts, "_broker_args", {}) or self._get_broker_args_from_job(host),
+            "_broker_args": getattr(
+                host_facts, "_broker_args", self._get_broker_args_from_job(host)
+            ),
         }
 
         return host_info
 
     def _get_broker_args_from_job(self, host):
-        """Get _broker_args from the source workflow job.
-           If the source workflow job could not be found, then try the last job.
-        """
+        """Get _broker_args from the source workflow job or last job."""
         _broker_args = {}
 
         try:
@@ -434,9 +434,7 @@ class AnsibleTower(Provider):
                 else self._translate_inventory(job.summary_fields.inventory)
             }
 
-            # FIXME Find better way to return ip / ansible_host from job
-            misc_attrs["ip"] = kwargs["ip"]
-            kwargs.pop("ip")
+            misc_attrs["ip"] = kwargs.pop("ip", None)
 
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
