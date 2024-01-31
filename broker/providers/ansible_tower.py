@@ -345,10 +345,16 @@ class AnsibleTower(Provider):
             return failure_messages
 
     def _compile_host_info(self, host):
-        # attempt to get the hostname from the host variables and then facts
-        if not (hostname := host.variables.get("fqdn")):
-            if hasattr(host_facts := host.related.ansible_facts.get(), "results"):
-                hostname = host_facts.results[0].ansible_facts.get("ansible_fqdn")
+        host_facts = host.related.ansible_facts.get()
+
+        # Get the hostname from host variables or facts
+        hostname = (
+            host.variables.get("fqdn")
+            or getattr(host_facts, "ansible_fqdn", None)
+            # Workaround for OSP hosts that have lost their hostname
+            or host.variables.get("openstack", {}).get("metadata", {}).get("fqdn", None)
+        )
+
         host_info = {
             "name": host.name,
             "type": host.type,
@@ -357,33 +363,38 @@ class AnsibleTower(Provider):
             "tower_inventory": self._translate_inventory(host.inventory),
             "_broker_provider": "AnsibleTower",
             "_broker_provider_instance": self.instance,
-            "_broker_args": getattr(host, "_broker_args", {}),
+            # Get _broker_args from host facts if present
+            "_broker_args": getattr(
+                host_facts, "_broker_args", self._get_broker_args_from_job(host)
+            ),
         }
+
+        return host_info
+
+    def _get_broker_args_from_job(self, host):
+        """Get _broker_args from the source workflow job or last job."""
+        _broker_args = {}
+
         try:
             create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
             create_job = create_job.results[0].get_related("source_workflow_job")
-            host_info["_broker_args"]["workflow"] = create_job.name
+            _broker_args["workflow"] = create_job.name
         except (IndexError, awxkit.exceptions.Unknown):  # Unknown is a Gateway Timeout
             if "last_job" in host.related:
                 # potentially not create job, but easier processing below
                 create_job = host.get_related("last_job")
                 try:
-                    host_info["_broker_args"]["workflow"] = host.get_related(
-                        "last_job"
-                    ).summary_fields.source_workflow_job.name
+                    _broker_args["workflow"] = create_job.summary_fields.source_workflow_job.name
                 except Exception as err:  # noqa: BLE001
                     logger.debug(f"Tell Jake that the exception here is: {err}!")
-                    logger.warning(f"Unable to determine workflow for {host_info['hostname']}")
+                    logger.warning(f"Unable to determine workflow for {host.name}")
             else:
-                return host_info
+                return _broker_args
         create_vars = json.loads(create_job.extra_vars)
-        host_info["_broker_args"].update(
+        _broker_args.update(
             {arg: val for arg, val in create_vars.items() if val and isinstance(val, str)}
         )
-        # temporary workaround for OSP hosts that have lost their hostname
-        if not host_info["hostname"] and host.variables.get("openstack"):
-            host_info["hostname"] = host.variables["openstack"]["metadata"].get("fqdn")
-        return host_info
+        return _broker_args
 
     @cached_property
     def inventory(self):
@@ -422,6 +433,9 @@ class AnsibleTower(Provider):
                 if "tower_inventory" in job_attrs
                 else self._translate_inventory(job.summary_fields.inventory)
             }
+
+            misc_attrs["ip"] = kwargs.pop("ip", None)
+
             job_attrs = helpers.flatten_dict(job_attrs)
             logger.debug(job_attrs)
             hostname, name, host_type = None, None, "host"
