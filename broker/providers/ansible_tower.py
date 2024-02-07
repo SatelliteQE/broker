@@ -244,31 +244,41 @@ class AnsibleTower(Provider):
         :param strategy:
             strategies:
                - merge: merge artifact dictionaries together
-               - branch: each branched child gets its own sub-dictionary (todo)
-               - min-branch: only branch children if conflict is detected (todo)
+               - last: return only the artifacts associated with the last child job
 
         :param artifacts: default to none
 
         :return: dictionary of merged artifact, used for constructing host
         """
         logger.debug(f"Attempting to merge: {at_object.name}")
-        if not artifacts:
+
+        if artifacts is None:
             artifacts = {}
+
+        # Merge with or overwrite previous artifacts, depending on strategy
         if getattr(at_object, "artifacts", None):
             logger.debug(f"Found artifacts: {at_object.artifacts}")
             if strategy == "merge":
                 artifacts = helpers.merge_dicts(artifacts, at_object.artifacts)
             elif strategy == "last":
                 artifacts = at_object.artifacts
+
+        # If this is a workflow job, then find any children jobs
         if "workflow_nodes" in at_object.related:
             children = at_object.get_related("workflow_nodes").results
-            # filter out children with no associated job
+
+            # Filter out children with no associated job
             children = list(
                 filter(lambda child: getattr(child.summary_fields, "job", None), children)
             )
+
+            # Sort children by job id
             children.sort(key=lambda child: child.summary_fields.job.id)
+
             if strategy == "last":
+                # Filter out all but the last job
                 children = children[-1:]
+
             for child in children:
                 if child.type == "workflow_job_node":
                     logger.debug(child)
@@ -355,6 +365,9 @@ class AnsibleTower(Provider):
             or host.variables.get("openstack", {}).get("metadata", {}).get("fqdn", None)
         )
 
+        # Get broker_args from host facts if present
+        broker_args = getattr(host_facts, "_broker_args", self._get_broker_args_from_job(host))
+
         host_info = {
             "name": host.name,
             "type": host.type,
@@ -364,10 +377,17 @@ class AnsibleTower(Provider):
             "_broker_provider": "AnsibleTower",
             "_broker_provider_instance": self.instance,
             # Get _broker_args from host facts if present
-            "_broker_args": getattr(
-                host_facts, "_broker_args", self._get_broker_args_from_job(host)
-            ),
+            "_broker_args": {key: val for key, val in broker_args.items() if val},
         }
+
+        # Find and add extra fields
+        interfaces = getattr(host_facts, "ansible_interfaces", [])
+        facts = {
+            "os_distribution": getattr(host_facts, "ansible_distribution", None),
+            "os_distribution_version": getattr(host_facts, "ansible_distribution_version", None),
+            "reported_devices": {"nics": interfaces} if interfaces else None,
+        }
+        host_info.update({key: val for key, val in facts.items() if val})
 
         return host_info
 
@@ -417,42 +437,82 @@ class AnsibleTower(Provider):
 
         :return: broker object of constructed host instance
         """
-        misc_attrs = {}  # used later to add misc attributes to host object
-        if provider_params:
-            job = provider_params
-            job_attrs = self._merge_artifacts(job, strategy=kwargs.get("strategy", "last"))
-            # pull information about the job arguments
-            job_extra_vars = json.loads(job.extra_vars)
-            # and update them if they have resolved values
-            for key in job_extra_vars:
-                job_extra_vars[key] = job_attrs.get(key)
-            kwargs.update({key: val for key, val in job_extra_vars.items() if val})
-            kwargs.update({key: val for key, val in job_attrs.items() if val})
-            misc_attrs = {
-                "tower_inventory": job_attrs["tower_inventory"]
-                if "tower_inventory" in job_attrs
-                else self._translate_inventory(job.summary_fields.inventory)
-            }
+        broker_args = kwargs.copy()
+        broker_facts = {}
 
-            misc_attrs["ip"] = kwargs.pop("ip", None)
+        strategy = broker_args.pop("strategy", "last")
 
-            job_attrs = helpers.flatten_dict(job_attrs)
-            logger.debug(job_attrs)
-            hostname, name, host_type = None, None, "host"
-            for key, value in job_attrs.items():
+        def _get_fields_from_facts(facts):
+            hostname = None
+            name = None
+            host_type = "host"
+
+            for key, value in facts.items():
                 if key.endswith("fqdn") and not hostname:
                     hostname = value if not isinstance(value, list) else value[0]
                 if key in ("name", "vm_provisioned") and not name:
                     name = value if not isinstance(value, list) else value[0]
                 if key.endswith("host_type"):
                     host_type = value if value in host_classes else host_type
-            if not hostname:
-                logger.warning(f"No hostname found in job attributes:\n{job_attrs}")
-            logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
-            host_inst = host_classes[host_type](**{**kwargs, "hostname": hostname, "name": name})
+
+            return hostname, name, host_type
+
+        if provider_params:
+            job = provider_params
+            artifacts = self._merge_artifacts(job, strategy=strategy)
+
+            # Use new host fact based method, if available
+            if "_broker_args" in artifacts and "_broker_facts" in artifacts:
+                broker_args = {k: v for k, v in artifacts._broker_args.items() if v}
+                broker_facts = {k: v for k, v in artifacts._broker_facts.items() if v}
+                logger.debug(artifacts)
+
+                # Get hostname, VM name, and host type
+                hostname, name, host_type = _get_fields_from_facts(broker_facts)
+                if not hostname:
+                    logger.warning(f"No hostname found in job artifacts:\n{artifacts}")
+                logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
+
+                host_inst = host_classes[host_type](
+                    **{**broker_args, "hostname": hostname, "name": name}
+                )
+                broker_facts["name"] = name
+                broker_facts["hostname"] = hostname
+
+            # Fallback to old method
+            else:
+                # Get initial extra vars passed to workflow
+                job_extra_vars = json.loads(job.extra_vars)
+
+                # Update with resolved values stored on job
+                for key in job_extra_vars:
+                    job_extra_vars[key] = artifacts.get(key)
+
+                # Add all non-empty workflow variables and job artifacts
+                broker_args.update({key: val for key, val in job_extra_vars.items() if val})
+                broker_args.update({key: val for key, val in artifacts.items() if val})
+
+                # Get inventory name
+                broker_args["tower_inventory"] = broker_facts.pop(
+                    "tower_inventory", self._translate_inventory(job.summary_fields.inventory)
+                )
+                artifacts = helpers.flatten_dict(artifacts)
+                logger.debug(artifacts)
+
+                # Get hostname, VM name, and host type
+                hostname, name, host_type = _get_fields_from_facts(artifacts)
+                if not hostname:
+                    logger.warning(f"No hostname found in job artifacts:\n{artifacts}")
+                logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
+
+                host_inst = host_classes[host_type](
+                    **{**broker_args, "hostname": hostname, "name": name}
+                )
         else:
-            host_inst = host_classes[kwargs.get("type")](**kwargs)
-        self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=misc_attrs)
+            host_inst = host_classes[kwargs.get("type")](**broker_args)
+
+        self._set_attributes(host_inst, broker_args=broker_args, misc_attrs=broker_facts)
+
         return host_inst
 
     @Provider.register_action("workflow", "job_template")
@@ -497,6 +557,14 @@ class AnsibleTower(Provider):
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
+
+        # Save custom, non-workflow extra vars to a named variable.
+        # The workflow can save these values to job artifacts / host facts.
+        workflow_extra_vars = json.loads(target.extra_vars)
+        kwargs["_broker_extra_vars"] = {
+            k: v for k, v in kwargs.items() if k not in workflow_extra_vars
+        }
+
         payload["extra_vars"] = str(kwargs)
         logger.debug(
             f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n{payload=}"
@@ -521,9 +589,8 @@ class AnsibleTower(Provider):
             raise exceptions.ProviderError(
                 provider="AnsibleTower", message=message_data["Reason(s)"]
             )
-        if artifacts := kwargs.get("artifacts"):
-            del kwargs["artifacts"]
-            return self._merge_artifacts(job, strategy=artifacts)
+        if strategy := kwargs.pop("artifacts", None):
+            return self._merge_artifacts(job, strategy=strategy)
         return job
 
     def get_inventory(self, user=None):

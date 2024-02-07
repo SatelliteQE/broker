@@ -175,6 +175,10 @@ class Host:
             "tower_inventory",
             "job_id",
             "_attrs",
+            "ip",
+            "os_distribution",
+            "os_distribution_version",
+            "reported_devices",
         )
         ret_dict = {
             "name": getattr(self, "name", None),
