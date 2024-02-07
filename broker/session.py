@@ -14,20 +14,25 @@ import socket
 import tempfile
 
 from logzero import logger
-from ssh2 import sftp as ssh2_sftp
-from ssh2.session import Session as ssh2_Session
 
 from broker import exceptions, helpers
 
-SESSIONS = {}
+try:
+    from ssh2 import sftp as ssh2_sftp
+    from ssh2.session import Session as ssh2_Session
 
-SFTP_MODE = (
-    ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
-    | ssh2_sftp.LIBSSH2_SFTP_S_IWUSR
-    | ssh2_sftp.LIBSSH2_SFTP_S_IRGRP
-    | ssh2_sftp.LIBSSH2_SFTP_S_IROTH
-)
-FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
+    SFTP_MODE = (
+        ssh2_sftp.LIBSSH2_SFTP_S_IRUSR
+        | ssh2_sftp.LIBSSH2_SFTP_S_IWUSR
+        | ssh2_sftp.LIBSSH2_SFTP_S_IRGRP
+        | ssh2_sftp.LIBSSH2_SFTP_S_IROTH
+    )
+    FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
+except ImportError:
+    logger.warning(
+        "ssh2-python is not installed, ssh actions will not work.\n"
+        "To use ssh, run pip install broker[ssh2]."
+    )
 
 
 def _create_connect_socket(host, port, timeout, ipv6=False, ipv4_fallback=True, sock=None):
