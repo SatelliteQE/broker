@@ -315,8 +315,13 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
 def duplicate(vm, background, count, all_, filter):
     """Duplicate a broker-procured vm.
 
+    DEPRECATED! This will be removed in Broker 0.5. If you need this feature, please open an issue.
+
     COMMAND: broker duplicate <vm hostname>|<local id>|all
     """
+    logger.warning(
+        "Duplicate will be remove in Broker 0.5. If you need this feature, please open an issue."
+    )
     if background:
         helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
