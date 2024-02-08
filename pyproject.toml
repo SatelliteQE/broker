@@ -30,7 +30,6 @@ dependencies = [
     "packaging",
     "pyyaml",
     "setuptools",
-    "ssh2-python@git+https://github.com/jacobcallahan/ssh2-python.git"
 ]
 dynamic = ["version"]  # dynamic fields to update on build - version via setuptools_scm
 
@@ -38,6 +37,7 @@ dynamic = ["version"]  # dynamic fields to update on build - version via setupto
 Repository = "https://github.com/SatelliteQE/broker"
 
 [project.optional-dependencies]
+beaker = ["beaker-client"]
 dev = [
     "pre-commit",
     "pytest",
@@ -48,11 +48,12 @@ docker = [
     "paramiko"
 ]
 podman = ["podman-py"]
-beaker = ["beaker-client"]
 setup = [
     "build",
     "twine",
 ]
+ssh2 = ["ssh2-python@git+https://github.com/jacobcallahan/ssh2-python.git"]
+ssh2_py311 = ["ssh2-python"]
 
 [project.scripts]
 broker = "broker.commands:cli"
