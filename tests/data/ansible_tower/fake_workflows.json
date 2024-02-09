@@ -3,12 +3,14 @@
     "id": 34,
     "type": "workflow_job_template",
     "url": "/api/v2/workflow_job_templates/34/",
-    "name": "deploy-base-rhel"
+    "name": "deploy-base-rhel",
+    "extra_vars": "{\"deploy_scenario\": \"baserhel\", \"deploy_rhel_version\": \"\", \"host_type\": \"host\", \"deploy_flavor\": \"prod-ssd.memory.xs\"}"
   },
   {
     "id": 35,
     "type": "workflow_job_template",
     "url": "/api/v2/workflow_job_templates/35/",
-    "name": "remove-vm"
+    "name": "remove-vm",
+    "extra_vars": "{\"source_vm\": \"\", \"host_type\": \"host\"}"
   }
 ]
