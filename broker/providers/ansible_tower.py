@@ -366,7 +366,9 @@ class AnsibleTower(Provider):
         )
 
         # Get broker_args from host facts if present
-        broker_args = getattr(host_facts, "_broker_args", self._get_broker_args_from_job(host))
+        broker_args = getattr(host_facts, "_broker_args", None) or self._get_broker_args_from_job(
+            host
+        )
 
         host_info = {
             "name": host.name,
