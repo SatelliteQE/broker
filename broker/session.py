@@ -27,7 +27,9 @@ try:
         | ssh2_sftp.LIBSSH2_SFTP_S_IRGRP
         | ssh2_sftp.LIBSSH2_SFTP_S_IROTH
     )
-    FILE_FLAGS = ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE
+    FILE_FLAGS = (
+        ssh2_sftp.LIBSSH2_FXF_CREAT | ssh2_sftp.LIBSSH2_FXF_WRITE | ssh2_sftp.LIBSSH2_FXF_TRUNC
+    )
 except ImportError:
     logger.warning(
         "ssh2-python is not installed, ssh actions will not work.\n"
