@@ -17,14 +17,21 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Setup and Build
+      env:
+        PWD: "${{ github.workspace }}"
       run: |
-        pip install -U pip .[setup]
+        pip install uv
+        uv venv
+        source .venv/bin/activate
+        uv pip install -e .[setup]
         python -m build
         python -m twine check dist/*
 
