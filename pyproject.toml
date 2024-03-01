@@ -30,7 +30,7 @@ dependencies = [
     "packaging",
     "pyyaml",
     "setuptools",
-    "ssh2-python@git+https://github.com/jacobcallahan/ssh2-python.git",
+    "ssh2-python  @ file://${PWD}/broker/vendored/ssh2-python",
 ]
 dynamic = ["version"]  # dynamic fields to update on build - version via setuptools_scm
 
@@ -53,7 +53,7 @@ setup = [
     "build",
     "twine",
 ]
-ssh2 = ["ssh2-python@git+https://github.com/jacobcallahan/ssh2-python.git"]
+# ssh2 = ["ssh2-python@git+https://github.com/jacobcallahan/ssh2-python.git"]
 ssh2_py311 = ["ssh2-python"]
 
 [project.scripts]

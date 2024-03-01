@@ -1,0 +1,3 @@
+[submodule "broker/vendored/ssh2-python"]
+	path = broker/vendored/ssh2-python
+	url = https://github.com/jacobcallahan/ssh2-python.git
