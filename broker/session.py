@@ -19,6 +19,7 @@ from broker import exceptions, helpers
 
 try:
     from ssh2 import sftp as ssh2_sftp
+    from ssh2.exceptions import SocketSendError
     from ssh2.session import Session as ssh2_Session
 
     SFTP_MODE = (
@@ -160,7 +161,14 @@ class Session:
     def run(self, command, timeout=0):
         """Run a command on the host and return the results."""
         self.session.set_timeout(helpers.translate_timeout(timeout))
-        channel = self.session.open_session()
+        try:
+            channel = self.session.open_session()
+        except SocketSendError as err:
+            logger.warning(
+                f"Encountered connection issue. Attempting to reconnect and retry.\n{err}"
+            )
+            del self._session
+            channel = self.session.open_session()
         channel.execute(
             command,
         )
