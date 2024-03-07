@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -50,7 +48,6 @@ jobs:
       - name: Unit Tests
         env:
           BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
-          PWD: "${{ github.workspace }}"
         run: |
           pip install uv
           uv venv

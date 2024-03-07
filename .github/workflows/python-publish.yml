@@ -17,16 +17,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Setup and Build
-      env:
-        PWD: "${{ github.workspace }}"
       run: |
         pip install uv
         uv venv
