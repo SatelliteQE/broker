@@ -17,15 +17,6 @@ Install Broker either by cloning locally with `pip install .` or with `pip insta
 
 Copy the example settings file to `broker_settings.yaml` and edit it.
 
-(optional) If you are using Broker for ssh-based host interaction, install one of the supported ssh backends.
-```
-# For python 3.12+
-pip install broker[ssh2]
-
-# For python 3.11 and below
-pip install broker[ssh2_py311]
-```
-
 (optional) If you are using the Container provider, install the extra dependency based on your container runtime of choice with either `pip install broker[podman]` or `pip install broker[docker]`.
 
 (optional) If you are using the Beaker provider, install the extra dependency with `dnf install krb5-devel` and then `pip install broker[beaker]`.
