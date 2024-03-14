@@ -25,9 +25,7 @@ jobs:
     - name: Setup and Build
       run: |
         pip install uv
-        uv venv
-        source .venv/bin/activate
-        uv pip install -e .[setup]
+        uv pip install --system "broker[dev,docker] @ ."
         python -m build
         python -m twine check dist/*
 
