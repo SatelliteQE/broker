@@ -50,9 +50,7 @@ jobs:
           BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
         run: |
           pip install uv
-          uv venv
-          source .venv/bin/activate
-          uv pip install -e .[dev,docker]
+          uv pip install --system "broker[dev,docker] @ ."
           ls -l "$BROKER_DIRECTORY"
           broker --version
           pytest -v tests/ --ignore tests/functional
