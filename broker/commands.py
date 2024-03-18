@@ -190,13 +190,16 @@ def cli(version):
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
 @click.option(
+    "--labels", type=str, help="List of strings (comma-separated) to be used as AAP labels"
+)  # fixme - this should be provider-agnostic
+@click.option(
     "--args-file",
     type=click.Path(exists=True),
     help="A json or yaml file mapping arguments to values",
 )
 @provider_options
 @click.pass_context
-def checkout(ctx, background, nick, count, args_file, **kwargs):
+def checkout(ctx, background, nick, count, args_file, labels, **kwargs):
     """Checkout or "create" a Virtual Machine broker instance.
 
     COMMAND: broker checkout --workflow "workflow-name" --workflow_arg1 something
@@ -210,6 +213,8 @@ def checkout(ctx, background, nick, count, args_file, **kwargs):
         broker_args["_count"] = count
     if args_file:
         broker_args["args_file"] = args_file
+    if labels:
+        broker_args["labels"] = labels.split(",")
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
     broker_args.update(
