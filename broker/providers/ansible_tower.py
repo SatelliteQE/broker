@@ -418,6 +418,24 @@ class AnsibleTower(Provider):
         )
         return _broker_args
 
+    def _resolve_labels(self, labels, target):
+        """Fetch and return ids of the given labels.
+
+        If label does not exist, create it under the same org as the target template.
+        """
+        label_ids = []
+        for label in labels:
+            if result := self.v2.labels.get(name=label).results:
+                label_ids.append(result[0].id)
+            else:
+                # label does not exist yet, creating
+                result = self.v2.labels.post(
+                    {"name": label, "organization": target.summary_fields.organization.id}
+                )
+                if result:
+                    label_ids.append(result.id)
+        return label_ids
+
     @cached_property
     def inventory(self):
         """Return the current tower inventory."""
@@ -518,7 +536,7 @@ class AnsibleTower(Provider):
         return host_inst
 
     @Provider.register_action("workflow", "job_template")
-    def execute(self, **kwargs):  # noqa: PLR0912 - Possible TODO refactor
+    def execute(self, **kwargs):  # noqa: PLR0912,PLR0915 - Possible TODO refactor
         """Execute workflow or job template in Ansible Tower.
 
         :param kwargs: workflow or job template name passed in a string
@@ -554,6 +572,15 @@ class AnsibleTower(Provider):
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(inventory)}")
+        if labels := kwargs.pop("labels", None):
+            payload["labels"] = self._resolve_labels(labels, target)
+            # record labels also as extra vars - use key=value format
+            kwargs.update(
+                {
+                    f"_broker_label_{label[0]}": "=".join(label[1:])
+                    for label in [kv_pair.split("=") for kv_pair in labels]
+                }
+            )
         elif self.inventory:
             payload["inventory"] = self.inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
