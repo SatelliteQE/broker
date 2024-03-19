@@ -418,6 +418,24 @@ class AnsibleTower(Provider):
         )
         return _broker_args
 
+    @staticmethod
+    def _pull_extra_vars(extra_vars):
+        """Pull extra vars from a json string or psuedo-dictionary."""
+        if not extra_vars:
+            return {}
+        try:
+            return json.loads(extra_vars)
+        except json.JSONDecodeError:
+            logger.warning(
+                f"Job uses non-json extra_vars:\n{extra_vars}\n"
+                "Attempting to parse as pseudo-dictionary."
+            )
+            compiled = {}
+            for line in extra_vars.splitlines():
+                key, val = line.split(": ")
+                compiled[key] = val
+            return compiled
+
     @cached_property
     def inventory(self):
         """Return the current tower inventory."""
@@ -484,7 +502,7 @@ class AnsibleTower(Provider):
             # Fallback to old method
             else:
                 # Get initial extra vars passed to workflow
-                job_extra_vars = json.loads(job.extra_vars)
+                job_extra_vars = self._pull_extra_vars(job.extra_vars)
 
                 # Update with resolved values stored on job
                 for key in job_extra_vars:
@@ -562,11 +580,10 @@ class AnsibleTower(Provider):
 
         # Save custom, non-workflow extra vars to a named variable.
         # The workflow can save these values to job artifacts / host facts.
-        workflow_extra_vars = json.loads(target.extra_vars)
+        workflow_extra_vars = self._pull_extra_vars(target.extra_vars)
         kwargs["_broker_extra_vars"] = {
             k: v for k, v in kwargs.items() if k not in workflow_extra_vars
         }
-
         payload["extra_vars"] = str(kwargs)
         logger.debug(
             f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n{payload=}"
