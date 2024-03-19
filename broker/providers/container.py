@@ -274,7 +274,14 @@ class Container(Provider):
         if origin[1]:
             envars["JENKINS_URL"] = origin[1]
         kwargs["environment"] = envars
-        kwargs["labels"] = envars
+        # process eventual labels that were passed externally, split by "="
+        kwargs["labels"] = {
+            label[0]: "".join(label[1:])
+            for label in [kv_pair.split("=") for kv_pair in kwargs.get("labels", {})]
+        }
+        # map(lambda l: l.split("="), kwargs.get("labels", {}))
+        # append envars as labels too
+        kwargs["labels"].update(envars)
         container_inst = self.runtime.create_container(container_host, **kwargs)
         container_inst.start()
         return container_inst
