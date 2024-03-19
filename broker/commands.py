@@ -219,7 +219,11 @@ def checkout(ctx, background, nick, count, args_file, labels, **kwargs):
     if args_file:
         broker_args["args_file"] = args_file
     if labels:
-        broker_args["labels"] = labels.split(",")
+        broker_args["labels"] = {
+            f"broker.{label[0]}": "=".join(label[1:])
+            for label in [kv_pair.split("=") for kv_pair in labels.split(",")]
+        }
+
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
     broker_args.update(
