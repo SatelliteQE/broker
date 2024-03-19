@@ -133,7 +133,6 @@ select = [
     "T100", # Trace found: {name} used
     "T20", # flake8-print
     "TRY004", # Prefer TypeError exception for invalid type
-    "TRY200", # Use raise from to specify exception cause
     "TRY302", # Remove exception handler; error is immediately re-raised
     "PLR0911", # Too many return statements ({returns} > {max_returns})
     "PLR0912", # Too many branches ({branches} > {max_branches})
@@ -146,7 +145,6 @@ select = [
 
 ignore = [
     "ANN", # flake8-annotations
-    "PGH001", # No builtin eval() allowed
     "D203", # 1 blank line required before class docstring
     "D213", # Multi-line docstring summary should start at the second line
     "D406", # Section name should end with a newline
