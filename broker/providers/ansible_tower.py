@@ -592,7 +592,13 @@ class AnsibleTower(Provider):
             logger.info(f"Using tower inventory: {self._translate_inventory(inventory)}")
         if labels := kwargs.pop("labels", None):
             payload["labels"] = self._resolve_labels(labels, target)
-            kwargs["_labels"] = ",".join(labels)
+            # record labels also as extra vars - use key=value format
+            kwargs.update(
+                {
+                    f"_broker_label_{label[0]}": "=".join(label[1:])
+                    for label in [kv_pair.split("=") for kv_pair in labels]
+                }
+            )
         elif self.inventory:
             payload["inventory"] = self.inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")

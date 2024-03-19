@@ -190,8 +190,13 @@ def cli(version):
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
 @click.option(
-    "--labels", type=str, help="List of strings (comma-separated) to be used as AAP labels"
-)  # fixme - this should be provider-agnostic
+    "-l",
+    "--labels",
+    type=str,
+    help="A string representing the list"
+    " of k=v pairs (comma-separated) to be used as provider resource"
+    " labels (e.g. '-l k1=v1,k2=v2,k3=v3=z4').",
+)
 @click.option(
     "--args-file",
     type=click.Path(exists=True),
