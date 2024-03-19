@@ -276,12 +276,11 @@ class Container(Provider):
         kwargs["environment"] = envars
         # process eventual labels that were passed externally, split by "="
         kwargs["labels"] = {
-            label[0]: "".join(label[1:])
+            f"broker.{label[0]}": "=".join(label[1:])
             for label in [kv_pair.split("=") for kv_pair in kwargs.get("labels", {})]
         }
-        # map(lambda l: l.split("="), kwargs.get("labels", {}))
-        # append envars as labels too
-        kwargs["labels"].update(envars)
+        # append origin as labels too
+        kwargs["labels"].update({"broker.origin": origin[0], "broker.jenkins.url": origin[1]})
         container_inst = self.runtime.create_container(container_host, **kwargs)
         container_inst.start()
         return container_inst
