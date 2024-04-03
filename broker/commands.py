@@ -191,7 +191,7 @@ def cli(version):
 @click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
 @click.option(
     "-l",
-    "--labels",
+    "--provider-labels",
     type=str,
     help="A string representing the list"
     " of k=v pairs (comma-separated) to be used as provider resource"
@@ -204,7 +204,7 @@ def cli(version):
 )
 @provider_options
 @click.pass_context
-def checkout(ctx, background, nick, count, args_file, labels, **kwargs):
+def checkout(ctx, background, nick, count, args_file, provider_labels, **kwargs):
     """Checkout or "create" a Virtual Machine broker instance.
 
     COMMAND: broker checkout --workflow "workflow-name" --workflow_arg1 something
@@ -218,10 +218,10 @@ def checkout(ctx, background, nick, count, args_file, labels, **kwargs):
         broker_args["_count"] = count
     if args_file:
         broker_args["args_file"] = args_file
-    if labels:
-        broker_args["labels"] = {
-            f"broker.{label[0]}": "=".join(label[1:])
-            for label in [kv_pair.split("=") for kv_pair in labels.split(",")]
+    if provider_labels:
+        broker_args["provider_labels"] = {
+            label[0]: "=".join(label[1:])
+            for label in [kv_pair.split("=") for kv_pair in provider_labels.split(",")]
         }
 
     # if additional arguments were passed, include them in the broker args
