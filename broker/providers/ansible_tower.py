@@ -443,12 +443,13 @@ class AnsibleTower(Provider):
         """
         label_ids = []
         for label in labels:
-            if result := self.v2.labels.get(name=label).results:
+            label_expanded = f"{label}={labels[label]}" if labels[label] else label
+            if result := self.v2.labels.get(name=label_expanded).results:
                 label_ids.append(result[0].id)
             else:
                 # label does not exist yet, creating
                 result = self.v2.labels.post(
-                    {"name": label, "organization": target.summary_fields.organization.id}
+                    {"name": label_expanded, "organization": target.summary_fields.organization.id}
                 )
                 if result:
                     label_ids.append(result.id)
@@ -594,10 +595,7 @@ class AnsibleTower(Provider):
             payload["labels"] = self._resolve_labels(labels, target)
             # record labels also as extra vars - use key=value format
             kwargs.update(
-                {
-                    f"_broker_label_{label[0]}": "=".join(label[1:])
-                    for label in [kv_pair.split("=") for kv_pair in labels]
-                }
+                {f"_broker_label_{label[0]}": "=".join(label[1:]) for label in labels.items()}
             )
         elif self.inventory:
             payload["inventory"] = self.inventory
