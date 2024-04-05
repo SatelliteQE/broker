@@ -1,2 +1,2 @@
 workflow: deploy-satellite
-deploy_sat_version: "6.11"
+deploy_sat_version: "6.13"
