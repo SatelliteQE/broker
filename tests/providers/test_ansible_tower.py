@@ -88,13 +88,13 @@ def tower_stub(api_stub, config_stub):
 
 
 def test_execute(tower_stub):
-    job = tower_stub.execute(workflow="deploy-base-rhel")
+    job = tower_stub.execute(workflow="deploy-rhel")
     assert "workflow_nodes" in job.related
 
 
 def test_host_creation(tower_stub):
     bx = Broker()
-    job = tower_stub.execute(workflow="deploy-base-rhel")
+    job = tower_stub.execute(workflow="deploy-rhel")
     host = tower_stub.construct_host(job, bx.host_classes)
     assert isinstance(host, bx.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
@@ -109,7 +109,7 @@ def test_workflow_lookup_failure(tower_stub):
 
 def test_host_release_dual_params(tower_stub):
     bx = Broker()
-    job = tower_stub.execute(workflow="deploy-base-rhel")
+    job = tower_stub.execute(workflow="deploy-rhel")
     host = tower_stub.construct_host(job, bx.host_classes)
     host._broker_args["source_vm"] = "fake-physical-host"
     assert host._broker_args["source_vm"] == host.name

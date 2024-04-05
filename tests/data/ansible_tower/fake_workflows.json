@@ -3,7 +3,7 @@
     "id": 34,
     "type": "workflow_job_template",
     "url": "/api/v2/workflow_job_templates/34/",
-    "name": "deploy-base-rhel",
+    "name": "deploy-rhel",
     "extra_vars": "{\"deploy_scenario\": \"baserhel\", \"deploy_rhel_version\": \"\", \"host_type\": \"host\", \"deploy_flavor\": \"prod-ssd.memory.xs\"}"
   },
   {

@@ -61,7 +61,7 @@ TestProvider:
 # You can set a nickname as a shortcut for arguments
 nicks:
     rhel7:
-        workflow: "deploy-base-rhel"
+        workflow: "deploy-rhel"
         deploy_rhel_version: "7.9"
         notes: "Requested by broker"
     test_nick:
