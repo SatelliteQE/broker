@@ -5,7 +5,7 @@
         "related": {
             "workflow_nodes": "/api/v2/workflow_jobs/343/workflow_nodes/"
         },
-        "name": "deploy-base-rhel",
+        "name": "deploy-rhel",
         "status": "successful",
         "url": "/api/v2/workflow_jobs/1329/",
         "extra_vars": "{\"provider\": \"rhv\", \"host_type\": \"\"}"

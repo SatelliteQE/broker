@@ -2,7 +2,7 @@
     deploy_rhel_version: '8.6'
     deploy_scenario: baserhel
     host_type: host
-    workflow: deploy-base-rhel
+    workflow: deploy-rhel
   _broker_provider: AnsibleTower
   _broker_provider_instance: rhv
   hostname: dhcp-111.test.example.com
@@ -13,7 +13,7 @@
     deploy_rhel_version: '8.6'
     deploy_scenario: baserhel
     host_type: host
-    workflow: deploy-base-rhel
+    workflow: deploy-rhel
   _broker_provider: AnsibleTower
   _broker_provider_instance: rhv
   hostname: dhcp-121.test.example.com

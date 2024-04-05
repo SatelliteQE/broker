@@ -63,7 +63,7 @@ def test_workflow_query():
 
 
 def test_tower_host():
-    with Broker(workflow="deploy-base-rhel") as r_host:
+    with Broker(workflow="deploy-rhel") as r_host:
         res = r_host.execute("hostname")
         assert res.stdout.strip() == r_host.hostname
         loc_settings_path = Path("broker_settings.yaml")
@@ -93,7 +93,7 @@ def test_tower_host():
 
 
 def test_tower_host_mp():
-    with Broker(workflow="deploy-base-rhel", _count=3) as r_hosts:
+    with Broker(workflow="deploy-rhel", _count=3) as r_hosts:
         for r_host in r_hosts:
             res = r_host.execute("hostname")
             assert res.stdout.strip() == r_host.hostname
