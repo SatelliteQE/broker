@@ -507,7 +507,7 @@ class Result:
         return cls(
             stdout=stdout,
             status=channel.get_exit_status(),
-            stderr=channel.read_stderr(),
+            stderr=channel.read_stderr()[1].decode("utf-8"),
         )
 
     @classmethod

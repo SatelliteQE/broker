@@ -1,9 +1,12 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+
 import pytest
 from click.testing import CliRunner
+
 from broker import Broker
 from broker.commands import cli
+from broker.hosts import Host
 from broker.providers.ansible_tower import AnsibleTower
 from broker.settings import inventory_path
 
@@ -29,7 +32,7 @@ def temp_inventory():
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")]
+    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
 )
 def test_checkout_scenarios(args_file, temp_inventory):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
@@ -37,7 +40,7 @@ def test_checkout_scenarios(args_file, temp_inventory):
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")]
+    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")], ids=lambda f: f.name.split(".")[0]
 )
 def test_execute_scenarios(args_file):
     result = CliRunner().invoke(cli, ["execute", "--args-file", args_file])
@@ -68,7 +71,7 @@ def test_tower_host():
         assert res.stdout.strip() == r_host.hostname
         loc_settings_path = Path("broker_settings.yaml")
         remote_dir = "/tmp/fake"
-        r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+        r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/", ensure_dir=True)
         res = r_host.execute(f"ls {remote_dir}")
         assert str(loc_settings_path) in res.stdout
         with NamedTemporaryFile() as tmp:
@@ -88,8 +91,8 @@ def test_tower_host():
         r_host.execute(f"echo 'hello world' > {tailed_file}")
         with r_host.session.tail_file(tailed_file) as tf:
             r_host.execute(f"echo 'this is a new line' >> {tailed_file}")
-        assert "this is a new line" in tf.stdout
-        assert "hello world" not in tf.stdout
+        assert "this is a new line" in tf.contents
+        assert "hello world" not in tf.contents
 
 
 def test_tower_host_mp():
@@ -99,7 +102,7 @@ def test_tower_host_mp():
             assert res.stdout.strip() == r_host.hostname
             loc_settings_path = Path("broker_settings.yaml")
             remote_dir = "/tmp/fake"
-            r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/")
+            r_host.session.sftp_write(loc_settings_path.name, f"{remote_dir}/", ensure_dir=True)
             res = r_host.execute(f"ls {remote_dir}")
             assert str(loc_settings_path) in res.stdout
             with NamedTemporaryFile() as tmp:
