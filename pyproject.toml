@@ -53,7 +53,12 @@ setup = [
     "build",
     "twine",
 ]
+
 ssh2_py311 = ["ssh2-python"]
+ssh2_python = ["ssh2-python"]
+ssh2_python312 = ["ssh2-python312"]
+ansible_pylibssh = ["ansible-pylibssh"]
+hussh = ["hussh"]
 
 [project.scripts]
 broker = "broker.commands:cli"

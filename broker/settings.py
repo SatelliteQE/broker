@@ -94,6 +94,7 @@ validators = [
     Validator("HOST_SSH_KEY_FILENAME", default=None),
     Validator("HOST_IPV6", default=False),
     Validator("HOST_IPV4_FALLBACK", default=True),
+    Validator("SSH_BACKEND", default="ssh2-python312"),
     Validator("LOGGING", is_type_of=dict),
     Validator(
         "LOGGING.CONSOLE_LEVEL",

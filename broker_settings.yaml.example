@@ -13,6 +13,7 @@ host_ssh_key_filename: "</path/to/the/ssh-key>"
 host_ipv6: False
 # If IPv6 connection attempts fail, fallback to IPv4
 host_ipv4_fallback: True
+ssh_backend: ssh2-python312
 # Provider settings
 AnsibleTower:
     base_url: "https://<ansible tower host>/"

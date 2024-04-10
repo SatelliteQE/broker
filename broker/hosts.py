@@ -136,7 +136,7 @@ class Host:
         """Close the SSH connection to the host."""
         # This attribute may be missing after pickling
         if isinstance(getattr(self, "_session", None), Session):
-            self._session.session.disconnect()
+            self._session.disconnect()
         self._session = None
 
     def release(self):
