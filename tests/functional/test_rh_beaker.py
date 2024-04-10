@@ -29,7 +29,7 @@ def temp_inventory():
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")]
+    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
 )
 def test_checkout_scenarios(args_file, temp_inventory):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
@@ -37,7 +37,7 @@ def test_checkout_scenarios(args_file, temp_inventory):
 
 
 # @pytest.mark.parametrize(
-#     "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")]
+#     "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")], ids=lambda f: f.name.split(".")[0]
 # )
 # def test_execute_scenarios(args_file):
 #     result = CliRunner().invoke(cli, ["execute", "--args-file", args_file])
