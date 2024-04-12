@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from hussh import Connection
-from logzero import logger
 
 from broker import exceptions, helpers
 
@@ -62,7 +61,6 @@ class Session:
             else:
                 raise exceptions.AuthenticationError("No password or key file provided.")
 
-            logger.info(f"{conn_kwargs=}")
             self.session = Connection(host, **conn_kwargs)
 
         except Exception as err:  # noqa: BLE001
