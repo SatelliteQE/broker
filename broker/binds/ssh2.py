@@ -16,7 +16,7 @@ from ssh2.exceptions import SocketSendError
 from ssh2.session import Session as _Session
 
 from broker import exceptions, helpers
-from broker.ssh_session import _create_connect_socket
+from broker.binds.utils import _create_connect_socket
 
 SFTP_MODE = (
     _sftp.LIBSSH2_SFTP_S_IRUSR

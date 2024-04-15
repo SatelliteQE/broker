@@ -14,7 +14,7 @@ from tempfile import NamedTemporaryFile
 from pylibsshext.session import Session as _Session
 
 from broker import exceptions, helpers
-from broker.ssh_session import _create_connect_socket
+from broker.binds.utils import _create_connect_socket
 
 
 class Session:
