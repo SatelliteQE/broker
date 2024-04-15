@@ -116,7 +116,7 @@ broker --output-file inventory.json inventory
 
 **Run Broker in the background**
 
-Certain Broker actions can be run in the background, these currently are: checkout, checkin, duplicate, and execute. When running a command in this mode, it will spin up a new Broker process and no longer log to stderr. To check progress, you can still follow broker's log file.
+Certain Broker actions can be run in the background, these currently are: checkout, checkin, and execute. When running a command in this mode, it will spin up a new Broker process and no longer log to stderr. To check progress, you can still follow broker's log file.
 Note that background mode will interfere with output options for execute since it won't be able to print to stdout. Those should kept in log mode.
 ```
 broker checkout --background --nick rhel7
