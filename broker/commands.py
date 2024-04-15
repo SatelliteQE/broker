@@ -306,38 +306,6 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     Broker(hosts=to_extend, **broker_args).extend(sequential=sequential)
 
 
-@loggedcli()
-@click.argument("vm", type=str, nargs=-1)
-@click.option("-b", "--background", is_flag=True, help="Run duplicate in the background")
-@click.option("-c", "--count", type=int, help="Number of times broker repeats the duplicate")
-@click.option("--all", "all_", is_flag=True, help="Select all VMs")
-@click.option("--filter", type=str, help="Duplicate only what matches the specified filter")
-def duplicate(vm, background, count, all_, filter):
-    """Duplicate a broker-procured vm.
-
-    DEPRECATED! This will be removed in Broker 0.5. If you need this feature, please open an issue.
-
-    COMMAND: broker duplicate <vm hostname>|<local id>|all
-    """
-    logger.warning(
-        "Duplicate will be remove in Broker 0.5. If you need this feature, please open an issue."
-    )
-    if background:
-        helpers.fork_broker()
-    inventory = helpers.load_inventory(filter=filter)
-    for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or host.get("name") in vm or all_:
-            broker_args = host.get("_broker_args")
-            if broker_args:
-                if count:
-                    broker_args["_count"] = count
-                logger.info(f"Duplicating: {host['hostname']}")
-                broker_inst = Broker(**broker_args)
-                broker_inst.checkout()
-            else:
-                logger.warning(f"Unable to duplicate {host['hostname']}, no _broker_args found")
-
-
 @loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
