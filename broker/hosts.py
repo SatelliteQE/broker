@@ -83,7 +83,8 @@ class Host:
         if not isinstance(getattr(self, "_session", None), Session):
             # Check to see if we're a non-ssh-enabled Container Host
             if hasattr(self, "_cont_inst") and not self._cont_inst.ports.get(22):
-                self._session = ContainerSession(self)
+                runtime = "podman" if "podman" in str(self._cont_inst.client) else "docker"
+                self._session = ContainerSession(self, runtime=runtime)
             else:
                 self.connect()
         return self._session

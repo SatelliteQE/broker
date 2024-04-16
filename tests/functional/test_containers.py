@@ -123,9 +123,9 @@ def test_container_e2e_mp():
 
 def test_broker_multi_manager():
     with Broker.multi_manager(
-        ubi7={"container_host": "ubi7:latest"},
-        ubi8={"container_host": "ubi8:latest", "_count": 2},
-        ubi9={"container_host": "ubi9:latest"},
+        ubi7={"container_host": "localhost/ubi7:latest"},
+        ubi8={"container_host": "localhost/ubi8:latest", "_count": 2},
+        ubi9={"container_host": "localhost/ubi9:latest"},
     ) as multi_hosts:
         assert "ubi7" in multi_hosts
         assert "ubi8" in multi_hosts

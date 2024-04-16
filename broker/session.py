@@ -59,8 +59,11 @@ finally:
 class ContainerSession:
     """An approximation of ssh-based functionality from the Session class."""
 
-    def __init__(self, cont_inst):
+    def __init__(self, cont_inst, runtime=None):
         self._cont_inst = cont_inst
+        if not runtime:
+            runtime = settings.CONTAINER.runtime
+        self.runtime = runtime
 
     def run(self, command, demux=True, **kwargs):
         """Container approximation of Session.run."""
@@ -77,7 +80,7 @@ class ContainerSession:
             command = f"/bin/bash -c '{command}'"
         result = self._cont_inst._cont_inst.exec_run(command, **kwargs)
         if demux:
-            result = helpers.Result.from_duplexed_exec(result)
+            result = helpers.Result.from_duplexed_exec(result, self.runtime)
         else:
             result = helpers.Result.from_nonduplexed_exec(result)
         return result

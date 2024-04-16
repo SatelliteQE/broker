@@ -8,7 +8,7 @@ Do not attempt to use Broker while running these functional tests or you may end
 Setup:
 - Ensure either Docker or Podman are installed and configured either locally or on a remote host.
 - Ensure Broker's Container provider is configured with the details of the previous step.
-- Clone the [content-host-d](https://github.com/JacobCallahan/content-host-d) repository and build the UBI8 image, tagging it as `ch-d:ubi8`.
+- Clone the [content-host-d](https://github.com/JacobCallahan/content-host-d) repository and build the UBI[7-9] images, tagging them as `ubi[7-9]` respectively.
 
 **SatLab Tests**
 
