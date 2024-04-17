@@ -116,7 +116,12 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
         silent = True
         log_level = LOG_LEVEL.INFO
     else:
-        log_level = resolve_log_level(level)
+        # Allow override of file logging level with --log-level, if the new level is lower than
+        # settings.logging.file_level. Otherwise, use the value from settings.
+        old_log_level = resolve_log_level(settings.logging.file_level)
+        new_log_level = resolve_log_level(level)
+        log_level = new_log_level if new_log_level.value < old_log_level.value else old_log_level
+
     path = BROKER_DIRECTORY.joinpath(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     logzero.logfile(
@@ -138,6 +143,8 @@ def setup_logzero(
 ):
     """Call logzero setup with the given settings."""
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    # FIXME helpers.update_log_level also needs to do this,
+    # if "--log-level trace" is passed to the CLI.
     if isinstance(level, str) and level.lower() == "trace":
         patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
