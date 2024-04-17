@@ -155,16 +155,9 @@ class Provider(metaclass=ProviderMeta):
     def _set_attributes(self, obj, attrs):
         obj.__dict__.update(attrs)
 
-    def _get_params(self, arg_list, kwargs):
-        return {k: v for k, v in kwargs.items() if k in arg_list}
-
+    @abstractmethod
     def construct_host(self, host_cls, provider_params, **kwargs):
         """Construct a host object from a host class and include relevent provider params."""
-        host_inst = host_cls(**provider_params, **kwargs)
-        host_attrs = self._get_params(self._construct_params)
-        host_attrs["release"] = self._host_release
-        self._set_attributes(host_inst, host_attrs)
-        return host_inst
 
     @abstractmethod
     def provider_help(self):

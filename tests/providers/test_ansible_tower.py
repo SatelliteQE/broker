@@ -102,7 +102,7 @@ def test_host_creation(tower_stub):
 
 
 def test_workflow_lookup_failure(tower_stub):
-    with pytest.raises(Broker.ProviderError) as err:
+    with pytest.raises(Broker.UserError) as err:
         tower_stub.execute(workflow="this-does-not-exist")
     assert "Workflow not found by name: this-does-not-exist" in err.value.message
 
