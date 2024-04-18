@@ -653,7 +653,7 @@ class AnsibleTower(Provider):
             compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
         return compiled_host_info
 
-    def extend(self, target_vm, new_expire_time=None):
+    def extend(self, target_vm, new_expire_time=None, provider_labels=None):
         """Run the extend workflow with defaults args.
 
         :param target_vm: This should be a host object
@@ -668,6 +668,7 @@ class AnsibleTower(Provider):
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
             new_expire_time=new_expire_time or settings.ANSIBLETOWER.get("new_expire_time"),
+            provider_labels=provider_labels,
         )
 
     def provider_help(

@@ -36,6 +36,14 @@ def loggedcli(group=None, *cli_args, **cli_kwargs):
     return decorator
 
 
+def parse_labels(provider_labels):
+    """Parse the provided label string and returns labels in a dict."""
+    return {
+        label[0]: "=".join(label[1:])
+        for label in [kv_pair.split("=") for kv_pair in provider_labels.split(",")]
+    }
+
+
 class ExceptionHandler(click.Group):
     """Wraps click group to catch and handle raised exceptions."""
 
@@ -219,10 +227,7 @@ def checkout(ctx, background, nick, count, args_file, provider_labels, **kwargs)
     if args_file:
         broker_args["args_file"] = args_file
     if provider_labels:
-        broker_args["provider_labels"] = {
-            label[0]: "=".join(label[1:])
-            for label in [kv_pair.split("=") for kv_pair in provider_labels.split(",")]
-        }
+        broker_args["provider_labels"] = parse_labels(provider_labels)
 
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
@@ -305,6 +310,14 @@ def inventory(details, sync, filter):
 @click.option("--all", "all_", is_flag=True, help="Select all VMs")
 @click.option("--sequential", is_flag=True, help="Run extends sequentially")
 @click.option("--filter", type=str, help="Extend only what matches the specified filter")
+@click.option(
+    "-l",
+    "--provider-labels",
+    type=str,
+    help="A string representing the list"
+    " of k=v pairs (comma-separated) to be used as provider resource"
+    " labels (e.g. '-l k1=v1,k2=v2,k3=v3=z4').",
+)
 @provider_options
 def extend(vm, background, all_, sequential, filter, **kwargs):
     """Extend a host's lease time.
@@ -336,9 +349,17 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     type=click.Path(exists=True),
     help="A json or yaml file mapping arguments to values",
 )
+@click.option(
+    "-l",
+    "--provider-labels",
+    type=str,
+    help="A string representing the list"
+    " of k=v pairs (comma-separated) to be used as provider resource"
+    " labels (e.g. '-l k1=v1,k2=v2,k3=v3=z4').",
+)
 @provider_options
 @click.pass_context
-def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs):
+def execute(ctx, background, nick, output_format, artifacts, args_file, provider_labels, **kwargs):
     """Execute an arbitrary provider action.
 
     COMMAND: broker execute --workflow "workflow-name" --workflow_arg1 something
@@ -352,6 +373,8 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, **kwargs
         broker_args["artifacts"] = artifacts
     if args_file:
         broker_args["args_file"] = args_file
+    if provider_labels:
+        broker_args["provider_labels"] = parse_labels(provider_labels)
     # if additional arguments were passed, include them in the broker args
     # strip leading -- characters
     broker_args.update(
