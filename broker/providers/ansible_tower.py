@@ -594,8 +594,9 @@ class AnsibleTower(Provider):
         if labels := kwargs.pop("provider_labels", None):
             payload["labels"] = self._resolve_labels(labels, target)
             # record labels also as extra vars - use key=value format
-            kwargs.update(
-                {f"_broker_label_{label[0]}": "=".join(label[1:]) for label in labels.items()}
+            kwargs["provider_labels"] = kwargs.get("provider_labels", {})
+            kwargs["provider_labels"].update(
+                {label[0]: "=".join(label[1:]) for label in labels.items()}
             )
         elif self.inventory:
             payload["inventory"] = self.inventory
