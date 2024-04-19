@@ -274,6 +274,11 @@ class Container(Provider):
         if origin[1]:
             envars["JENKINS_URL"] = origin[1]
         kwargs["environment"] = envars
+
+        # process eventual provider labels for each setting level
+        kwargs["provider_labels"] = kwargs.get("provider_labels", {})
+        kwargs["provider_labels"].update(settings.get("provider_labels", {}))
+        kwargs["provider_labels"].update(settings.CONTAINER.get("provider_labels", {}))
         # prefix eventual label keys with 'broker.' to conform to the docker guidelines
         # https://docs.docker.com/config/labels-custom-metadata/#key-format-recommendations
         kwargs["provider_labels"] = {

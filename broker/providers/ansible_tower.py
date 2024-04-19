@@ -591,18 +591,23 @@ class AnsibleTower(Provider):
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(inventory)}")
-        if labels := kwargs.pop("provider_labels", None):
-            payload["labels"] = self._resolve_labels(labels, target)
-            # record labels also as extra vars - use key=value format
-            kwargs["provider_labels"] = kwargs.get("provider_labels", {})
-            kwargs["provider_labels"].update(
-                {label[0]: "=".join(label[1:]) for label in labels.items()}
-            )
+
         elif self.inventory:
             payload["inventory"] = self.inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
+
+        # provider labels handling
+
+        provider_labels = kwargs.get("provider_labels", {})
+        # include eventual common labels, specified at each level of configuration
+        # typically imported from dynaconf env vars
+        provider_labels.update(settings.get("provider_labels", {}))
+        provider_labels.update(settings.ANSIBLETOWER.get("provider_labels", {}))
+        if provider_labels:
+            payload["labels"] = self._resolve_labels(provider_labels, target)
+            kwargs["provider_labels"] = provider_labels
 
         # Save custom, non-workflow extra vars to a named variable.
         # The workflow can save these values to job artifacts / host facts.
