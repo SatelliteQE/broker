@@ -277,7 +277,7 @@ class Container(Provider):
         # prefix eventual label keys with 'broker.' to conform to the docker guidelines
         # https://docs.docker.com/config/labels-custom-metadata/#key-format-recommendations
         kwargs["provider_labels"] = {
-            f"broker.{label[0]}": label[1] for label in kwargs["provider_labels"].items()
+            f"broker.{label[0]}": label[1] for label in kwargs.get("provider_labels", {}).items()
         }
         # process eventual labels that were passed externally, split by "="
         kwargs["provider_labels"].update(
