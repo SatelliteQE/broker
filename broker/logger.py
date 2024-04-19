@@ -57,10 +57,8 @@ logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
 
 
 def patch_awx_for_verbosity(api):
-    """Patch the awxkit API to log when we're at trace level."""
-    client = api.client
-    awx_log = client.log
-
+    """Patch the awxkit API to enable trace-level logging of API calls to Ansible provider."""
+    awx_log = api.client.log
     awx_log.parent = logzero.logger
 
     def patch(cls, name):
@@ -116,7 +114,12 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
         silent = True
         log_level = LOG_LEVEL.INFO
     else:
-        log_level = resolve_log_level(level)
+        # Allow override of file logging level with --log-level, if the new level is lower than
+        # settings.logging.file_level. Otherwise, use the value from settings.
+        old_log_level = resolve_log_level(settings.logging.file_level)
+        new_log_level = resolve_log_level(level)
+        log_level = new_log_level if new_log_level < old_log_level else old_log_level
+
     path = BROKER_DIRECTORY.joinpath(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     logzero.logfile(
@@ -138,8 +141,7 @@ def setup_logzero(
 ):
     """Call logzero setup with the given settings."""
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    if isinstance(level, str) and level.lower() == "trace":
-        patch_awx_for_verbosity(awxkit.api)
+    patch_awx_for_verbosity(awxkit.api)
     set_log_level(level)
     set_file_logging(file_level, path)
     if formatter:

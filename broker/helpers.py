@@ -393,7 +393,8 @@ def fork_broker():
     if pid:
         logger.info(f"Running broker in the background with pid: {pid}")
         sys.exit(0)
-    update_log_level(None, None, "silent")
+    b_log.set_log_level("silent")
+    b_log.set_file_logging("silent")
 
 
 def handle_keyboardinterrupt(*args):
