@@ -72,3 +72,9 @@ class BeakerBindError(BrokerError):
     """Raised when a problem occurs at the Beaker bind level."""
 
     error_code = 12
+
+
+class UserError(BrokerError):
+    """Raised when a user causes an otherwise unclassified error."""
+
+    error_code = 13

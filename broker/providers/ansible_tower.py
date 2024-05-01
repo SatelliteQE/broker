@@ -17,12 +17,30 @@ from broker.settings import settings
 try:
     import awxkit
 except ImportError as err:
-    raise exceptions.ProviderError(
-        provider="AnsibleTower", message="Unable to import awxkit. Is it installed?"
-    ) from err
+    raise exceptions.UserError(message="Unable to import awxkit. Is it installed?") from err
 
 from broker import helpers
 from broker.providers import Provider
+
+
+class JobExecutionError(exceptions.ProviderError):
+    """Raised when a job execution fails."""
+
+    def __init__(self, message_data=None):
+        super().__init__(
+            provider="AnsibleTower",
+            message=json.dumps(message_data, indent=2),
+        )
+
+
+class ATInventoryError(exceptions.ProviderError):
+    """Raised when we can't find the right inventory."""
+
+    def __init__(self, message_data=None):
+        super().__init__(
+            provider="AnsibleTower",
+            message=json.dumps(message_data, indent=2),
+        )
 
 
 @cache
@@ -51,8 +69,7 @@ def get_awxkit_and_uname(config=None, root=None, url=None, token=None, uname=Non
             my_username = uname or versions.v2.get().me.get().results[0].username
         except (IndexError, AttributeError) as err:
             # lookup failed for whatever reason
-            raise exceptions.ProviderError(
-                provider="AnsibleTower",
+            raise exceptions.ConfigurationError(
                 message="Failed to lookup a username for the given token, please check credentials",
             ) from err
     else:  # dynaconf validators should have checked that either token or password was provided
@@ -203,8 +220,7 @@ class AnsibleTower(Provider):
             if inventory_info := self.v2.inventory.get(id=inventory):
                 return inventory_info.results[0].name
             else:
-                raise exceptions.ProviderError(
-                    provider="AnsibleTower",
+                raise ATInventoryError(
                     message=f"Unknown AnsibleTower inventory by id {inventory}",
                 )
         elif isinstance(inventory, str):
@@ -214,15 +230,13 @@ class AnsibleTower(Provider):
                     filtered = [inv for inv in inventory_info.results if inv.name == inventory]
                     if len(filtered) == 1:
                         return filtered[0].id
-                    raise exceptions.ProviderError(
-                        provider="AnsibleTower",
+                    raise ATInventoryError(
                         message=f"Ambigious AnsibleTower inventory name {inventory}",
                     )
                 elif inventory_info.count == 1:
                     return inventory_info.results.pop().id
                 else:
-                    raise exceptions.ProviderError(
-                        provider="AnsibleTower",
+                    raise ATInventoryError(
                         message=f"Unknown AnsibleTower inventory {inventory}",
                     )
         elif inv_id := getattr(inventory, "id", None):
@@ -231,8 +245,7 @@ class AnsibleTower(Provider):
             return inv_name
         else:
             caller_context = inspect.stack()[1][0].f_locals
-            raise exceptions.ProviderError(
-                provider="AnsibleTower",
+            raise ATInventoryError(
                 message=f"Ambiguous AnsibleTower inventory {inventory} passed from {caller_context}",
             )
 
@@ -573,9 +586,7 @@ class AnsibleTower(Provider):
             subject = "job_template"
             get_path = self.v2.job_templates
         else:
-            raise exceptions.ProviderError(
-                provider="AnsibleTower", message="No workflow or job template specified"
-            )
+            raise exceptions.UserError(message="No workflow or job template specified")
         try:
             candidates = get_path.get(name=name).results
         except awxkit.exceptions.Unauthorized as err:
@@ -583,10 +594,7 @@ class AnsibleTower(Provider):
         if candidates:
             target = candidates.pop()
         else:
-            raise exceptions.ProviderError(
-                provider="AnsibleTower",
-                message=f"{subject.capitalize()} not found by name: {name}",
-            )
+            raise exceptions.UserError(message=f"{subject.capitalize()} not found by name: {name}")
         payload = {}
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
@@ -636,9 +644,7 @@ class AnsibleTower(Provider):
                 "URL": job_ui_url,
             }
             helpers.emit(message_data)
-            raise exceptions.ProviderError(
-                provider="AnsibleTower", message=message_data["Reason(s)"]
-            )
+            raise JobExecutionError(message_data=message_data)
         if strategy := kwargs.pop("artifacts", None):
             return self._merge_artifacts(job, strategy=strategy)
         return job

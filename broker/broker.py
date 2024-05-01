@@ -82,12 +82,13 @@ class Broker:
     """Main Broker class to be used as the primary interface for the Broker API."""
 
     # map exceptions for easier access when used as a library
-    BrokerError = exceptions.BrokerError
     AuthenticationError = exceptions.AuthenticationError
-    PermissionError = exceptions.PermissionError
-    ProviderError = exceptions.ProviderError
+    BrokerError = exceptions.BrokerError
     ConfigurationError = exceptions.ConfigurationError
     NotImplementedError = exceptions.NotImplementedError
+    PermissionError = exceptions.PermissionError
+    ProviderError = exceptions.ProviderError
+    UserError = exceptions.UserError
 
     def __init__(self, **kwargs):
         kwargs = helpers.resolve_file_args(kwargs)
