@@ -274,7 +274,22 @@ class Container(Provider):
         if origin[1]:
             envars["JENKINS_URL"] = origin[1]
         kwargs["environment"] = envars
-        kwargs["labels"] = envars
+
+        # process eventual provider labels for each setting level
+        kwargs["provider_labels"] = kwargs.get("provider_labels", {})
+        kwargs["provider_labels"].update(settings.get("provider_labels", {}))
+        kwargs["provider_labels"].update(settings.CONTAINER.get("provider_labels", {}))
+        # prefix eventual label keys with 'broker.' to conform to the docker guidelines
+        # https://docs.docker.com/config/labels-custom-metadata/#key-format-recommendations
+        kwargs["provider_labels"] = {
+            f"broker.{label[0]}": label[1] for label in kwargs.get("provider_labels", {}).items()
+        }
+        # process eventual labels that were passed externally, split by "="
+        kwargs["provider_labels"].update(
+            {"broker.origin": origin[0], "broker.jenkins.url": origin[1]}
+        )
+        # rename the dict key to the name of the arg recognized by provider
+        kwargs["labels"] = kwargs.pop("provider_labels")
         container_inst = self.runtime.create_container(container_host, **kwargs)
         container_inst.start()
         return container_inst

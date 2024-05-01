@@ -124,3 +124,17 @@ def test_tower_host_mp():
         )
         res = r_hosts[1].execute(f"ls /root")
         assert SETTINGS_PATH.name in res.stdout
+
+
+def test_tower_provider_labels():
+    """Assert labels being created on AAP and OSP metadata 
+    being attached accordingly
+    """
+    with Broker(workflow="deploy-rhel", provider_labels={"l1": "v1", "l2": ""}) as r_host:
+        # check provider labels in the resulting host object
+        assert r_host.provider_labels.get("l1") == "v1"
+        assert r_host.provider_labels.get("l2") == ""
+        # assert the AAP labels got created on the provider
+        aap_labels = [l.name for l in r_host._prov_inst.v2.labels.get().results]
+        assert "l1=v1" in aap_labels
+        assert "l2" in aap_labels

@@ -436,6 +436,25 @@ class AnsibleTower(Provider):
                 compiled[key] = val
             return compiled
 
+    def _resolve_labels(self, labels, target):
+        """Fetch and return ids of the given labels.
+
+        If label does not exist, create it under the same org as the target template.
+        """
+        label_ids = []
+        for label in labels:
+            label_expanded = f"{label}={labels[label]}" if labels[label] else label
+            if result := self.v2.labels.get(name=label_expanded).results:
+                label_ids.append(result[0].id)
+            else:
+                # label does not exist yet, creating
+                result = self.v2.labels.post(
+                    {"name": label_expanded, "organization": target.summary_fields.organization.id}
+                )
+                if result:
+                    label_ids.append(result.id)
+        return label_ids
+
     @cached_property
     def inventory(self):
         """Return the current tower inventory."""
@@ -536,7 +555,7 @@ class AnsibleTower(Provider):
         return host_inst
 
     @Provider.register_action("workflow", "job_template")
-    def execute(self, **kwargs):  # noqa: PLR0912 - Possible TODO refactor
+    def execute(self, **kwargs):  # noqa: PLR0912,PLR0915 - Possible TODO refactor
         """Execute workflow or job template in Ansible Tower.
 
         :param kwargs: workflow or job template name passed in a string
@@ -572,11 +591,23 @@ class AnsibleTower(Provider):
         if inventory := kwargs.pop("inventory", None):
             payload["inventory"] = inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(inventory)}")
+
         elif self.inventory:
             payload["inventory"] = self.inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
         else:
             logger.info("No inventory specified, Ansible Tower will use a default.")
+
+        # provider labels handling
+
+        provider_labels = kwargs.get("provider_labels", {})
+        # include eventual common labels, specified at each level of configuration
+        # typically imported from dynaconf env vars
+        provider_labels.update(settings.get("provider_labels", {}))
+        provider_labels.update(settings.ANSIBLETOWER.get("provider_labels", {}))
+        if provider_labels:
+            payload["labels"] = self._resolve_labels(provider_labels, target)
+            kwargs["provider_labels"] = provider_labels
 
         # Save custom, non-workflow extra vars to a named variable.
         # The workflow can save these values to job artifacts / host facts.
@@ -628,7 +659,7 @@ class AnsibleTower(Provider):
             compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
         return compiled_host_info
 
-    def extend(self, target_vm, new_expire_time=None):
+    def extend(self, target_vm, new_expire_time=None, provider_labels=None):
         """Run the extend workflow with defaults args.
 
         :param target_vm: This should be a host object
@@ -643,6 +674,7 @@ class AnsibleTower(Provider):
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
             new_expire_time=new_expire_time or settings.ANSIBLETOWER.get("new_expire_time"),
+            provider_labels=provider_labels,
         )
 
     def provider_help(

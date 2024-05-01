@@ -67,7 +67,7 @@ def test_containerhost_query():
 
 
 def test_container_e2e():
-    with Broker(container_host="ubi8:latest") as c_host:
+    with Broker(container_host="ubi8:latest", provider_labels={"l1": "v1", "l2": None}) as c_host:
         assert c_host._cont_inst.top()["Processes"]
         res = c_host.execute("hostname")
         assert res.stdout.strip() == c_host.hostname
@@ -87,6 +87,9 @@ def test_container_e2e():
                 SETTINGS_PATH.read_bytes() == data
             ), "Local file is different from the received one (return_data=True)"
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
+        # assert labels
+        assert c_host._cont_inst.labels.get("broker.l1") == "v1"
+        assert c_host._cont_inst.labels.get("broker.l2") == ""
         # test the tail_file context manager
         tailed_file = f"{remote_dir}/tail_me.txt"
         c_host.execute(f"echo 'hello world' > {tailed_file}")
