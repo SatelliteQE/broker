@@ -127,7 +127,7 @@ class Container(Provider):
         elif isinstance(port_map, dict):
             # {'22/tcp': [{'HostIp': '', 'HostPort': '1337'}],
             for key, val in port_map.items():
-                if key.startswith("22"):
+                if key.startswith("22") and isinstance(val, list):
                     return val[0]["HostPort"]
 
     def _set_attributes(self, host_inst, broker_args=None, cont_inst=None):
@@ -297,6 +297,8 @@ class Container(Provider):
     @Provider.register_action("container_app")
     def execute(self, container_app, **kwargs):
         """Run a container and return the raw results."""
+        if not kwargs.get("name"):
+            kwargs["name"] = self._gen_name()
         return self.runtime.execute(container_app, **kwargs)
 
     def run_wait_container(self, image_name, **kwargs):
