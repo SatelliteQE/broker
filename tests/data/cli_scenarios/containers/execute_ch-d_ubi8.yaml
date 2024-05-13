@@ -1,2 +1,2 @@
 container_app: ubi8:latest
-command: "ls -lah"
+command: pwd

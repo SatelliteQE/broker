@@ -34,12 +34,13 @@ Container:
             host_username: "<username>"
             host_password: "<plain text password>"
             host_port: None
+            runtime: docker
             default: True
         - remote:
             host: "<remote hostname>"
             host_username: "<username>"
             host_password: "<plain text password>"
-    runtime: 'docker'
+    runtime: podman
     # name used to prefix container names, used to distinguish yourself
     # if not set, then your local username will be used
     # name_prefix: test
