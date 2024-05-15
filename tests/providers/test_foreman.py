@@ -3,18 +3,19 @@ import pytest
 
 from broker import Broker
 from broker.helpers import MockStub
-from broker.providers.foreman import Foreman, ForemanAPI
+from broker.providers.foreman import Foreman
+from broker.binds.foreman import ForemanBind
 from broker.exceptions import ProviderError
 
 HOSTGROUP_VALID = "hg1"
 HOSTGROUP_INVALID = "hg7"
 
 
-class ForemanApiStub(MockStub, ForemanAPI):
+class ForemanApiStub(MockStub, ForemanBind):
     """Runtime to mock queries to Foreman."""
     def __init__(self, **kwargs):
         MockStub.__init__(self, in_dict={})
-        ForemanAPI.__init__(self)
+        ForemanBind.__init__(self)
 
     def _post(self, url, **kwargs):
         if "/api/job_invocations" in url:
