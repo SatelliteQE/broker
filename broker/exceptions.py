@@ -78,3 +78,9 @@ class UserError(BrokerError):
     """Raised when a user causes an otherwise unclassified error."""
 
     error_code = 13
+
+
+class ForemanBindError(BrokerError):
+    """Raised when a problem occurs at the Foreman bind level."""
+
+    error_code = 14

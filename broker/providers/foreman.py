@@ -1,163 +1,15 @@
 """Foreman provider implementation."""
-import time
+import inspect
 from uuid import uuid4
 
 import click
 from dynaconf import Validator
 from logzero import logger
-import requests
 
-from broker.exceptions import ProviderError
+from broker.binds import foreman
 from broker.helpers import Result
 from broker.providers import Provider
 from broker.settings import settings
-
-
-class ForemanAPI:
-    """Default runtime to query Foreman."""
-
-    headers = {
-        "Content-Type": "application/json",
-    }
-
-    def __init__(self, **kwargs):
-        self.foreman_username = settings.foreman.foreman_username
-        self.foreman_password = settings.foreman.foreman_password
-        self.url = settings.foreman.foreman_url
-        self.prefix = settings.foreman.name_prefix
-        self.verify = settings.foreman.verify
-        self.session = requests.session()
-
-    def interpret_response(self, response):
-        """Handle responses from Foreman, in particular catch errors."""
-        if "error" in response:
-            if "Unable to authenticate user" in response["error"]["message"]:
-                logger.warning("Could not authenticate")
-            raise ProviderError(
-                provider=self.__class__.__name__,
-                message=" ".join(response["error"]["full_messages"]),
-            )
-        if "errors" in response:
-            raise ProviderError(
-                provider=self.__class__.__name__, message=" ".join(response["errors"]["base"])
-            )
-        return response
-
-    def _get(self, endpoint):
-        """Send GET request to Foreman API."""
-        response = self.session.get(
-            self.url + endpoint,
-            auth=(self.foreman_username, self.foreman_password),
-            headers=self.headers,
-            verify=self.verify,
-        ).json()
-        return self.interpret_response(response)
-
-    def _post(self, endpoint, **kwargs):
-        """Send POST request to Foreman API."""
-        response = self.session.post(
-            self.url + endpoint,
-            auth=(self.foreman_username, self.foreman_password),
-            headers=self.headers,
-            verify=self.verify,
-            **kwargs,
-        ).json()
-        return self.interpret_response(response)
-
-    def _delete(self, endpoint, **kwargs):
-        """Send DELETE request to Foreman API."""
-        response = self.session.delete(
-            self.url + endpoint,
-            auth=(self.foreman_username, self.foreman_password),
-            headers=self.headers,
-            verify=self.verify,
-            **kwargs,
-        )
-        return self.interpret_response(response)
-
-    def obtain_id_from_name(self, resource_type, resource_name):
-        """Obtain id for resource with given name.
-
-        :param resource_type: Resource type, like hostgroups, hosts, ...
-
-        :param resource_name: String-like identifiere of the resource
-
-        :return: ID of the found object
-        """
-        response = self._get(
-            f"/api/{resource_type}?per_page=200",
-        )
-        try:
-            result = response["results"]
-            resource = next(x for x in result if x["name"] == resource_name)
-            id_ = resource["id"]
-        except KeyError:
-            logger.error(f"Could not find {resource_type} {resource_name}")
-            raise
-        except StopIteration:
-            raise ProviderError(
-                provider=self.__class__.__name__,
-                message=f"Could not find {resource_name} in {resource_type}",
-            )
-        return id_
-
-    def create_job_invocation(self, data):
-        """Run a job from the provided data."""
-        return self._post(
-            "/api/job_invocations",
-            json=data,
-        )["id"]
-
-    def job_output(self, job_id):
-        """Return output of job."""
-        return self._get(f"/api/job_invocations/{job_id}/outputs")["outputs"][0]["output"]
-
-    def wait_for_job_to_finish(self, job_id):
-        """Poll API for job status until it is finished.
-
-        :param job_id: id of the job to poll
-        """
-        still_running = True
-        while still_running:
-            response = self._get(f"/api/job_invocations/{job_id}")
-            still_running = response["status_label"] == "running"
-            time.sleep(1)
-
-    def hostgroups(
-        self,
-    ):
-        """Return list of available hostgroups."""
-        return self._get("/api/hostgroups")
-
-    def hosts(self):
-        """Return list of hosts deployed using this prefix."""
-        return self._get(f"/api/hosts?search={self.prefix}")["results"]
-
-    def image_uuid(self, compute_resource_id, image_name):
-        """Return the uuid of a VM image on a specific compute resource."""
-        try:
-            return self._get(
-                "/api/compute_resources/"
-                f"{compute_resource_id}"
-                f"/images/?search=name={image_name}"
-            )["results"][0]["uuid"]
-        except IndexError:
-            logger.error(f"Could not find {image_name} in VM images")
-
-    def create_host(self, data):
-        """Create a host from the provided data."""
-        return self._post("/api/hosts", json=data)
-
-    def wait_for_host_to_install(self, hostname):
-        """Poll API for host build status until it is built.
-
-        :param hostname: name of the host which is currently being built
-        """
-        building = True
-        while building:
-            host_status = self._get(f"/api/hosts/{hostname}")
-            building = host_status["build_status"] != 0
-            time.sleep(1)
 
 
 class Foreman(Provider):
@@ -192,7 +44,7 @@ class Foreman(Provider):
         if kwargs.get("bind") is not None:
             self._runtime_cls = kwargs.pop("bind")
         else:
-            self._runtime_cls = ForemanAPI
+            self._runtime_cls = foreman.ForemanBind
 
         self.runtime = self._runtime_cls(
             foreman_username=settings.foreman.foreman_username,
@@ -296,8 +148,8 @@ class Foreman(Provider):
 
     def provider_help(
         self,
-        hostgroups=True,
-        rex=None,
+        hostgroups=False,
+        hostgroup=None,
         **kwargs,
     ):
         """Return useful information about Foreman provider."""
@@ -307,6 +159,23 @@ class Foreman(Provider):
             logger.info(f"On Foreman {self.instance} you have the following hostgroups:")
             for hostgroup in all_hostgroups["results"]:
                 logger.info(f"- {hostgroup['title']}")
+        elif hostgroup:
+            self.__init__()
+            logger.info(
+                f"On Foreman {self.instance} the hostgroup {hostgroup} has the following properties:"
+            )
+            data = self.runtime.hostgroup(name=hostgroup)
+            fields_of_interest = {
+                "description": "description",
+                "operating_system": "operatingsystem_name",
+                "domain": "domain_name",
+                "subnet": "subnet_name",
+                "subnet6": "subnet6_name",
+            }
+            for name, field in fields_of_interest.items():
+                value = data.get(field, False)
+                if value:
+                    logger.info(f"  {name}: {value}")
 
     def _compile_host_info(self, host):
         return {
@@ -327,8 +196,8 @@ class Foreman(Provider):
 
     def _host_release(self):
         """Delete a specific hostDelete a specific host."""
-        hostname = self.last_deployed_host
-        self.release(hostname)
+        caller_host = inspect.stack()[1][0].f_locals["host"].hostname
+        self.release(caller_host)
 
     def _set_attributes(self, host_inst, broker_args=None, misc_attrs=None):
         """Extend host object by required parameters and methods."""
