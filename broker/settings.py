@@ -20,17 +20,14 @@ from dynaconf.validator import ValidationError
 from broker.exceptions import ConfigurationError
 
 
-def init_settings(settings_path, interactive=False):
+def init_settings(settings_path, source, interactive=False, is_url=False):
     """Initialize the broker settings file."""
-    raw_url = (
-        "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
-    )
     proceed = not False
     if interactive:
         try:
             proceed = (
                 click.prompt(
-                    f"Download example file from GitHub?\n{raw_url}",
+                    f"Get example file from {source}?\n{source}",
                     type=click.Choice(["y", "n"]),
                     default="y",
                 )
@@ -41,12 +38,16 @@ def init_settings(settings_path, interactive=False):
             global INTERACTIVE_MODE
             proceed, INTERACTIVE_MODE = True, False
     if proceed:
-        # download example file from github
-        import requests
+        # get example file from source
+        if is_url:
+            import requests
 
-        click.echo(f"Downloading example file from: {raw_url}")
-        raw_file = requests.get(raw_url, timeout=60)
-        settings_path.write_text(raw_file.text)
+            click.echo(f"Downloading example file from: {source}")
+            raw_file = requests.get(source, timeout=60)
+            settings_path.write_text(raw_file.text)
+        else:
+            example_file = source.read_text()
+            settings_path.write_text(example_file)
         if INTERACTIVE_MODE:
             try:
                 click.edit(filename=str(settings_path.absolute()))
@@ -55,8 +56,23 @@ def init_settings(settings_path, interactive=False):
                     f"Please edit the file {settings_path.absolute()} and add your settings.",
                     fg="yellow",
                 )
-    else:
-        raise ConfigurationError(f"Broker settings file not found at {settings_path.absolute()}.")
+        return True
+
+
+def init_settings_from_github(settings_path, interactive=False):
+    """Initialize the broker settings file."""
+    raw_url = (
+        "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
+    )
+    return init_settings(settings_path, raw_url, interactive, is_url=True)
+
+
+def init_settings_from_local_repo(settings_path, interactive=False):
+    """Initialize the broker settings file."""
+    example_path = Path(__file__).parent.parent.joinpath("broker_settings.yaml.example")
+    if not example_path.exists():
+        return
+    return init_settings(settings_path, example_path, interactive)
 
 
 INTERACTIVE_MODE = False
@@ -84,7 +100,10 @@ inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 
 if not settings_path.exists():
     click.secho(f"Broker settings file not found at {settings_path.absolute()}.", fg="red")
-    init_settings(settings_path, interactive=INTERACTIVE_MODE)
+    if not (success := init_settings_from_local_repo(settings_path, interactive=INTERACTIVE_MODE)):
+        success = init_settings_from_github(settings_path, interactive=INTERACTIVE_MODE)
+    if not success:
+        raise ConfigurationError(f"Broker settings file not found at {settings_path.absolute()}.")
 
 validators = [
     Validator("HOST_USERNAME", default="root"),
