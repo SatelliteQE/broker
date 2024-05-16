@@ -154,13 +154,11 @@ class Foreman(Provider):
     ):
         """Return useful information about Foreman provider."""
         if hostgroups:
-            self.__init__()
             all_hostgroups = self.runtime.hostgroups()
             logger.info(f"On Foreman {self.instance} you have the following hostgroups:")
             for hostgroup in all_hostgroups["results"]:
                 logger.info(f"- {hostgroup['title']}")
         elif hostgroup:
-            self.__init__()
             logger.info(
                 f"On Foreman {self.instance} the hostgroup {hostgroup} has the following properties:"
             )
