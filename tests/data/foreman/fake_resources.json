@@ -1,0 +1,19 @@
+{
+	"organizations": {
+		"ORG": 42
+	},
+	"locations": {
+		"LOC": 42
+	},
+	"hostgroups": {
+		"hg1": 41,
+		"hg2": 42,
+		"hg3": 43
+	},
+	"job_templates": {
+		"Run Command - Script Default": 42
+	},
+	"compute_resources": {
+		"vcenter.fq.dn": 42
+	}
+}

@@ -1,0 +1,23 @@
+{
+  "/api/hosts?search=broker": {
+    "results": [
+      {
+        "certname": "host1.fq.dn",
+        "hostgroup_title": "hg1",
+        "ip": "1.2.3.4"
+      },
+      {
+        "certname": "host2.fq.dn",
+        "hostgroup_title": "hg2",
+        "ip": "1.2.3.5"
+      }
+    ]
+  },
+  "/api/compute_resources/42/images/?search=name=debian12": {
+    "results": [
+      {
+        "uuid": "5023c760-9661-190c-2300-ef78fcf44580"
+      }
+    ]
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "success": {
+    "id": 42,
+    "result": [
+      {
+        "id": 1,
+        "template_invocation_id": 2,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 0,
+        "output_type": "stdout",
+        "output": "fake-host\\n"
+      },
+      {
+        "output_type": "stdout",
+        "output": "Exit status: 0",
+        "timestamp": 42.42
+      }
+    ]
+  },
+  "simple": {
+    "id": 43,
+    "result": [
+      {
+        "id": 267,
+        "template_invocation_id": 218,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 0,
+        "output_type": "stdout",
+        "output": "cat: /ets/hostname: No such file or directory\\n"
+      },
+      {
+        "output_type": "stdout",
+        "output": "Exit status: 1",
+        "timestamp": 42.42
+      },
+      {
+        "id": 269,
+        "template_invocation_id": 218,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 2,
+        "output_type": "debug",
+        "output": "StandardError: Job execution failed"
+      }
+    ]
+  },
+  "complex": {
+    "id": 44,
+    "result": [
+      {
+        "id": 270,
+        "template_invocation_id": 220,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 0,
+        "output_type": "stdout",
+        "output": "Hit:1 http://ftp.debian.org:80/debian bookworm InRelease\nHit:2 http://ftp.debian.org:80/debian bookworm-updates InRelease\n"
+      },
+      {
+        "id": 271,
+        "template_invocation_id": 220,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 1,
+        "output_type": "stdout",
+        "output": "Hit:3 http://security.debian.org/debian-security bookworm-security InRelease\nReading package lists..."
+      },
+      {
+        "id": 272,
+        "template_invocation_id": 220,
+        "timestamp": 42.42,
+        "meta": null,
+        "sequence_id": 2,
+        "output_type": "stdout",
+        "output": "\n"
+      },
+      {
+        "output_type": "stdout",
+        "output": "Exit status: 0",
+        "timestamp": 42.42
+      }
+    ]
+  },
+  "hostname": {
+    "id": 45,
+    "result": [
+      {
+        "output_type": "stdout",
+        "output": "Exit status: 0",
+        "timestamp": 42.42
+      }
+    ]
+  },
+  "complex-fail": {
+    "id": 46,
+    "result": [
+      {
+        "id": 335,
+        "template_invocation_id": 276,
+        "timestamp": 1714721372.0171509,
+        "meta": null,
+        "sequence_id": 0,
+        "output_type": "stdout",
+        "output": "Reading package lists..."
+      },
+      {
+        "id": 336,
+        "template_invocation_id": 276,
+        "timestamp": 1714721373.0201159,
+        "meta": null,
+        "sequence_id": 1,
+        "output_type": "stdout",
+        "output": "\nBuilding dependency tree...\nReading state information...\nE: Unable to locate package pizzaofen\n"
+      },
+      {
+        "output_type": "stdout",
+        "output": "Exit status: 100",
+        "timestamp": 1714721373.0201159
+      },
+      {
+        "id": 338,
+        "template_invocation_id": 276,
+        "timestamp": 1714721373.143476,
+        "meta": null,
+        "sequence_id": 3,
+        "output_type": "debug",
+        "output": "StandardError: Job execution failed"
+      }
+    ]
+  }
+}
