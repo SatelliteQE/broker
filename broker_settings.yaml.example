@@ -46,6 +46,23 @@ Container:
     # name_prefix: test
     results_limit: 50
     auto_map_ports: False
+Foreman:
+  instances:
+    - foreman1:
+        foreman_url: https://test.fore.man
+        foreman_username: admin
+        foreman_password: secret
+        organization: ORG
+        location: LOC
+        verify: ./ca.crt
+        default: true
+    - foreman2:
+        foreman_url: https://other-test.fore.man
+        foreman_username: admin
+        foreman_password: secret
+        organization: ORG
+        location: LOC
+  name_prefix: broker
 Beaker:
     hub_url:
     max_job_wait: 24h

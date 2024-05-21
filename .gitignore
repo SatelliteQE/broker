@@ -98,3 +98,4 @@ ENV/
 *settings.yaml
 inventory.yaml
 *.bak
+/bin/*
