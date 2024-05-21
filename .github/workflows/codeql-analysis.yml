@@ -49,6 +49,7 @@ jobs:
         env:
           BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
         run: |
+          cp broker_settings.yaml.example ${BROKER_DIRECTORY}/broker_settings.yaml
           pip install uv
           uv pip install --system "broker[dev,docker] @ ."
           ls -l "$BROKER_DIRECTORY"
