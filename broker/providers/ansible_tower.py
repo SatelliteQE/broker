@@ -36,10 +36,10 @@ class JobExecutionError(exceptions.ProviderError):
 class ATInventoryError(exceptions.ProviderError):
     """Raised when we can't find the right inventory."""
 
-    def __init__(self, message_data=None):
+    def __init__(self, message=None):
         super().__init__(
             provider="AnsibleTower",
-            message=json.dumps(message_data, indent=2),
+            message=message,
         )
 
 
@@ -161,7 +161,7 @@ class AnsibleTower(Provider):
         # Init the class itself
         config = kwargs.get("config")
         root = kwargs.get("root")
-        self.v2, self.username = get_awxkit_and_uname(
+        self._v2, self.username = get_awxkit_and_uname(
             config=config,
             root=root,
             url=self.url,
@@ -170,7 +170,7 @@ class AnsibleTower(Provider):
             pword=self.pword,
         )
         # Check to see if we're running AAP (ver 4.0+)
-        self._is_aap = self.v2.ping.get().version[0] != "3"
+        self._is_aap = self._v2.ping.get().version[0] != "3"
 
     @staticmethod
     def _pull_params(kwargs):
@@ -217,14 +217,14 @@ class AnsibleTower(Provider):
 
     def _translate_inventory(self, inventory):
         if isinstance(inventory, int):  # already an id, silly
-            if inventory_info := self.v2.inventory.get(id=inventory):
+            if (inventory_info := self._v2.inventory.get(id=inventory)).results:
                 return inventory_info.results[0].name
             else:
                 raise ATInventoryError(
                     message=f"Unknown AnsibleTower inventory by id {inventory}",
                 )
         elif isinstance(inventory, str):
-            if inventory_info := self.v2.inventory.get(search=inventory):
+            if inventory_info := self._v2.inventory.get(search=inventory):
                 if inventory_info.count > 1:
                     # let's try to manually narrow down to one result if the api returns multiple
                     filtered = [inv for inv in inventory_info.results if inv.name == inventory]
@@ -296,7 +296,7 @@ class AnsibleTower(Provider):
                 if child.type == "workflow_job_node":
                     logger.debug(child)
                     child_id = child.summary_fields.job.id
-                    child_obj = self.v2.jobs.get(id=child_id).results
+                    child_obj = self._v2.jobs.get(id=child_id).results
                     if child_obj:
                         child_obj = child_obj.pop()
                         artifacts = (
@@ -325,7 +325,7 @@ class AnsibleTower(Provider):
                 if child.type == "workflow_job_node":
                     logger.debug(child)
                     child_id = child.summary_fields.job.id
-                    child_obj = self.v2.jobs.get(id=child_id).results
+                    child_obj = self._v2.jobs.get(id=child_id).results
                     if child_obj:
                         child_obj = child_obj.pop()
                         if child_obj.status == "error":
@@ -368,7 +368,11 @@ class AnsibleTower(Provider):
             return failure_messages
 
     def _compile_host_info(self, host):
-        host_facts = host.related.ansible_facts.get()
+        try:
+            host_facts = host.related.ansible_facts.get()
+        except awxkit.exceptions.Forbidden as err:
+            logger.warning(f"Unable to get facts for {host.name}: {err}")
+            host_facts = {}
 
         # Get the hostname from host variables or facts
         hostname = (
@@ -411,10 +415,11 @@ class AnsibleTower(Provider):
         _broker_args = {}
 
         try:
-            create_job = self.v2.jobs.get(id=host.get_related("job_events").results[0].job)
+            create_job = self._v2.jobs.get(id=host.get_related("job_events").results[0].job)
             create_job = create_job.results[0].get_related("source_workflow_job")
             _broker_args["workflow"] = create_job.name
-        except (IndexError, awxkit.exceptions.Unknown):  # Unknown is a Gateway Timeout
+        # Unknown is a Gateway Timeout
+        except (IndexError, awxkit.exceptions.Unknown, awxkit.exceptions.Forbidden):
             if "last_job" in host.related:
                 # potentially not create job, but easier processing below
                 create_job = host.get_related("last_job")
@@ -458,14 +463,14 @@ class AnsibleTower(Provider):
         for label in labels:
             label_expanded = f"{label}={labels[label]}" if labels[label] else label
             try:
-                result = self.v2.labels.post(
+                result = self._v2.labels.post(
                     {"name": label_expanded, "organization": target.summary_fields.organization.id}
                 )
                 if result:
                     label_ids.append(result.id)
             except awxkit.exceptions.Duplicate:
                 logger.debug(f"Provider label {label_expanded} already exists on AAP instance")
-                if result := self.v2.labels.get(name=label_expanded).results:
+                if result := self._v2.labels.get(name=label_expanded).results:
                     logger.debug(f"Provider label {label_expanded} retrieved successfully")
                     label_ids.append(result[0].id)
                 else:
@@ -583,14 +588,14 @@ class AnsibleTower(Provider):
         """
         if name := kwargs.get("workflow"):
             subject = "workflow"
-            get_path = self.v2.workflow_job_templates
+            get_path = self._v2.workflow_job_templates
             origin = find_origin()
             kwargs["_broker_origin"] = origin[0]
             if origin[1]:
                 kwargs["_jenkins_url"] = origin[1]
         elif name := kwargs.get("job_template"):
             subject = "job_template"
-            get_path = self.v2.job_templates
+            get_path = self._v2.job_templates
         else:
             raise exceptions.UserError(message="No workflow or job template specified")
         try:
@@ -650,7 +655,7 @@ class AnsibleTower(Provider):
                 "URL": job_ui_url,
             }
             helpers.emit(message_data)
-            raise JobExecutionError(message_data=message_data)
+            raise JobExecutionError(message_data=message_data["Reason(s)"])
         if strategy := kwargs.pop("artifacts", None):
             return self._merge_artifacts(job, strategy=strategy)
         return job
@@ -660,7 +665,7 @@ class AnsibleTower(Provider):
         user = user or self.username
         invs = [
             inv
-            for inv in self.v2.inventory.get(page_size=100).results
+            for inv in self._v2.inventory.get(page_size=100).results
             if user in inv.name or user == "@ll"
         ]
         hosts = []
@@ -703,8 +708,8 @@ class AnsibleTower(Provider):
         """Get a list of extra vars and their defaults from a workflow."""
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
         if workflow:
-            wfjt = self.v2.workflow_job_templates.get(name=workflow).results.pop()
-            default_inv = self.v2.inventory.get(id=wfjt.inventory).results.pop()
+            wfjt = self._v2.workflow_job_templates.get(name=workflow).results.pop()
+            default_inv = self._v2.inventory.get(id=wfjt.inventory).results.pop()
             logger.info(
                 f"\nDescription:\n{wfjt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
@@ -713,7 +718,7 @@ class AnsibleTower(Provider):
         elif workflows:
             workflows = [
                 workflow.name
-                for workflow in self.v2.workflow_job_templates.get(page_size=1000).results
+                for workflow in self._v2.workflow_job_templates.get(page_size=1000).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
             if res_filter := kwargs.get("results_filter"):
@@ -722,19 +727,19 @@ class AnsibleTower(Provider):
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
         elif inventory:
-            inv = self.v2.inventory.get(name=inventory, kind="").results.pop()
+            inv = self._v2.inventory.get(name=inventory, kind="").results.pop()
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
         elif inventories:
-            inv = [inv.name for inv in self.v2.inventory.get(kind="", page_size=1000).results]
+            inv = [inv.name for inv in self._v2.inventory.get(kind="", page_size=1000).results]
             if res_filter := kwargs.get("results_filter"):
                 inv = eval_filter(inv, res_filter, "res")
                 inv = inv if isinstance(inv, list) else [inv]
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
         elif job_template:
-            jt = self.v2.job_templates.get(name=job_template).results.pop()
-            default_inv = self.v2.inventory.get(id=jt.inventory).results.pop()
+            jt = self._v2.job_templates.get(name=job_template).results.pop()
+            default_inv = self._v2.inventory.get(id=jt.inventory).results.pop()
             logger.info(
                 f"\nDescription:\n{jt.description}\n\n"
                 f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
@@ -743,7 +748,7 @@ class AnsibleTower(Provider):
         elif job_templates:
             job_templates = [
                 job_template.name
-                for job_template in self.v2.job_templates.get(page_size=1000).results
+                for job_template in self._v2.job_templates.get(page_size=1000).results
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
             if res_filter := kwargs.get("results_filter"):

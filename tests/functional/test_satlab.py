@@ -135,6 +135,6 @@ def test_tower_provider_labels():
         assert r_host.provider_labels.get("l1") == "v1"
         assert r_host.provider_labels.get("l2") == ""
         # assert the AAP labels got created on the provider
-        aap_labels = [l.name for l in r_host._prov_inst.v2.labels.get().results]
+        aap_labels = [l.name for l in r_host._prov_inst._v2.labels.get().results]
         assert "l1=v1" in aap_labels
         assert "l2" in aap_labels
