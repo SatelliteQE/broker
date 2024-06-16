@@ -457,15 +457,21 @@ class AnsibleTower(Provider):
         label_ids = []
         for label in labels:
             label_expanded = f"{label}={labels[label]}" if labels[label] else label
-            if result := self.v2.labels.get(name=label_expanded).results:
-                label_ids.append(result[0].id)
-            else:
-                # label does not exist yet, creating
+            try:
                 result = self.v2.labels.post(
                     {"name": label_expanded, "organization": target.summary_fields.organization.id}
                 )
                 if result:
                     label_ids.append(result.id)
+            except awxkit.exceptions.Duplicate:
+                logger.debug(f"Provider label {label_expanded} already exists on AAP instance")
+                if result := self.v2.labels.get(name=label_expanded).results:
+                    logger.debug(f"Provider label {label_expanded} retrieved successfully")
+                    label_ids.append(result[0].id)
+                else:
+                    logger.warning(
+                        f"Provider label {label_expanded} not found on AAP despite AAP returning 400: Duplicate while trying to create it"
+                    )
         return label_ids
 
     @cached_property
