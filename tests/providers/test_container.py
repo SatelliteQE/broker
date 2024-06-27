@@ -24,6 +24,7 @@ class ContainerApiStub(MockStub):
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
             "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
             "name": "f37d3058317f",  # self.runtime.get_attrs(cont_inst)["name"]
+            "ports": MockStub({'22/tcp': [{'HostIp': '', 'HostPort': '1337'}]}),  # self.runtime.get_attrs(cont_inst)["ports"]
         }
         if "job_id" in kwargs:
             # we need to load in an image object

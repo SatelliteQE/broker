@@ -1,4 +1,5 @@
 """Container provider implementation."""
+
 from functools import cache
 import getpass
 import inspect
@@ -154,6 +155,13 @@ class Container(Provider):
             22:1337 23:1335.
         """
         mapping = {}
+        # create mapping for all exposed ports in the image
+        if settings.container.auto_map_ports or kwargs.get("auto_map_ports"):
+            mapping = {
+                k: v or None
+                for k, v in self.runtime.image_info(image)["config"]["ExposedPorts"].items()
+            }
+        # add any ports that were passed as arguments
         if ports := kwargs.pop("ports", None):
             if isinstance(ports, str):
                 for _map in ports.split():
@@ -166,11 +174,6 @@ class Container(Provider):
                     else:
                         s = "tcp"
                     mapping[f"{p}/{s}"] = int(h) if h else None
-        elif settings.container.auto_map_ports:
-            mapping = {
-                k: v or None
-                for k, v in self.runtime.image_info(image)["config"]["ExposedPorts"].items()
-            }
         return mapping
 
     def _cont_inst_by_name(self, cont_name):
@@ -200,13 +203,18 @@ class Container(Provider):
         logger.debug(cont_attrs)
         hostname = cont_inst.id[:12]
         if port := self._find_ssh_port(cont_attrs["ports"]):
-            hostname = f"{hostname}:{port}"
+            hostname = f"{self.runtime.host}:{port}"
         if not hostname:
             raise Exception(f"Could not determine container hostname:\n{cont_attrs}")
         name = cont_attrs["name"]
         logger.debug(f"hostname: {hostname}, name: {name}, host type: host")
         host_inst = host_classes["host"](**{**kwargs, "hostname": hostname, "name": name})
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
+        # add the container's port mapping to the host instance only if there are any ports open
+        if cont_attrs.get("ports"):
+            host_inst.exposed_ports = {
+                f"{k.split('/')[0]}": v[0]["HostPort"] for k, v in cont_attrs["ports"].items()
+            }
         return host_inst
 
     def provider_help(
