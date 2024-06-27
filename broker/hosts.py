@@ -180,6 +180,7 @@ class Host:
             "os_distribution",
             "os_distribution_version",
             "reported_devices",
+            "exposed_ports",
         )
         ret_dict = {
             "name": getattr(self, "name", None),
