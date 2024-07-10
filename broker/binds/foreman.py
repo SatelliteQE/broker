@@ -16,26 +16,26 @@ class ForemanBind:
     }
 
     def __init__(self, **kwargs):
-        self.foreman_username = settings.foreman.foreman_username
-        self.foreman_password = settings.foreman.foreman_password
-        self.url = settings.foreman.foreman_url
-        self.prefix = settings.foreman.name_prefix
-        self.verify = settings.foreman.verify
+        self.foreman_username = kwargs.get("foreman_username", settings.foreman.foreman_username)
+        self.foreman_password = kwargs.get("foreman_password", settings.foreman.foreman_password)
+        self.url = kwargs.get("url", settings.foreman.foreman_url)
+        self.prefix = kwargs.get("prefix", settings.foreman.name_prefix)
+        self.verify = kwargs.get("verify", settings.foreman.verify)
+
         self.session = requests.session()
 
     def _interpret_response(self, response):
         """Handle responses from Foreman, in particular catch errors."""
         if "error" in response:
-            if "Unable to authenticate user" in response["error"]["message"]:
-                raise exceptions.AuthenticationError(response["error"]["message"])
+            error = response["error"]
+            message = error.get("message")
+            if message is not None and "Unable to authenticate user" in message:
+                raise exceptions.AuthenticationError(message)
             raise exceptions.ForemanBindError(
-                provider=self.__class__.__name__,
-                message=" ".join(response["error"]["full_messages"]),
+                " ".join(error["full_messages"]),
             )
         if "errors" in response:
-            raise exceptions.ForemanBindError(
-                provider=self.__class__.__name__, message=" ".join(response["errors"]["base"])
-            )
+            raise exceptions.ForemanBindError(" ".join(response["errors"]["base"]))
         return response
 
     def _get(self, endpoint):
@@ -95,8 +95,7 @@ class ForemanBind:
             raise
         except StopIteration:
             raise exceptions.ForemanBindError(
-                provider=self.__class__.__name__,
-                message=f"Could not find {resource_name} in {resource_type}",
+                f"Could not find {resource_name} in {resource_type}",
             )
         return id_
 
