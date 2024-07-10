@@ -179,6 +179,8 @@ class DockerBind(ContainerBind):
             self.uri = "ssh://{username}@{host}".format(**kwargs)
 
     def _sanitize_create_args(self, kwargs):
-        from docker.models.containers import RUN_CREATE_KWARGS
+        from docker.models.containers import RUN_CREATE_KWARGS, RUN_HOST_CONFIG_KWARGS
 
-        return {k: v for k, v in kwargs.items() if k in RUN_CREATE_KWARGS}
+        special_kwargs = ["ports", "volumes", "network", "networking_config"]
+        accepted_kwargs = RUN_HOST_CONFIG_KWARGS + RUN_CREATE_KWARGS + special_kwargs
+        return {k: v for k, v in kwargs.items() if k in accepted_kwargs}
