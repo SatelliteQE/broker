@@ -1,11 +1,13 @@
+from contextlib import nullcontext
 import json
+
 import pytest
 
 from broker import Broker
+from broker.binds.foreman import ForemanBind
+from broker.exceptions import AuthenticationError, ForemanBindError, ProviderError
 from broker.helpers import MockStub
 from broker.providers.foreman import Foreman
-from broker.binds.foreman import ForemanBind
-from broker.exceptions import ProviderError
 
 HOSTGROUP_VALID = "hg1"
 HOSTGROUP_INVALID = "hg7"
@@ -139,3 +141,34 @@ def test_negative_remote_execution(foreman_stub):
 
     assert simple_result.status == 1
     assert complex_result.status == 100
+
+
+@pytest.mark.parametrize(
+    "response,expected,context",
+    [
+        ({1: 2}, {1: 2}, nullcontext()),
+        (
+            {"error": {"message": "Unable to authenticate user"}},
+            None,
+            pytest.raises(AuthenticationError),
+        ),
+        (
+            {"error": {"full_messages": "foo", "message": "bar"}},
+            None,
+            pytest.raises(ForemanBindError),
+        ),
+        ({"errors": {"base": "foo"}}, None, pytest.raises(ForemanBindError)),
+        ({"error": {"full_messages": ["bar"]}}, None, pytest.raises(ForemanBindError)),
+    ],
+)
+def test_interpret_response(response, expected, context):
+    bind = ForemanBind(
+        foreman_username="",
+        foreman_password="",
+        url="",
+        prefix="",
+        verify=False,
+    )
+
+    with context:
+        assert bind._interpret_response(response) == expected
