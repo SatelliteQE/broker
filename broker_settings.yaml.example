@@ -35,6 +35,7 @@ Container:
             host_password: "<plain text password>"
             host_port: None
             runtime: docker
+            network: null
             default: True
         - remote:
             host: "<remote hostname>"
