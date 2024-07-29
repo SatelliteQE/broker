@@ -1,8 +1,11 @@
 """A collection of classes to ease interaction with Docker and Podman libraries."""
+from broker.exceptions import UserError
+from broker.settings import settings
 
 HEADER_SIZE = 8
 STDOUT = 1
 STDERR = 2
+SSH_PORT = 22
 
 
 def demux_output(data_bytes):
@@ -79,6 +82,11 @@ class ContainerBind:
         """Return a list of containers on the container host."""
         return self.client.containers.list(all=True)
 
+    @property
+    def networks(self):
+        """Return a list of networks on the container host."""
+        return self.client.networks.list()
+
     def image_info(self, name):
         """Return curated information about an image on the container host."""
         if image := self.client.images.get(name):
@@ -91,6 +99,12 @@ class ContainerBind:
 
     def create_container(self, image, command=None, **kwargs):
         """Create and return running container instance."""
+        if net_name := settings.container.network:
+            if not self.get_network_by_attrs({"name": net_name}):
+                raise UserError(
+                    f"Network '{settings.container.network}' not found on container host."
+                )
+            kwargs["networks"] = {net_name: {"NetworkId": net_name}}
         kwargs = self._sanitize_create_args(kwargs)
         return self.client.containers.create(image, command, **kwargs)
 
@@ -106,6 +120,12 @@ class ContainerBind:
     def pull_image(self, name):
         """Pull an image into the container host."""
         return self.client.images.pull(name)
+
+    def get_network_by_attrs(self, attr_dict):
+        """Return the first matching network that matches all attr_dict keys and values."""
+        for network in self.networks:
+            if all(network.attrs.get(k) == v for k, v in attr_dict.items()):
+                return network
 
     @staticmethod
     def get_logs(container):
@@ -144,8 +164,10 @@ class PodmanBind(ContainerBind):
         self._ClientClass = PodmanClient
         if self.host == "localhost":
             self.uri = "unix:///run/user/1000/podman/podman.sock"
-        else:
+        elif kwargs.get("port") == SSH_PORT:
             self.uri = "http+ssh://{username}@{host}:{port}/run/podman/podman.sock".format(**kwargs)
+        else:
+            self.uri = "tcp://{host}:{port}".format(**kwargs)
 
     def _sanitize_create_args(self, kwargs):
         from podman.domain.containers_create import CreateMixin
@@ -176,7 +198,7 @@ class DockerBind(ContainerBind):
         if self.host == "localhost":
             self.uri = "unix://var/run/docker.sock"
         else:
-            self.uri = "ssh://{username}@{host}".format(**kwargs)
+            self.uri = "tcp://{username}@{host}".format(**kwargs)
 
     def _sanitize_create_args(self, kwargs):
         from docker.models.containers import RUN_CREATE_KWARGS, RUN_HOST_CONFIG_KWARGS

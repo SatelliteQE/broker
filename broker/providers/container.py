@@ -58,7 +58,8 @@ class Container(Provider):
         Validator(
             "CONTAINER.host_password",
         ),
-        Validator("CONTAINER.host_port", default=22),
+        Validator("CONTAINER.host_port", default=2375),
+        Validator("CONTAINER.network", default=None),
         Validator("CONTAINER.timeout", default=360),
         Validator("CONTAINER.auto_map_ports", is_type_of=bool, default=True),
     ]
@@ -213,7 +214,7 @@ class Container(Provider):
         # add the container's port mapping to the host instance only if there are any ports open
         if cont_attrs.get("ports"):
             host_inst.exposed_ports = {
-                f"{k.split('/')[0]}": v[0]["HostPort"] for k, v in cont_attrs["ports"].items()
+                f"{k.split('/')[0]}": v[0]["HostPort"] for k, v in cont_attrs["ports"].items() if v
             }
         return host_inst
 

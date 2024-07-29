@@ -1,8 +1,10 @@
 import json
+from pathlib import Path
 import pytest
 from broker.broker import Broker
-from broker.providers.container import Container
 from broker.helpers import MockStub
+from broker.providers.container import Container
+from broker.settings import settings
 
 
 class ContainerApiStub(MockStub):
@@ -35,6 +37,16 @@ class ContainerApiStub(MockStub):
         else:
             super().__init__(in_dict=in_dict, **kwargs)
 
+    @property
+    def networks(self):
+        return [MockStub(obj) for obj in json.loads(Path("tests/data/container/fake_networks.json").read_text())]
+
+    def get_network_by_attrs(self, attr_dict):
+        """Return the first matching network that matches all attr_dict keys and values."""
+        for network in self.networks:
+            if all(network.attrs.get(k) == v for k, v in attr_dict.items()):
+                return network
+
     @staticmethod
     def pull_image(tag_name):
         with open("tests/data/container/fake_images.json") as image_file:
@@ -45,12 +57,17 @@ class ContainerApiStub(MockStub):
         raise Broker.ProviderError(f"Unable to find image: {tag_name}")
 
     def create_container(self, container_host, **kwargs):
+        if net_name := settings.container.network:
+            if not self.get_network_by_attrs({"name": net_name}):
+                raise Exception(f"Network '{settings.container.network}' not found on container host.")
+            kwargs["networks"] = {net_name: {"NetworkId": net_name}}
         with open("tests/data/container/fake_containers.json") as container_file:
             container_data = json.load(container_file)
         image_data = self.pull_image(container_host)
         for container in container_data:
             if container["Config"]["Image"] == image_data.RepoTags[0]:
                 container["id"] = container["Id"]  # hostname = cont_inst.id[:12]
+                container["kwargs"] = kwargs
                 return MockStub(container)
 
 
@@ -74,6 +91,12 @@ def test_host_creation(container_stub):
     host = container_stub.construct_host(cont, bx.host_classes)
     assert isinstance(host, bx.host_classes["host"])
     assert host.hostname == "f37d3058317f"
+
+
+def test_ipv6_host_creation(container_stub):
+    settings.container.network = "podman2"
+    cont = container_stub.run_container(container_host="ch-d:ubi8")
+    assert cont.kwargs["networks"] == {'podman2': {'NetworkId': 'podman2'}}
 
 
 def test_image_lookup_failure(container_stub):

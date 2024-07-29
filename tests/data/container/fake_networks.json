@@ -1,0 +1,59 @@
+[
+    {
+        "name": "podman1",
+        "id": "78a8f74414",
+        "driver": "bridge",
+        "network_interface": "cni-podman1",
+        "created": "2024-04-29T04:39:08.09789015-04:00",
+        "subnets": [
+            {
+                "subnet": "fd00::1:8:0/112",
+                "gateway": "fd00::1:8:1"
+            }
+        ],
+        "ipv6_enabled": true,
+        "internal": false,
+        "dns_enabled": true,
+        "ipam_options": {
+            "driver": "host-local"
+        }
+    },
+    {
+        "name": "podman2",
+        "id": "c785da3b9b",
+        "driver": "bridge",
+        "network_interface": "cni-podman2",
+        "created": "2024-04-29T04:32:25.30689015-04:00",
+        "subnets": [
+            {
+                "subnet": "10.89.0.0/24",
+                "gateway": "10.89.0.1"
+            }
+        ],
+        "ipv6_enabled": false,
+        "internal": false,
+        "dns_enabled": true,
+        "ipam_options": {
+            "driver": "host-local"
+        }
+    },
+    {
+        "name": "podman",
+        "id": "c0b7a1bb95",
+        "driver": "bridge",
+        "network_interface": "cni-podman0",
+        "created": "2024-07-26T15:05:00.256703131-04:00",
+        "subnets": [
+            {
+                "subnet": "10.88.0.0/16",
+                "gateway": "10.88.0.1"
+            }
+        ],
+        "ipv6_enabled": false,
+        "internal": false,
+        "dns_enabled": false,
+        "ipam_options": {
+            "driver": "host-local"
+        }
+    }
+]
