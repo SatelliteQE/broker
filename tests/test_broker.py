@@ -38,6 +38,13 @@ def test_full_init():
     assert broker_inst._kwargs["test_action"] == "blank"
 
 
+def test_specified_instance():
+    """Make sure that a specified instance is used"""
+    broker_inst = Broker(nick="test_nick", TestProvider="test2")
+    host_checkout = broker_inst.checkout()
+    assert host_checkout._broker_provider_instance == "test2"
+
+
 def test_broker_e2e():
     """Run through the base functionality of broker"""
     broker_inst = Broker(nick="test_nick")

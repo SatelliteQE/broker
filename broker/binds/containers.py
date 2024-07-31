@@ -100,11 +100,12 @@ class ContainerBind:
     def create_container(self, image, command=None, **kwargs):
         """Create and return running container instance."""
         if net_name := settings.container.network:
-            if not self.get_network_by_attrs({"name": net_name}):
-                raise UserError(
-                    f"Network '{settings.container.network}' not found on container host."
-                )
-            kwargs["networks"] = {net_name: {"NetworkId": net_name}}
+            net_dict = {}
+            for name in net_name.split(","):
+                if not self.get_network_by_attrs({"name": name}):
+                    raise UserError(f"Network '{name}' not found on container host.")
+                net_dict[name] = {"NetworkId": name}
+            kwargs["networks"] = net_dict
         kwargs = self._sanitize_create_args(kwargs)
         return self.client.containers.create(image, command, **kwargs)
 
