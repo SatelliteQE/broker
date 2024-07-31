@@ -58,9 +58,14 @@ class ContainerApiStub(MockStub):
 
     def create_container(self, container_host, **kwargs):
         if net_name := settings.container.network:
-            if not self.get_network_by_attrs({"name": net_name}):
-                raise Exception(f"Network '{settings.container.network}' not found on container host.")
-            kwargs["networks"] = {net_name: {"NetworkId": net_name}}
+            net_dict = {}
+            for name in net_name.split(","):
+                if not self.get_network_by_attrs({"name": name}):
+                    raise Exception(
+                        f"Network '{name}' not found on container host."
+                    )
+                net_dict[name] = {"NetworkId": name}
+            kwargs["networks"] = net_dict
         with open("tests/data/container/fake_containers.json") as container_file:
             container_data = json.load(container_file)
         image_data = self.pull_image(container_host)
@@ -93,10 +98,16 @@ def test_host_creation(container_stub):
     assert host.hostname == "f37d3058317f"
 
 
-def test_ipv6_host_creation(container_stub):
+def test_single_network(container_stub):
     settings.container.network = "podman2"
     cont = container_stub.run_container(container_host="ch-d:ubi8")
     assert cont.kwargs["networks"] == {'podman2': {'NetworkId': 'podman2'}}
+
+
+def test_multiple_networks(container_stub):
+    settings.container.network = "podman1,podman2"
+    cont = container_stub.run_container(container_host="ch-d:ubi8")
+    assert cont.kwargs["networks"] == {'podman1': {'NetworkId': 'podman1'}, 'podman2': {'NetworkId': 'podman2'}}
 
 
 def test_image_lookup_failure(container_stub):
