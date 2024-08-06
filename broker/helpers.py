@@ -1,4 +1,5 @@
 """Miscellaneous helpers live here."""
+
 import collections
 from collections import UserDict, namedtuple
 from collections.abc import MutableMapping
@@ -265,6 +266,24 @@ def yaml_format(in_struct):
     if isinstance(in_struct, str):
         in_struct = yaml.load(in_struct, Loader=yaml.FullLoader)
     return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
+
+
+def kwargs_from_click_ctx(ctx):
+    """Convert a Click context object to a dictionary of keyword arguments."""
+    # if users use `=` to note arg=value assignment, then we need to split it
+    _args = []
+    for arg in ctx.args:
+        if "=" in arg:
+            _args.extend(arg.split("="))
+        else:
+            _args.append(arg)
+    ctx.args = _args
+    # if additional arguments were passed, include them in the broker args
+    # strip leading -- characters
+    return {
+        (key[2:] if key.startswith("--") else key): val
+        for key, val in zip(ctx.args[::2], ctx.args[1::2])
+    }
 
 
 class Emitter:
