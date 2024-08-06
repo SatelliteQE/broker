@@ -163,3 +163,12 @@ def test_dict_from_paths_nested():
     paths = {"person_name": "person/name", "person_zip": "person/address/zip"}
     result = helpers.dict_from_paths(source_dict, paths)
     assert result == {"person_name": "John", "person_zip": "12345"}
+
+
+def test_kwargs_from_click_ctx():
+    """Test that we can extract kwargs from a mixed-style click context object"""
+    class ctx:
+        args = ["--arg1", "value1", "--arg2=value2", "--some-flag"]
+
+    kwargs = helpers.kwargs_from_click_ctx(ctx)
+    assert kwargs == {"arg1": "value1", "arg2": "value2"}

@@ -229,14 +229,7 @@ def checkout(ctx, background, nick, count, args_file, provider_labels, **kwargs)
     if provider_labels:
         broker_args["provider_labels"] = parse_labels(provider_labels)
 
-    # if additional arguments were passed, include them in the broker args
-    # strip leading -- characters
-    broker_args.update(
-        {
-            (key[2:] if key.startswith("--") else key): val
-            for key, val in zip(ctx.args[::2], ctx.args[1::2])
-        }
-    )
+    broker_args.update(helpers.kwargs_from_click_ctx(ctx))
     if background:
         helpers.fork_broker()
     Broker(**broker_args).checkout()
@@ -375,14 +368,9 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, provider
         broker_args["args_file"] = args_file
     if provider_labels:
         broker_args["provider_labels"] = parse_labels(provider_labels)
-    # if additional arguments were passed, include them in the broker args
-    # strip leading -- characters
-    broker_args.update(
-        {
-            (key[2:] if key.startswith("--") else key): val
-            for key, val in zip(ctx.args[::2], ctx.args[1::2])
-        }
-    )
+
+    broker_args.update(helpers.kwargs_from_click_ctx(ctx))
+
     if background:
         helpers.fork_broker()
     result = Broker(**broker_args).execute()
