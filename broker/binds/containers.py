@@ -198,6 +198,8 @@ class DockerBind(ContainerBind):
         self._ClientClass = DockerClient
         if self.host == "localhost":
             self.uri = "unix://var/run/docker.sock"
+        elif kwargs.get("port") == SSH_PORT:
+            self.uri = "ssh://{username}@{host}:{port}".format(**kwargs)
         else:
             self.uri = "tcp://{username}@{host}".format(**kwargs)
 
