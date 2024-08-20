@@ -27,7 +27,7 @@ def init_settings(settings_path, source, interactive=False, is_url=False):
         try:
             proceed = (
                 click.prompt(
-                    f"Get example file from {source}?\n{source}",
+                    f"Get example file from {source}?\n",
                     type=click.Choice(["y", "n"]),
                     default="y",
                 )

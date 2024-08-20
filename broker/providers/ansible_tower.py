@@ -1,5 +1,4 @@
 """Ansible Tower provider implementation."""
-from datetime import datetime
 from functools import cache, cached_property
 import inspect
 import json
@@ -74,13 +73,8 @@ def get_awxkit_and_uname(config=None, root=None, url=None, token=None, uname=Non
             ) from err
     else:  # dynaconf validators should have checked that either token or password was provided
         helpers.emit(auth_type="password")
-        if datetime.now() < datetime(2023, 2, 6):
-            time_based_modifier = " and will be unavailable soon"
-        else:
-            time_based_modifier = ""
         logger.warning(
-            f"Password-based authentication is deprecated{time_based_modifier}. "
-            "Please use a token instead.\n"
+            "You should probably be using token-based authentication.\n"
             "See https://docs.ansible.com/automation-controller/latest/html/userguide/"
             "applications_auth.html#applications-tokens for more information"
         )
