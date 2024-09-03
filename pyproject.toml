@@ -7,7 +7,6 @@ name = "broker"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE", name = "GNU General Public License v3"}
 keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker"]
 authors = [
     {name = "Jacob J Callahan", email = "jacob.callahan05@gmail.com"}

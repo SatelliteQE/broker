@@ -42,16 +42,19 @@ jobs:
       - name: Pre Commit Checks
         uses: pre-commit/action@v3.0.1
 
+      - name: Set up uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
       - name: Setup Temp Directory
         run: mkdir broker_dir
 
       - name: Unit Tests
         env:
           BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
+          UV_SYSTEM_PYTHON: 1
         run: |
           cp broker_settings.yaml.example ${BROKER_DIRECTORY}/broker_settings.yaml
-          pip install uv
-          uv pip install --system "broker[dev,docker] @ ."
+          uv pip install "broker[dev,docker] @ ."
           ls -l "$BROKER_DIRECTORY"
           broker --version
           pytest -v tests/ --ignore tests/functional

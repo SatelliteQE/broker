@@ -13,17 +13,24 @@ Broker's docs can be found at the wiki for this repo: https://github.com/Satelli
 # Quickstart
 Install cmake with `dnf install cmake`
 
-Install Broker either by cloning locally with `pip install .` or with `pip install broker` for the latest version from PyPI.
+**Note:** We recommend using [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation) to manage your Broker installation.
 
-Copy the example settings file to `broker_settings.yaml` and edit it.
+Install Broker either as a tool with uv `uv tool install broker` 
 
-(optional) If you are using the Container provider, install the extra dependency based on your container runtime of choice with either `pip install broker[podman]` or `pip install broker[docker]`.
+or with pip `pip install broker`
 
-(optional) If you are using the Beaker provider, install the extra dependency with `dnf install krb5-devel` and then `pip install broker[beaker]`.
+**Note:** If you install with pip it is recommended that you do so in a virtual environment.
 
-To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
+(optional) If you are using the Container provider, install the extra dependency based on your container runtime of choice with either `... install broker[podman]` or `... install broker[docker]`.
 
-Configure the `broker_settings.yaml` file to set configuration values for broker's interaction with its providers.
+(optional) If you are using the Beaker provider, install the extra dependency with `dnf install krb5-devel` and then `... install broker[beaker]`.
+
+The first time you run Broker, like with `broker --version`, it will check if you already have a `broker_settings.yaml` in the location it expects.
+If not, then it will help you get one setup and place it in the default broker directory `~/.broker/`
+
+If you want Broker to operate out of a different location, export a `BROKER_DIRECTORY` environment variable with the desired path.
+
+You can check `broker --version` at any time to verify where it is looking for its config file.
 
 # Basic CLI Usage
 **Checking out a VM or container**
@@ -123,3 +130,12 @@ broker checkout --background --nick rhel7
 broker checkin -b --all
 broker execute -b --workflow my-awesome-workflow --artifacts
 ```
+
+# Development Setup
+Install cmake with `dnf install cmake`
+
+Clone the Broker repository and install locally with  `uv pip install "broker[dev] @ ."`
+
+Copy the example settings file to `broker_settings.yaml` and edit it.
+
+To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
