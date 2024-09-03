@@ -22,9 +22,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Set up uv
+      run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
     - name: Setup and Build
+      env:
+        UV_SYSTEM_PYTHON: 1
       run: |
-        pip install uv
         uv pip install --system "broker[setup] @ ."
         python -m build
         python -m twine check dist/*
