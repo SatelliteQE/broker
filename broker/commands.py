@@ -1,10 +1,13 @@
 """Defines the CLI commands for Broker."""
+
 from functools import wraps
 import signal
 import sys
 
 import click
 from logzero import logger
+from rich.console import Console
+from rich.table import Table
 
 from broker import exceptions, helpers, settings
 from broker.broker import Broker
@@ -267,13 +270,14 @@ def checkin(vm, background, all_, sequential, filter):
 
 @loggedcli()
 @click.option("--details", is_flag=True, help="Display all host details")
+@click.option("--curated", is_flag=True, help="Display curated host details")
 @click.option(
     "--sync",
     type=str,
     help="Class-style name of a supported broker provider. (AnsibleTower)",
 )
 @click.option("--filter", type=str, help="Display only what matches the specified filter")
-def inventory(details, sync, filter):
+def inventory(details, curated, sync, filter):
     """Get a list of all VMs you've checked out showing hostname and local id.
 
     hostname pulled from list of dictionaries.
@@ -282,9 +286,25 @@ def inventory(details, sync, filter):
         Broker.sync_inventory(provider=sync)
     logger.info("Pulling local inventory")
     inventory = helpers.load_inventory(filter=filter)
-    emit_data = []
+    helpers.emit({"inventory": inventory})
+    if curated:
+        console = Console()
+        table = Table(title="Host Inventory")
+
+        table.add_column("Id", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Host", justify="left", style="magenta")
+        table.add_column("Provider", justify="left", style="green")
+        table.add_column("Action", justify="left", style="yellow")
+        table.add_column("OS", justify="left", style="blue")
+
+        for host in helpers.get_host_inventory_fields(inventory, PROVIDERS):
+            table.add_row(
+                str(host["id"]), host["host"], host["provider"], host["action"], host["os"]
+            )
+
+        console.print(table)
+        return
     for num, host in enumerate(inventory):
-        emit_data.append(host)
         if (display_name := host.get("hostname")) is None:
             display_name = host.get("name")
         # if we're filtering, then don't show an index.
@@ -294,7 +314,6 @@ def inventory(details, sync, filter):
             logger.info(f"{index}{display_name}:\n{helpers.yaml_format(host)}")
         else:
             logger.info(f"{index}{display_name}")
-    helpers.emit({"inventory": emit_data})
 
 
 @loggedcli()

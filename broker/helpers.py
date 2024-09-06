@@ -268,6 +268,48 @@ def yaml_format(in_struct):
     return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
 
 
+def get_checkout_options(provider_cls):
+    """Return the checkout options for a provider."""
+    options = []
+    # iterate through the _checkout_options list
+    for option in provider_cls._checkout_options:
+        # now we need to dig into the baked-in attributes of the click decorator
+        for param in option.__closure__:
+            if isinstance(param.cell_contents, tuple):
+                for opt in param.cell_contents:
+                    if opt.startswith("--"):
+                        options.append(opt[2:].replace("-", "_"))  # noqa: PERF401
+    return options
+
+
+def get_host_inventory_fields(inv_dict, providers):
+    """Get a more focused set of fields from the host inventory."""
+    curated_hosts = []
+    for num, host in enumerate(inv_dict):
+        match host:
+            case {
+                "name": name,
+                "hostname": hostname,
+                "_broker_provider": provider,
+            }:
+                os_name = host.get("os_distribution", "Unknown")
+                os_version = host.get("os_distribution_version", "")
+                checkout_opts = get_checkout_options(providers[provider])
+                for opt in checkout_opts:
+                    if action := host["_broker_args"].get(opt):
+                        curated_hosts.append(
+                            {
+                                "id": num,
+                                "host": hostname or name,
+                                "provider": provider,
+                                "os": f"{os_name} {os_version}",
+                                "action": action,
+                            }
+                        )
+                        break
+    return curated_hosts
+
+
 def kwargs_from_click_ctx(ctx):
     """Convert a Click context object to a dictionary of keyword arguments."""
     # if users use `=` to note arg=value assignment, then we need to split it

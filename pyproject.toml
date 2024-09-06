@@ -28,6 +28,7 @@ dependencies = [
     "logzero",
     "packaging",
     "pyyaml",
+    "rich",
     "setuptools",
     "ssh2-python312",
 ]
