@@ -182,7 +182,7 @@ class Session:
                 captured_data += data
             if return_data:
                 return captured_data
-            destination.write_bytes(data)
+            destination.write_bytes(captured_data)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
         """Sftp write a local file to a remote destination."""
