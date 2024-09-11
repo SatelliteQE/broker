@@ -1,4 +1,6 @@
 """A collection of classes to ease interaction with Docker and Podman libraries."""
+from logzero import logger
+
 from broker.exceptions import UserError
 from broker.settings import settings
 
@@ -68,8 +70,10 @@ class ContainerBind:
     @property
     def client(self):
         """Return the client instance. Create one if it does not exist."""
+        logger.info(f"tpapaioa ContainerBind client 1: {self._client=}")
         if not isinstance(self._client, self._ClientClass):
             self._client = self._ClientClass(base_url=self.uri, timeout=self.timeout)
+        logger.info(f"tpapaioa ContainerBind client 2: {self._client=}")
         return self._client
 
     @property
@@ -160,6 +164,7 @@ class PodmanBind(ContainerBind):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        logger.info("tpapaioa PodmanBind __init__")
         from podman import PodmanClient
 
         self._ClientClass = PodmanClient

@@ -94,6 +94,7 @@ class Container(Provider):
                 "Container",
                 f"Broker has no bind for {settings.container.runtime} containers",
             )
+        logger.info("tpapaioa Container __init__")
         self.runtime = get_runtime(
             runtime_cls=self._runtime_cls,
             host=settings.container.host,
@@ -307,6 +308,7 @@ class Container(Provider):
     @Provider.register_action("container_app")
     def execute(self, container_app, **kwargs):
         """Run a container and return the raw results."""
+        
         if not kwargs.get("name"):
             kwargs["name"] = self._gen_name()
         return self.runtime.execute(container_app, **kwargs)
