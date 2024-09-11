@@ -163,6 +163,7 @@ class Host:
         """
         timeout = timeout or self.default_timeout
         logger.debug(f"{self.hostname} executing command: {command}")
+        # breakpoint()
         res = self.session.run(command, timeout=timeout)
         logger.debug(f"{self.hostname} command result:\n{res}")
         return res

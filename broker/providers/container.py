@@ -35,7 +35,7 @@ def _host_release():
     caller_host._checked_in = True
 
 
-@cache
+# @cache
 def get_runtime(runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None):
     """Return a runtime instance."""
     return runtime_cls(
@@ -193,6 +193,7 @@ class Container(Provider):
 
         :return: broker object of constructed host instance
         """
+        # breakpoint()
         logger.debug(f"constructing with {provider_params=}\n{host_classes=}\n{kwargs=}")
         if not provider_params:
             host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
