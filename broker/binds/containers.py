@@ -115,6 +115,8 @@ class ContainerBind:
 
     def execute(self, image, command=None, remove=True, **kwargs):
         """Run a container and return the raw result."""
+        logger.info("tpapaioa ContainerBind execute")
+        remove = False
         return self.client.containers.run(image, command=command, remove=remove, **kwargs).decode()
 
     def remove_container(self, container=None):
