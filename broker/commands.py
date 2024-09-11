@@ -12,7 +12,7 @@ from rich.table import Table
 from broker import exceptions, helpers, settings
 from broker.broker import Broker
 from broker.logger import LOG_LEVEL
-from broker.providers import PROVIDER_HELP, PROVIDERS
+from broker.providers import PROVIDER_ACTIONS, PROVIDER_HELP, PROVIDERS
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 
@@ -297,7 +297,7 @@ def inventory(details, curated, sync, filter):
         table.add_column("Action", justify="left", style="yellow")
         table.add_column("OS", justify="left", style="blue")
 
-        for host in helpers.get_host_inventory_fields(inventory, PROVIDERS):
+        for host in helpers.get_host_inventory_fields(inventory, PROVIDER_ACTIONS):
             table.add_row(
                 str(host["id"]), host["host"], host["provider"], host["action"], host["os"]
             )
