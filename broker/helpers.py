@@ -268,22 +268,20 @@ def yaml_format(in_struct):
     return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
 
 
-def get_checkout_options(provider_cls):
-    """Return the checkout options for a provider."""
-    options = []
-    # iterate through the _checkout_options list
-    for option in provider_cls._checkout_options:
-        # now we need to dig into the baked-in attributes of the click decorator
-        for param in option.__closure__:
-            if isinstance(param.cell_contents, tuple):
-                for opt in param.cell_contents:
-                    if opt.startswith("--"):
-                        options.append(opt[2:].replace("-", "_"))  # noqa: PERF401
-    return options
+def flip_provider_actions(provider_actions):
+    """Flip the mapping of actions->provider to provider->actions."""
+    flipped = {}
+    for action, (provider, _) in provider_actions.items():
+        provider_name = provider.__name__
+        if provider_name not in flipped:
+            flipped[provider_name] = []
+        flipped[provider_name].append(action)
+    return flipped
 
 
-def get_host_inventory_fields(inv_dict, providers):
+def get_host_inventory_fields(inv_dict, provider_actions):
     """Get a more focused set of fields from the host inventory."""
+    flipped_prov_actions = flip_provider_actions(provider_actions)
     curated_hosts = []
     for num, host in enumerate(inv_dict):
         match host:
@@ -294,8 +292,7 @@ def get_host_inventory_fields(inv_dict, providers):
             }:
                 os_name = host.get("os_distribution", "Unknown")
                 os_version = host.get("os_distribution_version", "")
-                checkout_opts = get_checkout_options(providers[provider])
-                for opt in checkout_opts:
+                for opt in flipped_prov_actions[provider]:
                     if action := host["_broker_args"].get(opt):
                         curated_hosts.append(
                             {
