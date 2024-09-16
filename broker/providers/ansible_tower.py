@@ -659,7 +659,7 @@ class AnsibleTower(Provider):
         user = user or self.username
         invs = [
             inv
-            for inv in self._v2.inventory.get(page_size=100).results
+            for inv in self._v2.inventory.get(page_size=200).results
             if user in inv.name or user == "@ll"
         ]
         hosts = []
