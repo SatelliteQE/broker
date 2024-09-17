@@ -17,8 +17,9 @@ Usage:
 from logzero import logger
 
 from broker.exceptions import HostError, NotImplementedError
-from broker.session import ContainerSession, Session
 from broker.settings import settings
+
+SETTINGS_VALIDATED = False
 
 
 class Host:
@@ -45,6 +46,11 @@ class Host:
             ipv6 (bool): Whether or not to use IPv6. Defaults to False.
             ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
         """
+        global SETTINGS_VALIDATED  # noqa: PLW0603
+        if not SETTINGS_VALIDATED:
+            logger.debug("Validating ssh settings")
+            settings.validators.validate(only="SSH")
+            SETTINGS_VALIDATED = True
         logger.debug(f"Constructing host using {kwargs=}")
         self.hostname = kwargs.get("hostname") or kwargs.get("ip")
         if not self.hostname:
@@ -56,13 +62,13 @@ class Host:
             else:
                 raise HostError("Host must be constructed with a hostname or ip")
         self.name = kwargs.pop("name", None)
-        self.username = kwargs.pop("username", settings.HOST_USERNAME)
-        self.password = kwargs.pop("password", settings.HOST_PASSWORD)
-        self.timeout = kwargs.pop("connection_timeout", settings.HOST_CONNECTION_TIMEOUT)
-        self.port = kwargs.pop("port", settings.HOST_SSH_PORT)
-        self.key_filename = kwargs.pop("key_filename", settings.HOST_SSH_KEY_FILENAME)
-        self.ipv6 = kwargs.pop("ipv6", settings.HOST_IPV6)
-        self.ipv4_fallback = kwargs.pop("ipv4_fallback", settings.HOST_IPV4_FALLBACK)
+        self.username = kwargs.pop("username", settings.SSH.HOST_USERNAME)
+        self.password = kwargs.pop("password", settings.SSH.HOST_PASSWORD)
+        self.timeout = kwargs.pop("connection_timeout", settings.SSH.HOST_CONNECTION_TIMEOUT)
+        self.port = kwargs.pop("port", settings.SSH.HOST_SSH_PORT)
+        self.key_filename = kwargs.pop("key_filename", settings.SSH.HOST_SSH_KEY_FILENAME)
+        self.ipv6 = kwargs.pop("ipv6", settings.SSH.HOST_IPV6)
+        self.ipv4_fallback = kwargs.pop("ipv4_fallback", settings.SSH.HOST_IPV4_FALLBACK)
         self.__dict__.update(kwargs)  # Make every other kwarg an attribute
         self._session = None
 
@@ -79,10 +85,11 @@ class Host:
         If the session object does not exist, it will be created by calling the `connect` method.
         If the host is a non-SSH-enabled container host, a `ContainerSession` object will be created instead.
         """
-        # This attribute may be missing after pickling
-        if not isinstance(getattr(self, "_session", None), Session):
+        if self._session is None:
             # Check to see if we're a non-ssh-enabled Container Host
             if hasattr(self, "_cont_inst") and not self._cont_inst.ports.get(22):
+                from broker.session import ContainerSession
+
                 runtime = "podman" if "podman" in str(self._cont_inst.client) else "docker"
                 self._session = ContainerSession(self, runtime=runtime)
             else:
@@ -110,6 +117,8 @@ class Host:
             ipv6 (bool): Whether or not to use IPv6. Defaults to False.
             ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
         """
+        from broker.session import Session
+
         username = username or self.username
         password = password or self.password
         timeout = timeout or self.timeout
@@ -135,8 +144,7 @@ class Host:
 
     def close(self):
         """Close the SSH connection to the host."""
-        # This attribute may be missing after pickling
-        if isinstance(getattr(self, "_session", None), Session):
+        if self._session is not None:
             self._session.disconnect()
         self._session = None
 

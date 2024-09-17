@@ -50,11 +50,8 @@ jobs:
 
       - name: Unit Tests
         env:
-          BROKER_DIRECTORY: "${{ github.workspace }}/broker_dir"
           UV_SYSTEM_PYTHON: 1
         run: |
-          cp broker_settings.yaml.example ${BROKER_DIRECTORY}/broker_settings.yaml
-          uv pip install "broker[dev,docker] @ ."
-          ls -l "$BROKER_DIRECTORY"
+          uv pip install "broker[dev,podman] @ ."
           broker --version
           pytest -v tests/ --ignore tests/functional

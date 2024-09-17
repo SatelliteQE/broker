@@ -4,17 +4,28 @@ from functools import wraps
 import signal
 import sys
 
-import click
 from logzero import logger
 from rich.console import Console
+from rich.syntax import Syntax
 from rich.table import Table
+import rich_click as click
 
 from broker import exceptions, helpers, settings
 from broker.broker import Broker
+from broker.config_manager import ConfigManager
 from broker.logger import LOG_LEVEL
 from broker.providers import PROVIDER_ACTIONS, PROVIDER_HELP, PROVIDERS
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
+CONSOLE = Console()  # rich console for pretty printing
+
+click.rich_click.SHOW_ARGUMENTS = True
+click.rich_click.COMMAND_GROUPS = {
+    "broker": [
+        {"name": "Core Actions", "commands": ["checkout", "checkin", "inventory"]},
+        {"name": "Extras", "commands": ["execute", "extend", "providers", "config"]},
+    ]
+}
 
 
 def loggedcli(group=None, *cli_args, **cli_kwargs):
@@ -47,7 +58,7 @@ def parse_labels(provider_labels):
     }
 
 
-class ExceptionHandler(click.Group):
+class ExceptionHandler(click.RichGroup):
     """Wraps click group to catch and handle raised exceptions."""
 
     def __call__(self, *args, **kwargs):
@@ -167,12 +178,8 @@ def populate_providers(click_group):
 def cli(version):
     """Command-line interface for interacting with providers."""
     if version:
-        from importlib.metadata import version
-
         from packaging.version import Version
         import requests
-
-        broker_version = version("broker")
 
         # Check against the latest version published to PyPi
         try:
@@ -181,19 +188,28 @@ def cli(version):
                     "version"
                 ]
             )
-            if latest_version > Version(broker_version):
+            if latest_version > Version(ConfigManager.version):
                 click.secho(
                     f"A newer version of broker is available: {latest_version}",
                     fg="yellow",
                 )
         except requests.exceptions.RequestException as err:
             logger.warning(f"Unable to check for latest version: {err}")
-        click.echo(f"Version: {broker_version}")
-        broker_directory = settings.BROKER_DIRECTORY.absolute()
-        click.echo(f"Broker Directory: {broker_directory}")
-        click.echo(f"Settings File: {settings.settings_path.absolute()}")
-        click.echo(f"Inventory File: {broker_directory}/inventory.yaml")
-        click.echo(f"Log File: {broker_directory}/logs/broker.log")
+
+        # Create a rich table
+        table = Table(title=f"Broker {ConfigManager.version}")
+
+        table.add_column("", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Location", justify="left", style="magenta")
+
+        table.add_row("Broker Directory", str(settings.BROKER_DIRECTORY.absolute()))
+        table.add_row("Settings File", str(settings.settings_path.absolute()))
+        table.add_row("Inventory File", f"{settings.BROKER_DIRECTORY.absolute()}/inventory.yaml")
+        table.add_row("Log File", f"{settings.BROKER_DIRECTORY.absolute()}/logs/broker.log")
+
+        # Print the table
+        console = Console()
+        console.print(table)
 
 
 @loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
@@ -288,7 +304,6 @@ def inventory(details, curated, sync, filter):
     inventory = helpers.load_inventory(filter=filter)
     helpers.emit({"inventory": inventory})
     if curated:
-        console = Console()
         table = Table(title="Host Inventory")
 
         table.add_column("Id", justify="left", style="cyan", no_wrap=True)
@@ -302,7 +317,7 @@ def inventory(details, curated, sync, filter):
                 str(host["id"]), host["host"], host["provider"], host["action"], host["os"]
             )
 
-        console.print(table)
+        CONSOLE.print(table)
         return
     for num, host in enumerate(inventory):
         if (display_name := host.get("hostname")) is None:
@@ -400,3 +415,111 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, provider
         logger.info(result)
     elif output_format == "yaml":
         click.echo(helpers.yaml_format(result))
+
+
+@cli.group(cls=ExceptionHandler)
+def config():
+    """View and manage Broker's configuration.
+
+    Note: One important concept of these commands is the concept of a "chunk".
+
+    A chunk is a part of the configuration file that can be accessed or updated.
+    Chunks are specified by their keys in the configuration file.
+    Nested chunks are separated by periods.
+
+    e.g. broker config view AnsibleTower.instances.my_instance
+    """
+
+
+@loggedcli(group=config)
+@click.argument("chunk", type=str, required=False)
+@click.option("--no-syntax", is_flag=True, help="Disable syntax highlighting")
+def view(chunk, no_syntax):
+    """View all or part of the broker configuration."""
+    result = helpers.yaml_format(ConfigManager(settings.settings_path).get(chunk))
+    if no_syntax:
+        CONSOLE.print(result)
+    else:
+        CONSOLE.print(Syntax(result, "yaml", background_color="default"))
+
+
+@loggedcli(group=config)
+@click.argument("chunk", type=str, required=False)
+def edit(chunk):
+    """Directly edit the broker configuration file.
+
+    You can define the scope of the edit by specifying a chunk.
+    Otherwise, the entire configuration file will be opened.
+    """
+    ConfigManager(settings.settings_path).edit(chunk)
+
+
+@loggedcli(group=config, name="set")
+@click.argument("chunk", type=str, required=True)
+@click.argument("new-value", type=str, required=True)
+def _set(chunk, new_value):
+    """Set a value in the Broker configuration file.
+
+    These updates take the form of `<chunk> <value>` pairs.
+    You can also pass a yaml or json file containing the new contents of a chunk.
+    """
+    new_value = helpers.resolve_file_args({"nv": new_value})["nv"]
+    ConfigManager(settings.settings_path).update(chunk, new_value)
+
+
+@loggedcli(group=config)
+def restore():
+    """Restore the broker configuration file to the last backup."""
+    ConfigManager(settings.settings_path).restore()
+
+
+@loggedcli(group=config)
+@click.argument("chunk", type=str, required=False)
+def init(chunk):
+    """Initialize the broker configuration file from your local clone or GitHub.
+
+    You can also init specific chunks by passing the chunk name.
+    """
+    ConfigManager(settings.settings_path).init_config_file(chunk)
+
+
+@loggedcli(group=config)
+def nicks():
+    """Get a list of nicks."""
+    result = ConfigManager(settings.settings_path).nicks()
+    CONSOLE.print("\n".join(result))
+
+
+@loggedcli(group=config)
+@click.argument("nick", type=str, required=True)
+@click.option("--no-syntax", is_flag=True, help="Disable syntax highlighting")
+def nick(nick, no_syntax):
+    """Get information about a specific nick."""
+    result = helpers.yaml_format(ConfigManager(settings.settings_path).nicks(nick))
+    if no_syntax:
+        CONSOLE.print(result)
+    else:
+        CONSOLE.print(Syntax(result, "yaml", background_color="default"))
+
+
+@loggedcli(group=config)
+def migrate():
+    """Migrate the broker configuration file to the latest version."""
+    ConfigManager(settings.settings_path).migrate()
+
+
+@loggedcli(group=config)
+@click.argument("chunk", type=str, required=False, default="base")
+def validate(chunk):
+    """Validate top-level chunks of the broker configuration file.
+
+    You can validate against the `base` settings by default or specify a provider.
+    You can also validate against a specific provider instance with `ProviderClass:instance_name`.
+
+    To validate everything, pass `all`
+    """
+    try:
+        ConfigManager(settings.settings_path).validate(chunk, PROVIDERS)
+        logger.info("Validation passed!")
+    except exceptions.BrokerError as err:
+        logger.warning(f"Validation failed: {err}")

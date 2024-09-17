@@ -20,13 +20,10 @@ def skip_if_not_configured():
 
 
 @pytest.fixture(scope="module")
-def temp_inventory():
-    """Temporarily move the local inventory, then move it back when done"""
-    backup_path = inventory_path.rename(f"{inventory_path.absolute()}.bak")
+def checkin_containers():
+    """Checkin all containers checkout out by the tests."""
     yield
     CliRunner().invoke(cli, ["checkin", "--all", "--filter", "_broker_provider<Container"])
-    inventory_path.unlink()
-    backup_path.rename(inventory_path)
 
 
 # ----- CLI Scenario Tests -----
@@ -35,7 +32,7 @@ def temp_inventory():
 @pytest.mark.parametrize(
     "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
 )
-def test_checkout_scenarios(args_file, temp_inventory):
+def test_checkout_scenarios(args_file, checkin_containers):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
     assert result.exit_code == 0
 

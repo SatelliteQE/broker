@@ -458,19 +458,20 @@ def fork_broker():
 def handle_keyboardinterrupt(*args):
     """Handle keyboard interrupts gracefully.
 
-    Offer the user a choice between keeping Broker alive in the background or killing it.
+    Offer the user a choice between keeping Broker alive in the background, killing it, or resuming execution.
     """
     choice = click.prompt(
-        "\nEnding Broker while running won't end processes being monitored.\n"
-        "Would you like to switch Broker to run in the background?\n"
-        "[y/n]: ",
-        type=click.Choice(["y", "n"]),
-        default="n",
-    )
-    if choice == "y":
+        "\nEnding Broker while running may not end processes being monitored.\n"
+        "Would you like to switch Broker to run in the Background, Kill it, or Resume execution?\n",
+        type=click.Choice(["b", "k", "r"]),
+        default="r",
+    ).lower()
+    if choice == "b":
         fork_broker()
-    else:
+    elif choice == "k":
         raise exceptions.BrokerError("Broker killed by user.")
+    elif choice == "r":
+        click.echo("Resuming execution...")
 
 
 def translate_timeout(timeout):

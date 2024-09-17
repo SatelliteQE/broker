@@ -19,7 +19,7 @@ from broker.exceptions import NotImplementedError
 from broker.settings import settings
 
 SSH_BACKENDS = ("ssh2-python", "ssh2-python312", "ansible-pylibssh", "hussh")
-SSH_BACKEND = settings.SSH_BACKEND
+SSH_BACKEND = settings.BACKEND
 
 logger.debug(f"{SSH_BACKEND=}")
 
