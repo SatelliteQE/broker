@@ -1,19 +1,24 @@
 # Broker settings
+_version: 0.6.0
 # different log levels for file and stdout
 logging:
     console_level: info
     file_level: debug
-# Host Settings
+# Optionally set a limit for the number of threads Broker can use for actions
+thread_limit: None
+# Host SSH Settings
 # These can be left alone if you're not using Broker as a library
-host_username: root
-host_password: "<password>"
-host_ssh_port: 22
-host_ssh_key_filename: "</path/to/the/ssh-key>"
-# Default all host ssh connections to IPv6
-host_ipv6: False
-# If IPv6 connection attempts fail, fallback to IPv4
-host_ipv4_fallback: True
-ssh_backend: ssh2-python312
+ssh:
+    # this is the library Broker should use to perform ssh actions
+    backend: ssh2-python312
+    host_username: root
+    host_password: "<password>"
+    host_ssh_port: 22
+    host_ssh_key_filename: "</path/to/the/ssh-key>"
+    # Default all host ssh connections to IPv6
+    host_ipv6: False
+    # If IPv6 connection attempts fail, fallback to IPv4
+    host_ipv4_fallback: True
 # Provider settings
 AnsibleTower:
     base_url: "https://<ansible tower host>/"
@@ -30,14 +35,14 @@ AnsibleTower:
     results_limit: 50
 Container:
     instances:
-        - docker:
+        docker:
             host_username: "<username>"
             host_password: "<plain text password>"
             host_port: None
             runtime: docker
             network: null
             default: True
-        - remote:
+        remote:
             host: "<remote hostname>"
             host_username: "<username>"
             host_password: "<plain text password>"
@@ -49,7 +54,7 @@ Container:
     auto_map_ports: False
 Foreman:
   instances:
-    - foreman1:
+    foreman1:
         foreman_url: https://test.fore.man
         foreman_username: admin
         foreman_password: secret
@@ -57,7 +62,7 @@ Foreman:
         location: LOC
         verify: ./ca.crt
         default: true
-    - foreman2:
+    foreman2:
         foreman_url: https://other-test.fore.man
         foreman_username: admin
         foreman_password: secret
@@ -67,25 +72,9 @@ Foreman:
 Beaker:
     hub_url:
     max_job_wait: 24h
-TestProvider:
-    instances:
-        - test1:
-            foo: "bar"
-            default: True
-        - test2:
-            foo: "baz"
-            override_envars: True
-        - bad:
-            nothing: False
-    config_value: "something"
 # You can set a nickname as a shortcut for arguments
 nicks:
-    rhel7:
-        workflow: "deploy-rhel"
-        deploy_rhel_version: "7.9"
+    rhel9:
+        workflow: deploy-rhel
+        deploy_rhel_version: 9.4
         notes: "Requested by broker"
-    test_nick:
-        test_action: "fake"
-        arg1: "abc"
-        arg2: 123
-        arg3: True
