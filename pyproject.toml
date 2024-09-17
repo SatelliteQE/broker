@@ -29,6 +29,7 @@ dependencies = [
     "packaging",
     "pyyaml",
     "rich",
+    "rich_click",
     "setuptools",
     "ssh2-python312",
 ]

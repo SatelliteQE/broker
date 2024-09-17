@@ -1,0 +1,59 @@
+_version: 0.6.0
+logging:
+  console_level: info
+  file_level: debug
+ssh:
+  backend: ssh2-python312
+  host_username: root
+  host_password: <password>
+  host_ssh_port: 22
+  host_ssh_key_filename: </path/to/the/ssh-key>
+  host_ipv6: false
+  host_ipv4_fallback: true
+AnsibleTower:
+  base_url: https://<ansible tower host>/
+  username: <username>
+  token: <AT personal access token>
+  release_workflow: remove-vm
+  extend_workflow: extend-vm
+  new_expire_time: '+172800'
+  workflow_timeout: 3600
+  results_limit: 50
+Container:
+  host_username: <username>
+  host_password: <plain text password>
+  host_port: None
+  network: null
+  default: true
+  runtime: podman
+  results_limit: 50
+  auto_map_ports: false
+Foreman:
+  foreman_url: https://test.fore.man
+  foreman_username: admin
+  foreman_password: secret
+  organization: ORG
+  location: LOC
+  verify: ./ca.crt
+  name_prefix: broker
+Beaker:
+  hub_url: null
+  max_job_wait: 24h
+TestProvider:
+    instances:
+        test1:
+            foo: "bar"
+            default: True
+        test2:
+            foo: "baz"
+            override_envars: True
+        bad:
+            nothing: False
+    config_value: "something"
+# You can set a nickname as a shortcut for arguments
+nicks:
+    test_nick:
+        test_action: "fake"
+        arg1: "abc"
+        arg2: 123
+        arg3: True
