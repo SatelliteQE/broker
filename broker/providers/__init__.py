@@ -65,18 +65,22 @@ class ProviderMeta(ABCMeta):
             for attr, obj in attrs.items():
                 if attr == "provider_help":
                     # register the help options based on the function arguments
-                    for name, param in inspect.signature(obj).parameters.items():
-                        if name not in ("self", "kwargs"):
-                            # {name: (cls, is_flag)}
-                            PROVIDER_HELP[name] = (
+                    for _name, param in inspect.signature(obj).parameters.items():
+                        if _name not in ("self", "kwargs"):
+                            # {_name: (cls, is_flag)}
+                            PROVIDER_HELP[_name] = (
                                 new_cls,
                                 isinstance(param.default, bool),
                             )
-                            logger.debug(f"Registered help option {name} for provider {name}")
+                            logger.debug(f"Registered help option {_name} for provider {_name}")
                 elif hasattr(obj, "_as_action"):
                     for action in obj._as_action:
                         PROVIDER_ACTIONS[action] = (new_cls, attr)
                         logger.debug(f"Registered action {action} for provider {name}")
+            # register provider settings validators
+            if validators := attrs.get("_validators"):
+                logger.debug(f"Adding {len(validators)} validators for {name}")
+                settings.validators.extend(validators)
         return new_cls
 
 
@@ -143,9 +147,6 @@ class Provider(metaclass=ProviderMeta):
             if not inst_vals.get("override_envars"):
                 # if a provider instance doesn't want to override envars, load them
                 settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
-        new_validators = [v for v in self._validators if v not in settings.validators]
-        logger.debug(f"Adding new validators: {[v.names[0] for v in new_validators]}")
-        settings.validators.extend(new_validators)
         # use selective validation to only validate the instance settings
         try:
             settings.validators.validate(only=section_name)
