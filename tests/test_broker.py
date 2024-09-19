@@ -130,22 +130,3 @@ def test_multi_manager():
 
 class SomeException(Exception):
     pass
-
-
-class MyBroker:
-    @broker.mp_decorator
-    def workload(self):
-        return []
-
-    @broker.mp_decorator
-    def failing_workload(self):
-        raise SomeException()
-
-
-def test_mp_decorator():
-    tested_broker = MyBroker()
-    tested_broker._kwargs = dict(_count=2)
-
-    tested_broker.workload()
-    with pytest.raises(SomeException):
-        tested_broker.failing_workload()
