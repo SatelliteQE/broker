@@ -79,10 +79,13 @@ class ContainerSession:
             # Containers don't handle pipes, redirects, etc well in a bare exec_run
             command = f"/bin/bash -c '{command}'"
         result = self._cont_inst._cont_inst.exec_run(command, **kwargs)
+        logger.info(f"tpapaioa ContainerSession result 1: {command=} {result=}")
         if demux:
             result = helpers.Result.from_duplexed_exec(result, self.runtime)
+            logger.info(f"tpapaioa ContainerSession result demux: {result=}")
         else:
             result = helpers.Result.from_nonduplexed_exec(result)
+            logger.info(f"tpapaioa ContainerSession result nonduplex: {result=}")
         return result
 
     def disconnect(self):
