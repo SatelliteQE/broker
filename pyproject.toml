@@ -48,7 +48,7 @@ docker = [
     "docker",
     "paramiko"
 ]
-podman = ["podman"]
+podman = ["podman>=5.2"]
 setup = [
     "build",
     "twine",
