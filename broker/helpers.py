@@ -21,7 +21,6 @@ from logzero import logger
 import yaml
 
 from broker import exceptions, logger as b_log, settings
-from broker.binds.containers import demux_output
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
@@ -574,12 +573,13 @@ class Result:
     def from_duplexed_exec(cls, duplex_exec, runtime=None):
         """Create a Result object from a duplexed exec object from podman or docker."""
         if runtime == "podman":
-            stdout, stderr = demux_output(duplex_exec[1])
+            status, (stdout, stderr) = duplex_exec
             return cls(
-                status=duplex_exec[0],
+                status=status,
                 stdout=stdout.decode("utf-8"),
                 stderr=stderr.decode("utf-8"),
             )
+
         if duplex_exec.output[0]:
             stdout = duplex_exec.output[0].decode("utf-8")
         else:
