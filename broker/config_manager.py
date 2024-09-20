@@ -110,16 +110,22 @@ class ConfigManager:
         else:
             return source.read_text()
 
-    def _get_migrations(self):
+    def _get_migrations(self, force_version=None):
         """Construct a list of all applicable migrations."""
         from broker import config_migrations
 
         config_version = Version(self._cfg.get("_version", "0.0.0"))
+        if force_version:
+            force_version = Version(force_version)
         migrations = []
         for _, name, _ in pkgutil.iter_modules(config_migrations.__path__):
             module = importlib.import_module(f"broker.config_migrations.{name}")
-            if hasattr(module, "run_migrations") and config_version < file_name_to_ver(name):
-                migrations.append(module)
+            if hasattr(module, "run_migrations"):
+                if force_version and force_version == file_name_to_ver(name):
+                    migrations.append(module)
+                    break
+                elif config_version < file_name_to_ver(name):
+                    migrations.append(module)
         return migrations
 
     def backup(self):
@@ -199,26 +205,34 @@ class ConfigManager:
             return nicks[nick]
         return list(nicks.keys())
 
-    def init_config_file(self, chunk=None):
+    def init_config_file(self, chunk=None, _from=None):
         """Check for the existence of the config file and create it if it doesn't exist."""
         if self.interactive_mode and self._settings_path.exists() and not chunk:
             # if the file exists, ask the user if they want to overwrite it
             if (
                 click.prompt(
-                    f"Settings file already exists at {self._settings_path.absolute()}. Overwrite?",
+                    f"Overwrite the settings file at {self._settings_path.absolute()}. Overwrite?",
                     type=click.Choice(["y", "n"]),
                     default="n",
                 )
                 != "y"
             ):
                 return
-        # get the example file from the local repo or GitHub
-        example_path = Path(__file__).parent.parent.joinpath("broker_settings.yaml.example")
         raw_data = None
-        if example_path.exists():
-            raw_data = self._import_config(example_path)
+        if _from:
+            # determine if this is a local file or a URL
+            if Path(_from).exists():
+                raw_data = self._import_config(Path(_from))
+            else:
+                raw_data = self._import_config(_from, is_url=True)
+        # if we still don't have data, get the example file from the local repo or GitHub
         if not raw_data:
-            raw_data = self._import_config(GH_CFG, is_url=True)
+            # get the example file from the local repo or GitHub
+            example_path = Path(__file__).parent.parent.joinpath("broker_settings.yaml.example")
+            if example_path.exists():
+                raw_data = self._import_config(example_path)
+            if not raw_data:
+                raw_data = self._import_config(GH_CFG, is_url=True)
         if not raw_data:
             raise exceptions.ConfigurationError(
                 f"Broker settings file not found at {self._settings_path.absolute()}."
@@ -228,10 +242,10 @@ class ConfigManager:
             chunk_data = self._interactive_edit(chunk_data)
         self.update(chunk, chunk_data)
 
-    def migrate(self):
+    def migrate(self, force_version=None):
         """Migrate the config from a previous version of Broker."""
         # get all available migrations
-        if not (migrations := self._get_migrations()):
+        if not (migrations := self._get_migrations(force_version)):
             logger.info("No migrations are applicable to your config.")
             return
         # run all migrations in order
