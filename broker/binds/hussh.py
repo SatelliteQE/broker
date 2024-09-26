@@ -91,9 +91,7 @@ class Session:
 
     def run(self, command, timeout=0):
         """Run a command on the host and return the results."""
-        # TODO support timeout parameter
-        result = self.session.execute(command)
-
+        result = self.session.execute(command, timeout=helpers.translate_timeout(timeout))
         # Create broker Result from hussh SSHResult
         return helpers.Result(
             status=result.status,
