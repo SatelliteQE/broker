@@ -264,22 +264,22 @@ populate_providers(providers)
 
 
 @loggedcli()
-@click.argument("vm", type=str, nargs=-1)
+@click.argument("hosts", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
-@click.option("--all", "all_", is_flag=True, help="Select all VMs")
+@click.option("--all", "all_", is_flag=True, help="Select all hosts")
 @click.option("--sequential", is_flag=True, help="Run checkins sequentially")
 @click.option("--filter", type=str, help="Checkin only what matches the specified filter")
-def checkin(vm, background, all_, sequential, filter):
-    """Checkin or "remove" a VM or series of VM broker instances.
+def checkin(hosts, background, all_, sequential, filter):
+    """Checkin or "remove" a host or series of hosts.
 
-    COMMAND: broker checkin <vm hostname>|<local id>|--all
+    COMMAND: broker checkin <hostname>|<local id>|--all
     """
     if background:
         helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     to_remove = []
     for num, host in enumerate(inventory):
-        if str(num) in vm or host.get("hostname") in vm or host.get("name") in vm or all_:
+        if str(num) in hosts or host.get("hostname") in hosts or host.get("name") in hosts or all_:
             to_remove.append(Broker().reconstruct_host(host))
     Broker(hosts=to_remove).checkin(sequential=sequential)
 
@@ -294,7 +294,7 @@ def checkin(vm, background, all_, sequential, filter):
 )
 @click.option("--filter", type=str, help="Display only what matches the specified filter")
 def inventory(details, curated, sync, filter):
-    """Get a list of all VMs you've checked out showing hostname and local id.
+    """Get a list of all hosts you've checked out showing hostname and local id.
 
     hostname pulled from list of dictionaries.
     """
@@ -332,9 +332,9 @@ def inventory(details, curated, sync, filter):
 
 
 @loggedcli()
-@click.argument("vm", type=str, nargs=-1)
+@click.argument("hosts", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
-@click.option("--all", "all_", is_flag=True, help="Select all VMs")
+@click.option("--all", "all_", is_flag=True, help="Select all hosts")
 @click.option("--sequential", is_flag=True, help="Run extends sequentially")
 @click.option("--filter", type=str, help="Extend only what matches the specified filter")
 @click.option(
@@ -346,10 +346,10 @@ def inventory(details, curated, sync, filter):
     " labels (e.g. '-l k1=v1,k2=v2,k3=v3=z4').",
 )
 @provider_options
-def extend(vm, background, all_, sequential, filter, **kwargs):
+def extend(hosts, background, all_, sequential, filter, **kwargs):
     """Extend a host's lease time.
 
-    COMMAND: broker extend <vm hostname>|<vm name>|<local id>|--all
+    COMMAND: broker extend <hostname>|<host name>|<local id>|--all
     """
     broker_args = helpers.clean_dict(kwargs)
     if background:
@@ -357,7 +357,7 @@ def extend(vm, background, all_, sequential, filter, **kwargs):
     inventory = helpers.load_inventory(filter=filter)
     to_extend = []
     for num, host in enumerate(inventory):
-        if str(num) in vm or host["hostname"] in vm or host.get("name") in vm or all_:
+        if str(num) in hosts or host["hostname"] in hosts or host.get("name") in hosts or all_:
             to_extend.append(Broker().reconstruct_host(host))
     Broker(hosts=to_extend, **broker_args).extend(sequential=sequential)
 
