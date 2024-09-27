@@ -1,4 +1,5 @@
 """Ansible Tower provider implementation."""
+
 from functools import cache, cached_property
 import inspect
 import json
@@ -7,7 +8,6 @@ from urllib import parse as url_parser
 import click
 from dynaconf import Validator
 from logzero import logger
-import yaml
 
 from broker import exceptions
 from broker.helpers import eval_filter, find_origin
@@ -20,6 +20,19 @@ except ImportError as err:
 
 from broker import helpers
 from broker.providers import Provider
+
+
+def convert_psuedonamespaces(attr_dict):
+    """Recursively convert PsuedoNamespace objects into dictionaries."""
+    out_dict = {}
+    for key, value in attr_dict.items():
+        if isinstance(value, awxkit.utils.PseudoNamespace):
+            out_dict[key] = dict(value)
+        elif isinstance(value, dict):
+            out_dict[key] = convert_psuedonamespaces(value)
+        else:
+            out_dict[key] = value
+    return out_dict
 
 
 class JobExecutionError(exceptions.ProviderError):
@@ -203,11 +216,11 @@ class AnsibleTower(Provider):
                 "release": self._host_release,
                 "_prov_inst": self,
                 "_broker_provider": "AnsibleTower",
-                "_broker_args": broker_args,
+                "_broker_args": convert_psuedonamespaces(broker_args),
             }
         )
         if isinstance(misc_attrs, dict):
-            host_inst.__dict__.update(misc_attrs)
+            host_inst.__dict__.update(convert_psuedonamespaces(misc_attrs))
 
     def _translate_inventory(self, inventory):
         if isinstance(inventory, int):  # already an id, silly
@@ -776,11 +789,3 @@ class AnsibleTower(Provider):
             source_vm=name,
             **broker_args,
         )
-
-
-def awxkit_representer(dumper, data):
-    """In order to resolve awxkit objects, a custom representer is needed."""
-    return dumper.represent_dict(dict(data))
-
-
-yaml.add_representer(awxkit.utils.PseudoNamespace, awxkit_representer)

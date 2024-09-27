@@ -8,6 +8,7 @@ Classes:
 Note: You typically want to use a Host object instance to create sessions,
       not these classes directly.
 """
+
 from contextlib import contextmanager
 from pathlib import Path
 import tempfile
@@ -19,7 +20,7 @@ from broker.exceptions import NotImplementedError
 from broker.settings import settings
 
 SSH_BACKENDS = ("ssh2-python", "ssh2-python312", "ansible-pylibssh", "hussh")
-SSH_BACKEND = settings.BACKEND
+SSH_BACKEND = settings.SSH.BACKEND
 
 logger.debug(f"{SSH_BACKEND=}")
 

@@ -3,7 +3,6 @@
 import importlib
 from importlib.metadata import version
 import json
-import os
 from pathlib import Path
 import pkgutil
 import sys
@@ -12,9 +11,13 @@ from tempfile import NamedTemporaryFile
 import click
 from logzero import logger
 from packaging.version import Version
-import yaml
+from ruamel.yaml import YAML, YAMLError
 
 from broker import exceptions
+
+yaml = YAML()
+yaml.default_flow_style = False
+yaml.sort_keys = False
 
 C_SEP = "."  # chunk separator
 GH_CFG = "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_settings.yaml.example"
@@ -23,14 +26,6 @@ GH_CFG = "https://raw.githubusercontent.com/SatelliteQE/broker/master/broker_set
 def file_name_to_ver(file_name):
     """Convert a version-encoded filename `v0_6_0` to a `Version` object."""
     return Version(file_name[1:].replace("_", "."))
-
-
-def yaml_format(data):
-    """Format the data as yaml.
-
-    Duplicating here to avoid circular imports.
-    """
-    return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
 
 class ConfigManager:
@@ -45,44 +40,31 @@ class ConfigManager:
     e.g. broker config view AnsibleTower.instances.my_instance
     """
 
+    interactive_mode = sys.stdin.isatty()
     version = version("broker")
 
     def __init__(self, settings_path=None):
-        self._interactive_mode = None
         self._settings_path = settings_path
         if settings_path:
             if settings_path.exists():
-                self._cfg = yaml.safe_load(self._settings_path.read_text())
+                self._cfg = yaml.load(self._settings_path)
             else:
                 click.secho(
                     f"Broker settings file not found at {settings_path.absolute()}.", fg="red"
                 )
                 self.init_config_file()
 
-    @property
-    def interactive_mode(self):
-        """Determine if Broker is running in interactive mode."""
-        if self._interactive_mode is None:
-            self._interactive_mode = False
-            # GitHub action context
-            if "GITHUB_WORKFLOW" not in os.environ:
-                # determine if we're being ran from a CLI
-                if sys.stdin.isatty():
-                    self._interactive_mode = True
-        return self._interactive_mode
-
     def _interactive_edit(self, chunk):
         """Write the chunk data to a temporary file and open it in an editor."""
         with NamedTemporaryFile(mode="w+", suffix=".yaml") as tmp:
-            tmp.write(yaml_format(chunk))
-            tmp.seek(0)
+            yaml.dump(chunk, tmp)
             click.edit(filename=tmp.name)
             tmp.seek(0)
             new_data = tmp.read()
         # first try to load it as yaml
         try:
-            return yaml.safe_load(new_data)
-        except yaml.YAMLError:  # then try json
+            return yaml.load(new_data)
+        except YAMLError:  # then try json
             try:
                 return json.loads(new_data)
             except json.JSONDecodeError:  # finally, just return the raw data
@@ -187,9 +169,7 @@ class ConfigManager:
             # update the config file if it exists
             if self._settings_path.exists():
                 self.backup()
-            self._settings_path.write_text(
-                yaml.dump(self._cfg, default_flow_style=False, sort_keys=False)
-            )
+            yaml.dump(self._cfg, self._settings_path)
         else:  # we're not at the top level, so keep going down
             if C_SEP in chunk:
                 curr, chunk = chunk.split(C_SEP, 1)
@@ -237,7 +217,7 @@ class ConfigManager:
             raise exceptions.ConfigurationError(
                 f"Broker settings file not found at {self._settings_path.absolute()}."
             )
-        chunk_data = self.get(chunk, yaml.safe_load(raw_data))
+        chunk_data = self.get(chunk, yaml.load(raw_data))
         if self.interactive_mode:
             chunk_data = self._interactive_edit(chunk_data)
         self.update(chunk, chunk_data)
@@ -253,9 +233,7 @@ class ConfigManager:
         for migration in sorted(migrations, key=lambda m: m.TO_VERSION):
             working_config = migration.run_migrations(working_config)
         self.backup()
-        self._settings_path.write_text(
-            yaml.dump(working_config, default_flow_style=False, sort_keys=False)
-        )
+        yaml.dump(working_config, self._settings_path)
         logger.info("Config migration complete.")
 
     def validate(self, chunk, providers=None):
@@ -265,7 +243,7 @@ class ConfigManager:
             for item in all_settings:
                 self.validate(item, providers)
             return
-        chunk = chunk.split(".")[0] if "." in chunk else chunk
+        chunk = chunk.split(C_SEP)[0] if C_SEP in chunk else chunk
         if chunk.lower() == "base":
             return
         if chunk.lower() == "ssh":
