@@ -2,6 +2,11 @@ import os
 import pytest
 
 
+def pytest_sessionstart(session):
+    """Put Broker into test mode."""
+    os.environ["BROKER_TEST_MODE"] = "True"
+
+
 @pytest.fixture
 def set_envars(request):
     """Set and unset one or more environment variables"""

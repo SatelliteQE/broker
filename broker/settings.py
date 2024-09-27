@@ -10,9 +10,9 @@ Useful items:
     settings_path: The path to the settings file.
     inventory_path: The path to the inventory file.
 """
+
 import os
 from pathlib import Path
-import sys
 
 import click
 from dynaconf import Dynaconf, Validator
@@ -21,9 +21,9 @@ from dynaconf.validator import ValidationError
 from broker.config_manager import ConfigManager
 from broker.exceptions import ConfigurationError
 
-INTERACTIVE_MODE = ConfigManager().interactive_mode
+INTERACTIVE_MODE = ConfigManager.interactive_mode
 BROKER_DIRECTORY = Path.home().joinpath(".broker")
-TEST_MODE = "pytest" in sys.modules
+TEST_MODE = os.environ.get("BROKER_TEST_MODE", False)
 
 if TEST_MODE:  # when in test mode, don't use the real broker directory
     BROKER_DIRECTORY = Path("tests/data/")

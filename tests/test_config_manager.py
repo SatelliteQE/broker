@@ -1,9 +1,11 @@
 """Test file for broker.config_manager module."""
-import yaml
+from ruamel.yaml import YAML
 from broker.config_manager import ConfigManager, GH_CFG
 from broker.settings import settings_path
 
-TEST_CFG_DATA = yaml.safe_load(settings_path.read_text())
+
+yaml = YAML()
+TEST_CFG_DATA = yaml.load(settings_path)
 
 
 def test_basic_assertions():
@@ -19,7 +21,7 @@ def test_import_config():
     cfg_mgr = ConfigManager()
     result = cfg_mgr._import_config(GH_CFG, is_url=True)
     assert isinstance(result, str)
-    converted = yaml.safe_load(result)
+    converted = yaml.load(result)
     assert isinstance(converted, dict)
 
 def test_get_e2e():
