@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 import getpass
 import inspect
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -18,12 +19,16 @@ from uuid import uuid4
 
 import click
 from logzero import logger
-import yaml
+from ruamel.yaml import YAML
 
 from broker import exceptions, logger as b_log, settings
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
+
+yaml = YAML()
+yaml.default_flow_style = False
+yaml.sort_keys = False
 
 
 def clean_dict(in_dict):
@@ -167,15 +172,10 @@ def load_file(file, warn=True):
         if warn:
             logger.warning(f"File {file.absolute()} is invalid or does not exist.")
         return []
-    loader_args = {}
     if file.suffix == ".json":
-        loader = json
+        return json.loads(file.read_text())
     elif file.suffix in (".yaml", ".yml"):
-        loader = yaml
-        loader_args = {"Loader": yaml.FullLoader}
-    with file.open() as f:
-        data = loader.load(f, **loader_args) or []
-    return data
+        return yaml.load(file)
 
 
 def resolve_file_args(broker_args):
@@ -251,8 +251,7 @@ def update_inventory(add=None, remove=None):
             inv_data.extend(add)
 
         settings.inventory_path.touch()
-        with settings.inventory_path.open("w") as inv_file:
-            yaml.dump(inv_data, inv_file)
+        yaml.dump(inv_data, settings.inventory_path)
 
 
 def yaml_format(in_struct):
@@ -263,8 +262,10 @@ def yaml_format(in_struct):
     :return: yaml-formatted string
     """
     if isinstance(in_struct, str):
-        in_struct = yaml.load(in_struct, Loader=yaml.FullLoader)
-    return yaml.dump(in_struct, default_flow_style=False, sort_keys=False)
+        in_struct = yaml.load(in_struct)
+    output = BytesIO()  # ruamel doesn't natively allow for string output
+    yaml.dump(in_struct, output)
+    return output.getvalue().decode("utf-8")
 
 
 def flip_provider_actions(provider_actions):
