@@ -208,8 +208,7 @@ def cli(version):
         table.add_row("Log File", f"{settings.BROKER_DIRECTORY.absolute()}/logs/broker.log")
 
         # Print the table
-        console = Console()
-        console.print(table)
+        CONSOLE.print(table)
 
 
 @loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
