@@ -2,11 +2,11 @@
 
 import importlib
 from importlib.metadata import version
-import inspect
 import json
 import os
 from pathlib import Path
 import pkgutil
+import sys
 from tempfile import NamedTemporaryFile
 
 import click
@@ -67,10 +67,8 @@ class ConfigManager:
             # GitHub action context
             if "GITHUB_WORKFLOW" not in os.environ:
                 # determine if we're being ran from a CLI
-                for frame in inspect.stack()[::-1]:
-                    if "/bin/broker" in frame.filename:
-                        self._interactive_mode = True
-                        break
+                if sys.stdin.isatty():
+                    self._interactive_mode = True
         return self._interactive_mode
 
     def _interactive_edit(self, chunk):
@@ -156,7 +154,7 @@ class ConfigManager:
         new_val = self._interactive_edit(content)
         self.update(chunk, new_val)
 
-    def get(self, chunk=None, curr_chunk=None):
+    def get(self, chunk=None, curr_chunk=None, suppress=False):
         """Get a chunk of Broker's config or the whole config."""
         if not curr_chunk:
             curr_chunk = self._cfg
@@ -171,6 +169,8 @@ class ConfigManager:
             try:
                 return curr_chunk[chunk]
             except KeyError:
+                if suppress:
+                    return
                 raise exceptions.UserError(f"Chunk '{chunk}' not found in the config.")
 
     def update(self, chunk, new_val, curr_chunk=None):
@@ -260,35 +260,38 @@ class ConfigManager:
 
     def validate(self, chunk, providers=None):
         """Validate a top-level chunk of Broker's config."""
-        if "." in chunk:  # only validate the top-level chunk
-            chunk = chunk.split(".")[0]
-        if chunk.lower() == "base":  # validate the base config
-            return  # this happens before we're called
+        if chunk == "all":
+            all_settings = [prov for prov in providers if prov != "TestProvider"] + ["base", "ssh"]
+            for item in all_settings:
+                self.validate(item, providers)
+            return
+        chunk = chunk.split(".")[0] if "." in chunk else chunk
+        if chunk.lower() == "base":
+            return
         if chunk.lower() == "ssh":
             from broker.settings import settings
 
+            logger.info("Validating SSH settings.")
             settings.validators.validate(only="SSH")
             return
         if providers is None:
             raise exceptions.UserError(
                 "Attempted to validate provider settings without passing providers."
             )
+        instance_settings = {}
         if ":" in chunk:
-            prov_name, instance = chunk.split(":")
-            providers[prov_name](**{prov_name: instance})
-        if chunk == "all":
-            for prov_name, prov_cls in providers.items():
-                if prov_name == "TestProvider":
-                    continue
-                logger.info(f"Validating {prov_name} provider settings.")
-                try:  # we want to suppress all exceptions here to allow each provider to validate
-                    prov_cls()
-                except Exception as err:  # noqa: BLE001
-                    logger.warning(f"Provider {prov_name} failed validation: {err}")
-            return
+            chunk, instance = chunk.split(":")
+            instance_settings = {chunk: instance}
         if chunk not in providers:
             raise exceptions.UserError(
                 "I don't know how to validate that.\n"
                 "If it's important, it is likely covered in the base validations."
             )
-        providers[chunk]()
+        if not self.get(chunk, suppress=True):
+            logger.warning(f"No settings found for {chunk} provider.")
+            return
+        logger.info(f"Validating {chunk} provider settings.")
+        try:
+            providers[chunk](**instance_settings)
+        except Exception as err:  # noqa: BLE001
+            logger.warning(f"Provider {chunk} failed validation: {err}")
