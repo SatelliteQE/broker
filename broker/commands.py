@@ -285,49 +285,52 @@ def checkin(hosts, background, all_, sequential, filter):
 
 @loggedcli()
 @click.option("--details", is_flag=True, help="Display all host details")
-@click.option("--curated", is_flag=True, help="Display curated host details")
+@click.option("--list", "_list", is_flag=True, help="Display only hostnames and local ids")
 @click.option(
     "--sync",
     type=str,
     help="Class-style name of a supported broker provider. (AnsibleTower)",
 )
 @click.option("--filter", type=str, help="Display only what matches the specified filter")
-def inventory(details, curated, sync, filter):
-    """Get a list of all hosts you've checked out showing hostname and local id.
+def inventory(details, _list, sync, filter):
+    """Display a table of hosts in your local inventory.
 
-    hostname pulled from list of dictionaries.
+    Inventory fields are configurable in Broker's settings file.
+
+    Run a sync for your providers to pull down your host information.
+
+    e.g. `broker inventory --sync AnsibleTower`
+
+    Note: Applying a filter will result in incorrect id's being displayed.
     """
     if sync:
         Broker.sync_inventory(provider=sync)
-    logger.info("Pulling local inventory")
     inventory = helpers.load_inventory(filter=filter)
     helpers.emit({"inventory": inventory})
-    if curated:
-        table = Table(title="Host Inventory")
-
-        table.add_column("Id", justify="left", style="cyan", no_wrap=True)
-        table.add_column("Host", justify="left", style="magenta")
-        table.add_column("Provider", justify="left", style="green")
-        table.add_column("Action", justify="left", style="yellow")
-        table.add_column("OS", justify="left", style="blue")
-
-        for host in helpers.get_host_inventory_fields(inventory, PROVIDER_ACTIONS):
-            table.add_row(
-                str(host["id"]), host["host"], host["provider"], host["action"], host["os"]
-            )
-
-        CONSOLE.print(table)
+    # details is handled differently than the normal and list views
+    if details:
+        detailed = helpers.yaml_format(dict(enumerate(inventory)))
+        CONSOLE.print(Syntax(detailed, "yaml", background_color="default"))
         return
-    for num, host in enumerate(inventory):
-        if (display_name := host.get("hostname")) is None:
-            display_name = host.get("name")
-        # if we're filtering, then don't show an index.
-        # Otherwise, a user might perform an action on the incorrect (unfiltered) index.
-        index = f"{num}: " if filter is None else ""
-        if details:
-            logger.info(f"{index}{display_name}:\n{helpers.yaml_format(host)}")
-        else:
-            logger.info(f"{index}{display_name}")
+
+    inventory_fields = (
+        {"Host": settings.settings.inventory_list_vars}
+        if _list
+        else settings.settings.inventory_fields
+    )
+    curated_host_info = [
+        helpers.inventory_fields_to_dict(
+            inventory_fields=inventory_fields,
+            host_dict=host,
+            provider_actions=PROVIDER_ACTIONS,
+        )
+        for host in inventory
+    ]
+    table = helpers.dictlist_to_table(curated_host_info, "Host Inventory", _id=True)
+    if _list:
+        table.title = None
+        table.box = None
+    CONSOLE.print(table)
 
 
 @loggedcli()
