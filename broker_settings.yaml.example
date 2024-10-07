@@ -4,6 +4,15 @@ _version: 0.6.0
 logging:
     console_level: info
     file_level: debug
+# Customize the fields and values presented by `broker inventory`
+# Almost all field values should correspond to a field in your Broker inventory
+inventory_fields:
+  Host: hostname | name  # use a | to allow fallback values
+  Provider: _broker_provider  # just pull the _broker_provider value
+  Action: $action  # some special field values are possible, check the wiki
+  OS: os_distribution os_distribution_version  # you can combine multiple values with a space between
+# Much like you can set a variable lookup order for inventory fields
+inventory_list_vars: hostname | name | ip
 # Optionally set a limit for the number of threads Broker can use for actions
 thread_limit: None
 # Host SSH Settings

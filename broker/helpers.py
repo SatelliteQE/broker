@@ -19,6 +19,7 @@ from uuid import uuid4
 
 import click
 from logzero import logger
+from rich.table import Table
 from ruamel.yaml import YAML
 
 from broker import exceptions, logger as b_log, settings
@@ -29,6 +30,18 @@ INVENTORY_LOCK = threading.Lock()
 yaml = YAML()
 yaml.default_flow_style = False
 yaml.sort_keys = False
+
+SPECIAL_INVENTORY_FIELDS = {}  # use the _special_inventory_field decorator to add new fields
+
+
+def _special_inventory_field(action_name):
+    """Register inventory field actions."""
+
+    def decorator(func):
+        SPECIAL_INVENTORY_FIELDS[action_name] = func
+        return func
+
+    return decorator
 
 
 def clean_dict(in_dict):
@@ -98,7 +111,7 @@ def flatten_dict(nested_dict, parent_key="", separator="_"):
     return dict(flattened)
 
 
-def dict_from_paths(source_dict, paths):
+def dict_from_paths(source_dict, paths, sep="/"):
     """Given a dictionary of desired keys and nested paths, return a new dictionary.
 
     Example:
@@ -122,10 +135,10 @@ def dict_from_paths(source_dict, paths):
     """
     result = {}
     for key, path in paths.items():
-        if "/" not in path:
+        if sep not in path:
             result[key] = source_dict.get(path)
         else:
-            top, rem = path.split("/", 1)
+            top, rem = path.split(sep, 1)
             result.update(dict_from_paths(source_dict[top], {key: rem}))
     return result
 
@@ -279,32 +292,73 @@ def flip_provider_actions(provider_actions):
     return flipped
 
 
-def get_host_inventory_fields(inv_dict, provider_actions):
+def inventory_fields_to_dict(inventory_fields, host_dict, **extras):
+    """Convert a dicionary-like representation of inventory fields to a resolved dictionary.
+
+    inventory fields, as set in the config look like this, in yaml:
+    inventory_fields:
+        Host: hostname | name
+        Provider: _broker_provider
+        Action: $action
+        OS: os_distribution os_distribution_version
+
+    We then process that into a dictionary with inventory values like this:
+    {
+        "Host": "some.test.host",
+        "Provider": "AnsibleTower",
+        "Action": "deploy-base-rhel",
+        "OS": "RHEL 8.4"
+    }
+
+    Notes: The special syntax use in Host and Action fields <$action> is a special keyword that
+    represents a more complex field resolved by Broker.
+    Also, the Host field represents a priority  order of single values,
+    so if hostname is not present, name will be used.
+    Finally, spaces between values are preserved. This lets us combine multiple values in a single field.
+    """
+    return {
+        name: _resolve_inv_field(field, host_dict, **extras)
+        for name, field in inventory_fields.items()
+    }
+
+
+def _resolve_inv_field(field, host_dict, **extras):
+    """Real functionality for inventory_fields_to_dict, allows recursive evaluation."""
+    # Users can specify multiple values to try in order of priority, so evaluate each
+    if "|" in field:
+        resolved = [_resolve_inv_field(f.strip(), host_dict, **extras) for f in field.split("|")]
+        for val in resolved:
+            if val:
+                return val
+        return "Unknown"
+    # Users can combine multiple values in a single field, so evaluate each
+    if " " in field:
+        return " ".join(_resolve_inv_field(f, host_dict, **extras) for f in field.split())
+    # Some field values require special handling beyond what the existing syntax allows
+    if special_field_func := SPECIAL_INVENTORY_FIELDS.get(field):
+        return special_field_func(host_dict, **extras)
+    # Otherwise, try to get the value from the host dictionary
+    return dict_from_paths(host_dict, {"_": field}, sep=".")["_"] or "Unknown"
+
+
+@_special_inventory_field("$action")
+def get_host_action(host_dict, provider_actions=None, **_):
     """Get a more focused set of fields from the host inventory."""
-    flipped_prov_actions = flip_provider_actions(provider_actions)
-    curated_hosts = []
-    for num, host in enumerate(inv_dict):
-        match host:
-            case {
-                "name": name,
-                "hostname": hostname,
-                "_broker_provider": provider,
-            }:
-                os_name = host.get("os_distribution", "Unknown")
-                os_version = host.get("os_distribution_version", "")
-                for opt in flipped_prov_actions[provider]:
-                    if action := host["_broker_args"].get(opt):
-                        curated_hosts.append(
-                            {
-                                "id": num,
-                                "host": hostname or name,
-                                "provider": provider,
-                                "os": f"{os_name} {os_version}",
-                                "action": action,
-                            }
-                        )
-                        break
-    return curated_hosts
+    if not provider_actions:
+        return "$actionError"
+    # Flip the mapping of actions->provider to provider->actions
+    flipped_actions = {}
+    for action, (provider, _) in provider_actions.items():
+        provider_name = provider.__name__
+        if provider_name not in flipped_actions:
+            flipped_actions[provider_name] = []
+        flipped_actions[provider_name].append(action)
+    # Get the host's action, based on its provider
+    provider = host_dict["_broker_provider"]
+    for opt in flipped_actions[provider]:
+        if action := host_dict["_broker_args"].get(opt):
+            return action
+    return "Unknown"
 
 
 def kwargs_from_click_ctx(ctx):
@@ -657,3 +711,26 @@ def temporary_tar(paths):
             tar.add(path, arcname=path.name)
     yield temp_tar.absolute()
     temp_tar.unlink()
+
+
+def dictlist_to_table(dict_list, title=None, _id=False):
+    """Convert a list of dictionaries to a rich table."""
+    # I like pretty colors, so let's cycle through them
+    column_colors = ["cyan", "magenta", "green", "yellow", "blue", "red"]
+    curr_color = 0
+    table = Table(title=title)
+    # construct the columns
+    if _id:  # likely just for inventory tables
+        table.add_column("Id", justify="left", style=column_colors[curr_color], no_wrap=True)
+        curr_color += 1
+    for key in dict_list[0]:  # assume all dicts have the same keys
+        table.add_column(key, justify="left", style=column_colors[curr_color])
+        curr_color += 1
+        if curr_color >= len(column_colors):
+            curr_color = 0
+    # add the rows
+    for id_num, data_dict in enumerate(dict_list):
+        row = [str(id_num)] if _id else []
+        row.extend([str(value) for value in data_dict.values()])
+        table.add_row(*row)
+    return table

@@ -1,4 +1,5 @@
 """Config migrations for versions older than 0.6.0 to 0.6.0."""
+
 from logzero import logger
 
 TO_VERSION = "0.6.0"
@@ -60,6 +61,29 @@ def add_thread_limit(config_dict):
     return config_dict
 
 
+def add_inventory_fields(config_dict):
+    """Inventory fields are new in this version.
+
+    Example:
+        # Customize the fields and values presented by `broker inventory`
+        # Almost all field values should correspond to a field in your Broker inventory
+        inventory_fields:
+        Host: hostname | name  # use a | to allow fallback values
+        Provider: _broker_provider  # just pull the _broker_provider value
+        Action: $action  # some special field values are possible, check the wiki
+        OS: os_distribution os_distribution_version  # you can combine multiple values with a space between
+    """
+    logger.debug("Adding inventory fields to the config.")
+    config_dict["inventory_fields"] = {
+        "Host": "hostname",
+        "Provider": "_broker_provider",
+        "Action": "$action",
+        "OS": "os_distribution os_distribution_version",
+    }
+    config_dict["inventory_list_vars"] = "hostname | name"
+    return config_dict
+
+
 def run_migrations(config_dict):
     """Run all migrations."""
     logger.info(f"Running config migrations for {TO_VERSION}.")
@@ -68,5 +92,6 @@ def run_migrations(config_dict):
     config_dict = remove_test_nick(config_dict)
     config_dict = move_ssh_settings(config_dict)
     config_dict = add_thread_limit(config_dict)
+    config_dict = add_inventory_fields(config_dict)
     config_dict["_version"] = TO_VERSION
     return config_dict
