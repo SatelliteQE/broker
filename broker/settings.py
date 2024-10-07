@@ -76,6 +76,8 @@ validators = [
         default="debug",
     ),
     Validator("THREAD_LIMIT", default=None),
+    Validator("INVENTORY_FIELDS", is_type_of=dict),
+    Validator("INVENTORY_LIST_VARS", is_type_of=str, default="hostname | name"),
 ]
 
 # temporary fix for dynaconf #751
