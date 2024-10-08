@@ -17,7 +17,7 @@ from broker.logger import LOG_LEVEL
 from broker.providers import PROVIDER_ACTIONS, PROVIDER_HELP, PROVIDERS
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
-CONSOLE = Console()  # rich console for pretty printing
+CONSOLE = Console(no_color=settings.settings.less_colors)  # rich console for pretty printing
 
 click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.COMMAND_GROUPS = {
