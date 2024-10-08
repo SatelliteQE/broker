@@ -84,6 +84,13 @@ def add_inventory_fields(config_dict):
     return config_dict
 
 
+def add_color_control(config_dict):
+    """Add in the new `less_colors` field."""
+    logger.debug("Adding the less_colors field to the config.")
+    config_dict["less_colors"] = config_dict.get("less_colors", False)
+    return config_dict
+
+
 def run_migrations(config_dict):
     """Run all migrations."""
     logger.info(f"Running config migrations for {TO_VERSION}.")
@@ -93,5 +100,6 @@ def run_migrations(config_dict):
     config_dict = move_ssh_settings(config_dict)
     config_dict = add_thread_limit(config_dict)
     config_dict = add_inventory_fields(config_dict)
+    config_dict = add_color_control(config_dict)
     config_dict["_version"] = TO_VERSION
     return config_dict
