@@ -328,7 +328,7 @@ def _resolve_inv_field(field, host_dict, **extras):
     if "|" in field:
         resolved = [_resolve_inv_field(f.strip(), host_dict, **extras) for f in field.split("|")]
         for val in resolved:
-            if val:
+            if val and val != "Unknown":
                 return val
         return "Unknown"
     # Users can combine multiple values in a single field, so evaluate each
