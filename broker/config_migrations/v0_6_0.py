@@ -1,4 +1,5 @@
 """Config migrations for versions older than 0.6.0 to 0.6.0."""
+
 from logzero import logger
 
 TO_VERSION = "0.6.0"
@@ -36,7 +37,10 @@ def remove_test_nick(config_dict):
 
 
 def move_ssh_settings(config_dict):
-    """Move SSH settings from the top leve into its own chunk."""
+    """Move SSH settings from the top level into its own chunk."""
+    # Check if the migration has already been performed
+    if "ssh" in config_dict:
+        return config_dict
     logger.debug("Moving SSH settings into their own section.")
     ssh_settings = {
         "backend": config_dict.pop("ssh_backend", "ssh2-python312"),
@@ -56,7 +60,39 @@ def move_ssh_settings(config_dict):
 def add_thread_limit(config_dict):
     """Add a thread limit to the config."""
     logger.debug("Adding a thread limit to the config.")
-    config_dict["thread_limit"] = None
+    config_dict["thread_limit"] = config_dict.get("thread_limit")
+    return config_dict
+
+
+def add_inventory_fields(config_dict):
+    """Inventory fields are new in this version.
+
+    Example:
+        # Customize the fields and values presented by `broker inventory`
+        # Almost all field values should correspond to a field in your Broker inventory
+        inventory_fields:
+        Host: hostname | name  # use a | to allow fallback values
+        Provider: _broker_provider  # just pull the _broker_provider value
+        Action: $action  # some special field values are possible, check the wiki
+        OS: os_distribution os_distribution_version  # you can combine multiple values with a space between
+    """
+    if "inventory_fields" in config_dict:
+        return config_dict
+    logger.debug("Adding inventory fields to the config.")
+    config_dict["inventory_fields"] = {
+        "Host": "hostname",
+        "Provider": "_broker_provider",
+        "Action": "$action",
+        "OS": "os_distribution os_distribution_version",
+    }
+    config_dict["inventory_list_vars"] = "hostname | name"
+    return config_dict
+
+
+def add_color_control(config_dict):
+    """Add in the new `less_colors` field."""
+    logger.debug("Adding the less_colors field to the config.")
+    config_dict["less_colors"] = config_dict.get("less_colors", False)
     return config_dict
 
 
@@ -68,5 +104,7 @@ def run_migrations(config_dict):
     config_dict = remove_test_nick(config_dict)
     config_dict = move_ssh_settings(config_dict)
     config_dict = add_thread_limit(config_dict)
+    config_dict = add_inventory_fields(config_dict)
+    config_dict = add_color_control(config_dict)
     config_dict["_version"] = TO_VERSION
     return config_dict
