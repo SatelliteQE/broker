@@ -306,7 +306,7 @@ def inventory_fields_to_dict(inventory_fields, host_dict, **extras):
     {
         "Host": "some.test.host",
         "Provider": "AnsibleTower",
-        "Action": "deploy-base-rhel",
+        "Action": "deploy-rhel",
         "OS": "RHEL 8.4"
     }
 
