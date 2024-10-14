@@ -17,14 +17,18 @@ from broker.settings import settings
 
 def container_info(container_inst):
     """Return a dict of container information."""
-    return {
+    info = {
         "_broker_provider": "Container",
         "name": container_inst.name,
         "hostname": container_inst.id[:12],
         "image": container_inst.image.tags,
         "ports": container_inst.ports,
-        "status": container_inst.status,
     }
+    try:
+        info["status"] = container_inst.status
+    except TypeError:
+        info["status"] = container_inst.attrs["State"]
+    return info
 
 
 def _host_release():
