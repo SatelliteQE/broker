@@ -86,7 +86,7 @@ class ConfigManager:
             import requests
 
             click.echo(f"Downloading example file from: {source}")
-            return requests.get(source, timeout=60).text
+            return requests.get(source, timeout=60, verify=False).text
         else:
             return source.read_text()
 

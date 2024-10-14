@@ -267,15 +267,23 @@ def update_inventory(add=None, remove=None):
         yaml.dump(inv_data, settings.inventory_path)
 
 
-def yaml_format(in_struct):
+def yaml_format(in_struct, force_yaml_dict=False):
     """Convert a yaml-compatible structure to a yaml dumped string.
 
     :param in_struct: yaml-compatible structure or string containing structure
+    :param force_yaml_dict: force the in_struct to be converted to a dictionary before dumping
 
     :return: yaml-formatted string
     """
     if isinstance(in_struct, str):
-        in_struct = yaml.load(in_struct)
+        # first try to load is as json
+        try:
+            in_struct = json.loads(in_struct)
+        except json.JSONDecodeError:
+            # then try yaml
+            in_struct = yaml.load(in_struct)
+            if force_yaml_dict:
+                in_struct = dict(in_struct)
     output = BytesIO()  # ruamel doesn't natively allow for string output
     yaml.dump(in_struct, output)
     return output.getvalue().decode("utf-8")
