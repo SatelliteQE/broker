@@ -33,18 +33,24 @@
         "name": "deploy-set-stats-for-jenkins",
         "artifacts": {
             "provider": "rhv",
-            "reported_devices": {
-                "nics": [
-                    "lo",
-                    "eth0"
-                ]
+            "_broker_args": {
+                "host_type": "host"
             },
-            "host_type": "host",
-            "os_distribution_version": "7.8",
-            "fqdn": "fake.host.test.com",
-            "template": "",
-            "os_distribution": "RedHat",
-            "name": "fake-physical-host"
+            "_broker_facts": {
+                "fqdn": "fake.host.test.com",
+                "name": [
+                    "fake-physical-host"
+                ],
+                "os_distribution": "RedHat",
+                "os_distribution_version": "9.4",
+                "reported_devices": {
+                    "nics": [
+                        "lo",
+                        "eth0"
+                    ]
+                },
+                "template": ""
+            }
         }
     }
 ]

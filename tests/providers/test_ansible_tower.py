@@ -98,7 +98,7 @@ def test_host_creation(tower_stub):
     host = tower_stub.construct_host(job, bx.host_classes)
     assert isinstance(host, bx.host_classes["host"])
     assert host.hostname == "fake.host.test.com"
-    assert host._broker_args["os_distribution_version"] == "7.8"
+    assert host.os_distribution_version == "9.4"
 
 
 def test_workflow_lookup_failure(tower_stub):
