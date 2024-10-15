@@ -22,14 +22,14 @@ from broker import helpers
 from broker.providers import Provider
 
 
-def convert_psuedonamespaces(attr_dict):
+def convert_pseudonamespaces(attr_dict):
     """Recursively convert PsuedoNamespace objects into dictionaries."""
     out_dict = {}
     for key, value in attr_dict.items():
         if isinstance(value, awxkit.utils.PseudoNamespace):
             out_dict[key] = dict(value)
         elif isinstance(value, dict):
-            out_dict[key] = convert_psuedonamespaces(value)
+            out_dict[key] = convert_pseudonamespaces(value)
         else:
             out_dict[key] = value
     return out_dict
@@ -216,11 +216,11 @@ class AnsibleTower(Provider):
                 "release": self._host_release,
                 "_prov_inst": self,
                 "_broker_provider": "AnsibleTower",
-                "_broker_args": convert_psuedonamespaces(broker_args),
+                "_broker_args": convert_pseudonamespaces(broker_args),
             }
         )
         if isinstance(misc_attrs, dict):
-            host_inst.__dict__.update(convert_psuedonamespaces(misc_attrs))
+            host_inst.__dict__.update(convert_pseudonamespaces(misc_attrs))
 
     def _translate_inventory(self, inventory):
         if isinstance(inventory, int):  # already an id, silly
@@ -390,9 +390,7 @@ class AnsibleTower(Provider):
         )
 
         # Get broker_args from host facts if present
-        broker_args = getattr(host_facts, "_broker_args", None) or self._get_broker_args_from_job(
-            host
-        )
+        broker_args = getattr(host_facts, "_broker_args", {})
 
         host_info = {
             "name": host.name,
@@ -417,35 +415,9 @@ class AnsibleTower(Provider):
 
         return host_info
 
-    def _get_broker_args_from_job(self, host):
-        """Get _broker_args from the source workflow job or last job."""
-        _broker_args = {}
-
-        try:
-            create_job = self._v2.jobs.get(id=host.get_related("job_events").results[0].job)
-            create_job = create_job.results[0].get_related("source_workflow_job")
-            _broker_args["workflow"] = create_job.name
-        # Unknown is a Gateway Timeout
-        except (IndexError, awxkit.exceptions.Unknown, awxkit.exceptions.Forbidden):
-            if "last_job" in host.related:
-                # potentially not create job, but easier processing below
-                create_job = host.get_related("last_job")
-                try:
-                    _broker_args["workflow"] = create_job.summary_fields.source_workflow_job.name
-                except Exception as err:  # noqa: BLE001
-                    logger.debug(f"Tell Jake that the exception here is: {err}!")
-                    logger.warning(f"Unable to determine workflow for {host.name}")
-            else:
-                return _broker_args
-        create_vars = json.loads(create_job.extra_vars)
-        _broker_args.update(
-            {arg: val for arg, val in create_vars.items() if val and isinstance(val, str)}
-        )
-        return _broker_args
-
     @staticmethod
     def _pull_extra_vars(extra_vars):
-        """Pull extra vars from a json string or psuedo-dictionary."""
+        """Pull extra vars from a json string or pseudo-dictionary."""
         if not extra_vars:
             return {}
         try:
@@ -531,7 +503,7 @@ class AnsibleTower(Provider):
             job = provider_params
             artifacts = self._merge_artifacts(job, strategy=strategy)
 
-            # Use new host fact based method, if available
+            # Get host facts from job artifacts
             if "_broker_args" in artifacts and "_broker_facts" in artifacts:
                 broker_args = {k: v for k, v in artifacts._broker_args.items() if v}
                 broker_facts = {k: v for k, v in artifacts._broker_facts.items() if v}
@@ -548,36 +520,9 @@ class AnsibleTower(Provider):
                 )
                 broker_facts["name"] = name
                 broker_facts["hostname"] = hostname
-
-            # Fallback to old method
             else:
-                # Get initial extra vars passed to workflow
-                job_extra_vars = self._pull_extra_vars(job.extra_vars)
+                logger.debug(f"Host facts not found in artifacts for job: {job}")
 
-                # Update with resolved values stored on job
-                for key in job_extra_vars:
-                    job_extra_vars[key] = artifacts.get(key)
-
-                # Add all non-empty workflow variables and job artifacts
-                broker_args.update({key: val for key, val in job_extra_vars.items() if val})
-                broker_args.update({key: val for key, val in artifacts.items() if val})
-
-                # Get inventory name
-                broker_args["tower_inventory"] = broker_facts.pop(
-                    "tower_inventory", self._translate_inventory(job.summary_fields.inventory)
-                )
-                artifacts = helpers.flatten_dict(artifacts)
-                logger.debug(artifacts)
-
-                # Get hostname, VM name, and host type
-                hostname, name, host_type = _get_fields_from_facts(artifacts)
-                if not hostname:
-                    logger.warning(f"No hostname found in job artifacts:\n{artifacts}")
-                logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
-
-                host_inst = host_classes[host_type](
-                    **{**broker_args, "hostname": hostname, "name": name}
-                )
         else:
             host_inst = host_classes[kwargs.get("type")](**broker_args)
 
