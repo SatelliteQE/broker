@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import pkgutil
 import sys
-from tempfile import NamedTemporaryFile
 
 import click
 from logzero import logger
@@ -56,11 +55,11 @@ class ConfigManager:
 
     def _interactive_edit(self, chunk):
         """Write the chunk data to a temporary file and open it in an editor."""
-        with NamedTemporaryFile(mode="w+", suffix=".yaml") as tmp:
-            yaml.dump(chunk, tmp)
-            click.edit(filename=tmp.name)
-            tmp.seek(0)
-            new_data = tmp.read()
+        temp_file = Path("temp_settings.yaml")
+        yaml.dump(chunk, temp_file)
+        click.edit(filename=str(temp_file))
+        new_data = temp_file.read_text()
+        temp_file.unlink()
         # first try to load it as yaml
         try:
             return yaml.load(new_data)

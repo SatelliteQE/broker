@@ -326,6 +326,9 @@ def inventory(details, _list, sync, filter):
         )
         for host in inventory
     ]
+    if not curated_host_info:
+        CONSOLE.print("No hosts found in inventory.")
+        return
     table = helpers.dictlist_to_table(curated_host_info, "Host Inventory", _id=True)
     if _list:
         table.title = None

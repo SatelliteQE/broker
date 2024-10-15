@@ -701,7 +701,7 @@ class AnsibleTower(Provider):
             provider_labels=provider_labels,
         )
 
-    def provider_help(
+    def provider_help(  # noqa: PLR0912, PLR0915 - Possible TODO refactor
         self,
         workflows=False,
         workflow=None,
@@ -728,6 +728,9 @@ class AnsibleTower(Provider):
                 for workflow in self._v2.workflow_job_templates.get(page_size=1000).results
                 if workflow.summary_fields.user_capabilities.get("start")
             ]
+            if not workflows:
+                logger.warning("No workflows found")
+                return
             if res_filter := kwargs.get("results_filter"):
                 workflows = eval_filter(workflows, res_filter, "res")
                 workflows = workflows if isinstance(workflows, list) else [workflows]
@@ -739,6 +742,9 @@ class AnsibleTower(Provider):
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
         elif inventories:
             inv = [inv.name for inv in self._v2.inventory.get(kind="", page_size=1000).results]
+            if not inv:
+                logger.warning("No inventories found!")
+                return
             if res_filter := kwargs.get("results_filter"):
                 inv = eval_filter(inv, res_filter, "res")
                 inv = inv if isinstance(inv, list) else [inv]
@@ -758,6 +764,9 @@ class AnsibleTower(Provider):
                 for job_template in self._v2.job_templates.get(page_size=1000).results
                 if job_template.summary_fields.user_capabilities.get("start")
             ]
+            if not job_templates:
+                logger.warning("No job templates found!")
+                return
             if res_filter := kwargs.get("results_filter"):
                 job_templates = eval_filter(job_templates, res_filter, "res")
                 job_templates = (
@@ -773,6 +782,9 @@ class AnsibleTower(Provider):
                     ]
                 )
             )
+            if not templates:
+                logger.warning("No templates found!")
+                return
             templates.sort(reverse=True)
             if res_filter := kwargs.get("results_filter"):
                 templates = eval_filter(templates, res_filter, "res")
