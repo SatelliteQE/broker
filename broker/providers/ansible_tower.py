@@ -646,7 +646,7 @@ class AnsibleTower(Provider):
             provider_labels=provider_labels,
         )
 
-    def provider_help(  # noqa: PLR0912, PLR0915 - Possible TODO refactor
+    def provider_help(  # noqa: PLR0911, PLR0912, PLR0915 - Possible TODO refactor
         self,
         workflows=False,
         workflow=None,
@@ -660,7 +660,11 @@ class AnsibleTower(Provider):
         """Get a list of extra vars and their defaults from a workflow."""
         results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
         if workflow:
-            wfjt = self._v2.workflow_job_templates.get(name=workflow).results.pop()
+            if wfjt := self._v2.workflow_job_templates.get(name=workflow).results:
+                wfjt = wfjt.pop()
+            else:
+                logger.warning(f"Workflow {workflow} not found!")
+                return
             default_inv = self._v2.inventory.get(id=wfjt.inventory).results.pop()
             logger.info(
                 f"\nDescription:\n{wfjt.description}\n\n"
@@ -682,7 +686,11 @@ class AnsibleTower(Provider):
             workflows = "\n".join(workflows[:results_limit])
             logger.info(f"Available workflows:\n{workflows}")
         elif inventory:
-            inv = self._v2.inventory.get(name=inventory, kind="").results.pop()
+            if inv := self._v2.inventory.get(name=inventory, kind="").results:
+                inv = inv.pop()
+            else:
+                logger.warning(f"Inventory {inventory} not found!")
+                return
             inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
             logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
         elif inventories:
@@ -696,7 +704,11 @@ class AnsibleTower(Provider):
             inv = "\n".join(inv[:results_limit])
             logger.info(f"Available Inventories:\n{inv}")
         elif job_template:
-            jt = self._v2.job_templates.get(name=job_template).results.pop()
+            if jt := self._v2.job_templates.get(name=job_template).results:
+                jt = jt.pop()
+            else:
+                logger.warning(f"Job Template {job_template} not found!")
+                return
             default_inv = self._v2.inventory.get(id=jt.inventory).results.pop()
             logger.info(
                 f"\nDescription:\n{jt.description}\n\n"
