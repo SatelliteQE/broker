@@ -17,8 +17,10 @@ from broker.settings import settings
 
 def container_info(container_inst):
     """Return a dict of container information."""
+    attr_dict = {"container_host": "Image", "_broker_origin": "Labels/broker.origin"}
     info = {
         "_broker_provider": "Container",
+        "_broker_args": helpers.dict_from_paths(container_inst.attrs, attr_dict),
         "name": container_inst.name,
         "hostname": container_inst.id[:12],
         "image": container_inst.image.tags,
