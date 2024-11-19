@@ -104,7 +104,7 @@ class ConfigManager:
         migrations = []
         for _, name, _ in pkgutil.iter_modules(config_migrations.__path__):
             module = importlib.import_module(f"broker.config_migrations.{name}")
-            if hasattr(module, "run_migrations"):
+            if hasattr(module, "run_migrations") and "example" not in module.__name__:
                 if force_version and force_version == file_name_to_ver(name):
                     migrations.append(module)
                     break
