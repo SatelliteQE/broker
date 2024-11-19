@@ -16,9 +16,10 @@ from logzero import logger
 from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 from rich.console import Console
+from rich.prompt import Prompt
 
 from broker import exceptions
-from broker.helpers import MockStub, eval_filter, find_origin, yaml
+from broker.helpers import MockStub, eval_filter, find_origin, update_inventory, yaml
 from broker.settings import clone_global_settings
 
 # Basic import first - we'll configure it properly later
@@ -107,7 +108,7 @@ def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
 
 
 def convert_pseudonamespaces(attr_dict):
-    """Recursively convert PsuedoNamespace objects into dictionaries."""
+    """Recursively convert PseudoNamespace objects into dictionaries."""
     out_dict = {}
     for key, value in attr_dict.items():
         if isinstance(value, awxkit.utils.PseudoNamespace):
@@ -262,6 +263,11 @@ class AnsibleTower(Provider):
         Validator("ANSIBLETOWER.inventory", default=None),
         Validator("ANSIBLETOWER.AAP_VERSION", default="", cast=str),
         Validator("ANSIBLETOWER.max_resilient_wait", is_type_of=int, default=7200),
+        Validator(
+            "ANSIBLETOWER.dangling_behavior",
+            default="checkin",
+            is_in=["prompt", "checkin", "store"],
+        ),
     ]
 
     _checkout_options = [
@@ -305,6 +311,7 @@ class AnsibleTower(Provider):
         self.uname = self._settings.ANSIBLETOWER.get("username")
         self.pword = self._settings.ANSIBLETOWER.get("password")
         self.token = self._settings.ANSIBLETOWER.get("token")
+        self.dangling_behavior = self._settings.ANSIBLETOWER.get("dangling_behavior")
         self._inventory = kwargs.get("tower_inventory") or self._settings.ANSIBLETOWER.inventory
         # Init the class itself
         config = kwargs.get("config")
@@ -533,6 +540,55 @@ class AnsibleTower(Provider):
             return failure_messages[0]
         else:
             return failure_messages
+
+    def _try_get_dangling_hosts(self, failed_workflow):
+        """Get one or more hosts that may have been left behind by a failed workflow."""
+        hosts = []
+        for node in failed_workflow.get_related("workflow_nodes").results:
+            if not (job_fields := node.summary_fields.get("job", {})) or job_fields.get(
+                "failed"
+            ):  # skip jobs with no summary fields and failed jobs
+                continue
+            if jobs := self._v2.jobs.get(id=job_fields["id"]).results:
+                if vm_name := jobs[0].artifacts.get("vm_name"):
+                    hosts.append(vm_name)
+        return list(set(hosts))
+
+    def handle_dangling_hosts(self, job):
+        """Attempt to check in dangling hosts associated with the given job."""
+        dangling_hosts = self._try_get_dangling_hosts(job)
+        if not dangling_hosts:
+            logger.debug("No dangling hosts found for the failed job.")
+            return
+        dangling_behavior = self.dangling_behavior
+        for dangling_host in dangling_hosts:
+            logger.warning(f"Found dangling host: {dangling_host}")
+            if dangling_behavior == "prompt":
+                choice = Prompt.ask(
+                    "What would you like to do with this host? [c/s/cA/sA]\n"
+                    "Checkin (c), Store (s), Checkin All (cA), Store All (sA)",
+                    choices=["c", "s", "cA", "sA"],
+                )
+                if choice == "cA":
+                    dangling_behavior = "checkin"
+                elif choice == "sA":
+                    dangling_behavior = "store"
+            else:
+                choice = None
+            # handle checkins
+            if choice == "c" or dangling_behavior == "checkin":
+                try:
+                    logger.info(f"Checking in dangling host: {dangling_host}")
+                    self.release(dangling_host)
+                    logger.info(f"Successfully checked in dangling host: {dangling_host}")
+                except exceptions.BrokerError:
+                    logger.error(f"Failed to check in dangling host: {dangling_host}")
+            elif choice == "s" or dangling_behavior == "store":
+                logger.info(f"Storing dangling host: {dangling_host}")
+                host = self._v2.hosts.get(name=dangling_host).results[0]
+                host = self._compile_host_info(host)
+                host["deploy_failed"] = True
+                update_inventory(add=host)
 
     def _compile_host_info(self, host):
         try:
@@ -780,12 +836,20 @@ class AnsibleTower(Provider):
         logger.info(f"Waiting for job: \nAPI: {job_api_url}\nUI: {job_ui_url}")
         resilient_job_wait(job)
         if job.status != "successful":
+            failure_message = self._get_failure_messages(job)
             message_data = {
                 f"{subject.capitalize()} Status": job.status,
-                "Reason(s)": self._get_failure_messages(job),
+                "Reason(s)": failure_message,
                 "URL": job_ui_url,
             }
             helpers.emit(message_data)
+            # handle potential dangling hosts
+            if not isinstance(failure_message, list):
+                failure_message = [failure_message]
+            if not any("was automatically checked-in" in msg["reason"] for msg in failure_message):
+                self.handle_dangling_hosts(job)
+            else:
+                logger.warning(f"Apparently it is in the failure message...\n{failure_message}")
             raise JobExecutionError(message_data=message_data["Reason(s)"])
         if strategy := kwargs.pop("artifacts", None):
             return self._merge_artifacts(job, strategy=strategy)
@@ -793,7 +857,7 @@ class AnsibleTower(Provider):
 
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned."""
-        user = user or self.username
+        user = user or self.uname
         invs = [
             inv
             for inv in self._v2.inventory.get(page_size=200).results
