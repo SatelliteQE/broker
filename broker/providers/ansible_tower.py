@@ -10,7 +10,7 @@ from dynaconf import Validator
 from logzero import logger
 
 from broker import exceptions
-from broker.helpers import eval_filter, find_origin
+from broker.helpers import eval_filter, find_origin, yaml
 from broker.settings import settings
 
 try:
@@ -20,6 +20,12 @@ except ImportError as err:
 
 from broker import helpers
 from broker.providers import Provider
+
+# ruamel has a hard time with PseudoNamespace objects
+yaml.representer.add_representer(
+    awxkit.utils.PseudoNamespace,
+    lambda dumper, data: dumper.represent_dict(dict(data)),
+)
 
 
 def convert_pseudonamespaces(attr_dict):
