@@ -8,6 +8,7 @@ from urllib import parse as url_parser
 import click
 from dynaconf import Validator
 from logzero import logger
+from requests.exceptions import ConnectionError
 
 from broker import exceptions
 from broker.helpers import eval_filter, find_origin, yaml
@@ -39,6 +40,19 @@ def convert_pseudonamespaces(attr_dict):
         else:
             out_dict[key] = value
     return out_dict
+
+
+def resilient_job_wait(job, timeout=None):
+    """Wait for a job to complete. Retry on errors."""
+    timeout = timeout or settings.ANSIBLETOWER.workflow_timeout
+    completed = False
+    while not completed:
+        try:
+            job.wait_until_completed(timeout=timeout)
+            completed = True
+        except ConnectionError as err:
+            logger.error(f"Error occurred while waiting for job: {err}")
+            logger.info("Retrying job wait...")
 
 
 class JobExecutionError(exceptions.ProviderError):
@@ -605,7 +619,7 @@ class AnsibleTower(Provider):
             job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info(f"Waiting for job: \nAPI: {job_api_url}\nUI: {job_ui_url}")
-        job.wait_until_completed(timeout=settings.ANSIBLETOWER.workflow_timeout)
+        resilient_job_wait(job)
         if job.status != "successful":
             message_data = {
                 f"{subject.capitalize()} Status": job.status,
