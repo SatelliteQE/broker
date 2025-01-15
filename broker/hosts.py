@@ -74,8 +74,8 @@ class Host:
 
     def __del__(self):
         """Try to close the connection on garbage collection of the host instance."""
-        self.close()
-        # object.__del__ DNE, so I don't have to call it here.
+        if hasattr(self, "_session") and self._session is not None:
+            self.close()
         # If host inherits from a different class with __del__, it should get called through super
 
     @property
