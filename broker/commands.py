@@ -277,10 +277,26 @@ def checkin(hosts, background, all_, sequential, filter):
         helpers.fork_broker()
     inventory = helpers.load_inventory(filter=filter)
     to_remove = []
+    unmatched = set(hosts)  # Track unmatched hosts
+
     for num, host in enumerate(inventory):
-        if str(num) in hosts or host.get("hostname") in hosts or host.get("name") in hosts or all_:
+        # Check if this host matches any of our criteria
+        if (
+            all_
+            or str(num) in unmatched
+            or host.get("hostname") in unmatched
+            or host.get("name") in unmatched
+        ):
             to_remove.append(Broker().reconstruct_host(host))
-    Broker(hosts=to_remove).checkin(sequential=sequential)
+            # Remove all possible match values for this host from unmatched
+            unmatched.discard(str(num))
+            unmatched.discard(host.get("hostname"))
+            unmatched.discard(host.get("name"))
+
+    if unmatched:
+        logger.warning(f"The following hosts were not found in inventory: {', '.join(unmatched)}")
+    if to_remove:
+        Broker(hosts=to_remove).checkin(sequential=sequential)
 
 
 @loggedcli()
