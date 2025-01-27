@@ -9,10 +9,10 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker"]
 authors = [{ name = "Jacob J Callahan", email = "jacob.callahan05@gmail.com" }]
+# license-files = ["LICENSE"]  - Not ready in setuptools until #4706 is released
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -22,14 +22,14 @@ classifiers = [
 dependencies = [
     "awxkit",
     "click",
-    "dynaconf<4.0.0",
+    "dynaconf>=3.1.6,<4.0.0",
     "logzero",
     "packaging",
     "rich",
     "rich_click",
     "ruamel.yaml",
     "setuptools",
-    "ssh2-python312",
+    "ssh2-python",
 ]
 dynamic = [
     "version",
@@ -45,9 +45,11 @@ docker = ["docker", "paramiko"]
 podman = ["podman>=5.2"]
 setup = ["build", "twine"]
 
-ssh2_py311 = ["ssh2-python"]
+ssh2_py311 = ["ssh2-python"] # temporary compatibility - removing in Broker 0.7
 ssh2_python = ["ssh2-python"]
-ssh2_python312 = ["ssh2-python312"]
+ssh2_python312 = [
+    "ssh2-python",
+] # temporary compatibility - removing in Broker 0.7
 ansible_pylibssh = ["ansible-pylibssh"]
 hussh = ["hussh>=0.1.7"]
 
