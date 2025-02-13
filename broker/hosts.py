@@ -124,11 +124,11 @@ class Host:
         timeout = timeout or self.timeout
         _hostname = self.hostname
         _port = self.port or port
+        ipv6 = ipv6 or self.ipv6
         key_filename = key_filename or self.key_filename
-        if ":" in self.hostname:
+        if ":" in self.hostname and not ipv6:
             _hostname, port = self.hostname.split(":")
             _port = int(port)
-        ipv6 = ipv6 or self.ipv6
         ipv4_fallback = ipv4_fallback or self.ipv4_fallback
         self.close()
         self._session = Session(
