@@ -22,7 +22,7 @@ def container_info(container_inst):
         "_broker_provider": "Container",
         "_broker_args": helpers.dict_from_paths(container_inst.attrs, attr_dict),
         "name": container_inst.name,
-        "hostname": container_inst.id[:12],
+        "hostname": container_inst.attrs["Config"].get("Hostname"),
         "image": container_inst.image.tags,
         "ports": container_inst.ports,
     }
@@ -208,7 +208,7 @@ class Container(Provider):
         cont_inst = provider_params
         cont_attrs = self.runtime.get_attrs(cont_inst)
         logger.debug(cont_attrs)
-        hostname = cont_inst.id[:12]
+        hostname = cont_inst.attrs["Config"].get("Hostname")
         if port := self._find_ssh_port(cont_attrs["ports"]):
             hostname = f"{self.runtime.host}:{port}"
         if not hostname:
