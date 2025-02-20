@@ -640,8 +640,8 @@ class Result:
             status, (stdout, stderr) = duplex_exec
             return cls(
                 status=status,
-                stdout=stdout.decode("utf-8"),
-                stderr=stderr.decode("utf-8"),
+                stdout=stdout.decode("utf-8") if stdout else "",
+                stderr=stderr.decode("utf-8") if stderr else "",
             )
 
         if duplex_exec.output[0]:
