@@ -5,7 +5,6 @@ from click.testing import CliRunner
 from broker import Broker
 from broker.commands import cli
 from broker.providers.container import Container
-from broker.settings import inventory_path
 from broker.settings import settings_path as SETTINGS_PATH
 
 SCENARIO_DIR = Path("tests/data/cli_scenarios/containers")
@@ -135,3 +134,9 @@ def test_broker_multi_manager():
             multi_hosts["ubi8"][1].execute("hostname").stdout.strip()
             == multi_hosts["ubi8"][1].hostname
         )
+
+
+def test_custom_hostname():
+    with Broker(container_host="ubi8:latest", hostname="my.custom.hostname") as chost:
+        assert chost.hostname == "my.custom.hostname"
+        assert chost.execute("hostname").strip() == "my.custom.hostname"
