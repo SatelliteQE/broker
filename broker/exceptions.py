@@ -85,3 +85,9 @@ class ForemanBindError(BrokerError):
     """Raised when a problem occurs at the Foreman bind level."""
 
     error_code = 14
+
+
+class ParamikoBindError(BrokerError):
+    """Raised when a problem occurs at the Paramiko bind level."""
+
+    error_code = 15
