@@ -235,7 +235,7 @@ class ConfigManager:
         yaml.dump(working_config, self._settings_path)
         logger.info("Config migration complete.")
 
-    def validate(self, chunk, providers=None):
+    def validate(self, chunk, providers):
         """Validate a top-level chunk of Broker's config."""
         if chunk == "all":
             all_settings = [prov for prov in providers if prov != "TestProvider"] + ["base", "ssh"]
@@ -251,10 +251,6 @@ class ConfigManager:
             logger.info("Validating SSH settings.")
             settings.validators.validate(only="SSH")
             return
-        if providers is None:
-            raise exceptions.UserError(
-                "Attempted to validate provider settings without passing providers."
-            )
         instance_settings = {}
         if ":" in chunk:
             chunk, instance = chunk.split(":")

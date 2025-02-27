@@ -95,7 +95,7 @@ class Broker:
             for task in as_completed(tasks):
                 try:
                     result.append(task.result())
-                except exceptions.ProviderError as err:
+                except exceptions.ProviderError as err:  # noqa: PERF203
                     result.append(err)
         logger.debug(f"Result:\n{result}")
         if result and checkout:

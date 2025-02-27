@@ -59,10 +59,22 @@ def test_broker_empty_checkin():
 
 def test_broker_checkin_n_sync_empty_hostname():
     """Test that broker can checkin and sync inventory with a host that has empty hostname"""
+    # Ensure a clean slate by removing any existing TestProvider hosts from inventory
+    initial_inventory = helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"')
+    for host_entry in initial_inventory:
+        if host_entry.get("hostname"):
+            helpers.update_inventory(remove=host_entry["hostname"])
+        else:
+            pass
+
+    # Verify cleanup before proceeding
+    assert not helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"'), \
+        "Inventory cleanup failed before test execution."
+
     broker_inst = broker.Broker(nick="test_nick")
     broker_inst.checkout()
     inventory = helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"')
-    assert len(inventory) == 1
+    assert len(inventory) == 1 # This assertion should now reliably pass
     inventory[0]["hostname"] = None
     # remove the host from the inventory
     helpers.update_inventory(remove="test.host.example.com")

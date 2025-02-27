@@ -319,7 +319,7 @@ class Container(Provider):
     def run_wait_container(self, image_name, **kwargs):
         """Run a container and wait for it to exit."""
         cont_inst = self.run_container(image_name, **kwargs)
-        cont_inst.wait(condition="excited")
+        cont_inst.wait(condition="exited")
         return self.runtime.get_logs(cont_inst)
 
     def _gen_name(self):

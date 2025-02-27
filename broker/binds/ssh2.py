@@ -152,7 +152,8 @@ class Session:
     def scp_write(self, source, destination=None, ensure_dir=True):
         """SCP write a local file to a remote destination."""
         destination = self._set_destination(source, destination)
-        fileinfo = (source := Path(source).stat())
+        source_path = Path(source)  # Store the Path object
+        fileinfo = source_path.stat()
 
         chan = self.session.scp_send64(
             destination,
@@ -163,7 +164,7 @@ class Session:
         )
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
-        with source.open("rb") as local:
+        with source_path.open("rb") as local:
             for data in local:
                 chan.write(data)
 
