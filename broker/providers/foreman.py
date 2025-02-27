@@ -1,4 +1,5 @@
 """Foreman provider implementation."""
+
 import inspect
 from uuid import uuid4
 
@@ -156,8 +157,8 @@ class Foreman(Provider):
         if hostgroups:
             all_hostgroups = self.runtime.hostgroups()
             logger.info(f"On Foreman {self.instance} you have the following hostgroups:")
-            for hostgroup in all_hostgroups["results"]:
-                logger.info(f"- {hostgroup['title']}")
+            for hg in all_hostgroups["results"]:
+                logger.info(f"- {hg['title']}")
         elif hostgroup:
             logger.info(
                 f"On Foreman {self.instance} the hostgroup {hostgroup} has the following properties:"

@@ -1,0 +1,115 @@
+name: "Run Tests"
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths-ignore:
+      - "*.md"
+      - "*.example"
+      - ".gitignore"
+      - "tests/functional/*"
+
+jobs:
+  tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    services:
+      hussh-test-server:
+        image: ghcr.io/jacobcallahan/hussh/hussh-test-server:latest
+        options: >-
+          --name hussh-test-server
+        ports:
+          - 8022:22
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full clone history is required for accurate change detection
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Get changed common SSH files
+        id: changed_common_ssh_files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            broker/session.py
+            broker/hosts.py
+            broker/settings.py
+            tests/test_ssh.py
+            tests/data/ssh/**
+            .github/workflows/code-checks.yml
+
+      - name: Get changed Hussh files
+        id: changed_hussh_files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: broker/binds/hussh.py
+
+      - name: Get changed Paramiko files
+        id: changed_paramiko_files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: broker/binds/paramiko.py
+
+      - name: Get changed ssh2 files
+        id: changed_ssh2_files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: broker/binds/ssh2.py
+
+      - name: Setup Temp Directory
+        run: mkdir broker_dir
+
+      - name: Core Unit Tests (excluding SSH)
+        env:
+          UV_SYSTEM_PYTHON: 1
+        run: |
+          uv pip install "broker[dev,podman] @ ."
+          broker config init --from tests/data/broker_settings.yaml
+          broker config view
+          pytest -v tests/ --ignore tests/functional --ignore tests/test_ssh.py
+
+      - name: Test Hussh backend
+        if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_hussh_files.outputs.any_changed == 'true'
+        env:
+          UV_SYSTEM_PYTHON: 1
+          BROKER_SSH_BACKEND: hussh
+        run: |
+          uv pip install "broker[hussh] @ ."
+          pytest -v tests/test_ssh.py
+
+      - name: Test Paramiko backend
+        if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_paramiko_files.outputs.any_changed == 'true'
+        env:
+          UV_SYSTEM_PYTHON: 1
+          BROKER_SSH_BACKEND: paramiko
+        run: |
+          uv pip install "broker[paramiko] @ ."
+          pytest -v tests/test_ssh.py
+
+      - name: Test ssh2-python backend
+        if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_ssh2_files.outputs.any_changed == 'true'
+        env:
+          UV_SYSTEM_PYTHON: 1
+          BROKER_SSH_BACKEND: ssh2-python
+        run: |
+          uv pip install "broker[ssh2-python] @ ."
+          pytest -v tests/test_ssh.py
