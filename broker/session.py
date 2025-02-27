@@ -19,7 +19,7 @@ from broker import helpers
 from broker.exceptions import NotImplementedError
 from broker.settings import settings
 
-SSH_BACKENDS = ("ssh2-python", "ssh2-python312", "ansible-pylibssh", "hussh")
+SSH_BACKENDS = ("ssh2-python", "ansible-pylibssh", "hussh", "paramiko")
 SSH_BACKEND = settings.SSH.BACKEND
 
 logger.debug(f"{SSH_BACKEND=}")
@@ -40,8 +40,10 @@ try:
         from broker.binds.pylibssh import InteractiveShell, Session
     elif SSH_BACKEND == "hussh":
         from broker.binds.hussh import Session
-    elif SSH_BACKEND in ("ssh2-python", "ssh2-python312"):
-        from broker.binds.ssh2 import InteractiveShell, Session  # noqa: F401
+    elif SSH_BACKEND == "ssh2-python":
+        from broker.binds.ssh2 import InteractiveShell, Session
+    elif SSH_BACKEND == "paramiko":
+        from broker.binds.paramiko import InteractiveShell, Session  # noqa: F401
     else:
         SSH_IMPORT_MSG = SSH_NOT_SUPPORTED_MSG
 except ImportError:
