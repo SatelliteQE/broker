@@ -16,6 +16,7 @@ Note:
     This module (or parent directory) should be used as the main entry point for the Broker API.
 
 """
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 
@@ -94,7 +95,7 @@ class Broker:
             for task in as_completed(tasks):
                 try:
                     result.append(task.result())
-                except exceptions.ProviderError as err:
+                except exceptions.ProviderError as err:  # noqa: PERF203
                     result.append(err)
         logger.debug(f"Result:\n{result}")
         if result and checkout:
@@ -187,8 +188,7 @@ class Broker:
         # default to hosts listed on the instance
         hosts = host or self._hosts
         logger.debug(
-            f"Checkin called with: {hosts}, "
-            f'running {"sequential" if sequential else "concurrent"}'
+            f"Checkin called with: {hosts}, running {'sequential' if sequential else 'concurrent'}"
         )
         # normalize the type since the function accepts multiple types
         if isinstance(hosts, dict):
@@ -239,8 +239,7 @@ class Broker:
         # default to hosts listed on the instance
         hosts = host or self._hosts
         logger.debug(
-            f"Extend called with: {hosts}, "
-            f'running {"sequential" if sequential else "concurrent"}'
+            f"Extend called with: {hosts}, running {'sequential' if sequential else 'concurrent'}"
         )
         # normalize the type since the function accepts multiple types
         if isinstance(hosts, dict):
@@ -267,9 +266,7 @@ class Broker:
             provider, instance = provider.split("::")
         if ":" in provider:
             provider, additional_arg = provider.split(":")
-        logger.info(
-            f"Pulling remote inventory from {f'{instance } ' if instance else ''}{provider}"
-        )
+        logger.info(f"Pulling remote inventory from {f'{instance} ' if instance else ''}{provider}")
         if instance:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
