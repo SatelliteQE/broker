@@ -215,7 +215,7 @@ class Broker:
                 _host = completed.result()
                 self._hosts = [h for h in self._hosts if h.to_dict() != _host.to_dict()]
                 logger.debug(f"Completed checkin process for {_host.hostname or _host.name}")
-        helpers.update_inventory(remove=[h.hostname for h in hosts])
+        helpers.update_inventory(remove=[h.name for h in hosts])
 
     def _extend(self, host):
         """Extend a single VM."""
