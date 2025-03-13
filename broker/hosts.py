@@ -121,7 +121,7 @@ class Host:
 
         username = username or self.username
         password = password or self.password
-        timeout = timeout or self.timeout
+        timeout = self.timeout if timeout is None else timeout
         _hostname = self.hostname
         _port = self.port or port
         ipv6 = ipv6 or self.ipv6
@@ -169,7 +169,7 @@ class Host:
         Returns:
             str: The output of the command executed on the host.
         """
-        timeout = timeout or self.default_timeout
+        timeout = self.default_timeout if timeout is None else timeout
         logger.debug(f"{self.hostname} executing command: {command}")
         res = self.session.run(command, timeout=timeout)
         logger.debug(f"{self.hostname} command result:\n{res}")
