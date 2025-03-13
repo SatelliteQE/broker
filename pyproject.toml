@@ -46,13 +46,10 @@ docker = ["docker", "paramiko"]
 podman = ["podman>=5.2"]
 setup = ["build", "twine"]
 
-ssh2_py311 = ["ssh2-python"] # temporary compatibility - removing in Broker 0.7
 ssh2_python = ["ssh2-python"]
-ssh2_python312 = [
-    "ssh2-python",
-] # temporary compatibility - removing in Broker 0.7
 ansible_pylibssh = ["ansible-pylibssh"]
 hussh = ["hussh>=0.1.7"]
+paramiko = ["paramiko"]
 
 [project.scripts]
 broker = "broker.commands:cli"
@@ -74,7 +71,7 @@ addopts = ["-v", "-l", "--color=yes", "--code-highlight=yes"]
 [tool.ruff]
 line-length = 100
 exclude = ["tests/"]
-target-version = "py311"
+target-version = "py310"
 fixable = ["ALL"]
 
 select = [
