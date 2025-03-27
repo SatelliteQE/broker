@@ -50,7 +50,7 @@ def resilient_job_wait(job, timeout=None):
         try:
             job.wait_until_completed(timeout=timeout)
             completed = True
-        except ConnectionError as err:
+        except (ConnectionError, awxkit.exceptions.Unknown) as err:
             logger.error(f"Error occurred while waiting for job: {err}")
             logger.info("Retrying job wait...")
 
