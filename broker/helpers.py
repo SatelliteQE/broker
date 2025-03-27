@@ -226,7 +226,9 @@ def load_inventory(filter=None):
     :return: list of dictionaries
     """
     inv_data = load_file(settings.inventory_path, warn=False)
-    return inv_data if not filter else eval_filter(inv_data, filter)
+    if inv_data and filter:
+        inv_data = eval_filter(inv_data, filter)
+    return inv_data or []
 
 
 def update_inventory(add=None, remove=None):

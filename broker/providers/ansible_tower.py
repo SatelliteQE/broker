@@ -3,17 +3,21 @@
 from functools import cache, cached_property
 import inspect
 import json
+import os
+import sys
 from urllib import parse as url_parser
 
 import click
 from dynaconf import Validator
 from logzero import logger
+from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 
 from broker import exceptions
-from broker.helpers import eval_filter, find_origin, yaml
+from broker.helpers import MockStub, eval_filter, find_origin, yaml
 from broker.settings import settings
 
+# Basic import first - we'll configure it properly later
 try:
     import awxkit
 except ImportError as err:
@@ -22,11 +26,79 @@ except ImportError as err:
 from broker import helpers
 from broker.providers import Provider
 
-# ruamel has a hard time with PseudoNamespace objects
+AAP_URL_PREFIX = "#"  # Used to construct the UI URL
+
+# Configure ruamel yaml representer for PseudoNamespace
 yaml.representer.add_representer(
     awxkit.utils.PseudoNamespace,
     lambda dumper, data: dumper.represent_dict(dict(data)),
 )
+
+
+def detect_and_reconfigure_for_aap25(base_url):
+    """Detect AAP 2.5+ and reconfigure awxkit if needed.
+
+    This function can be called multiple times safely.
+    Returns True if reconfiguration was done, False otherwise.
+    """
+    # Exit immediately if we've already configured
+    if getattr(detect_and_reconfigure_for_aap25, "_configured", False):
+        return False
+
+    # Check to see if the user wants us to operate against AAP 2.4-
+    need_reconfigure = False
+    try:
+        if Version(settings.ANSIBLETOWER.get("AAP_VERSION")) < Version("2.5"):
+            return False
+        need_reconfigure = True
+    except (InvalidVersion, TypeError):
+        pass  # aap_version isn't set or is invalid, need to manually check
+
+    # Only perform API check if we don't already know we need to reconfigure
+    if not need_reconfigure:
+        config = awxkit.config
+        config.base_url = base_url
+        try:
+            # Create temporary API instance to test version
+            api = awxkit.api.Api()
+            api.get().available_versions
+        except AttributeError:
+            # AAP 2.5+ hits this error, so we need to reconfigure
+            logger.debug("AAP 2.5+ detected, need to reconfigure awxkit")
+            need_reconfigure = True
+
+    # Perform reconfiguration only if needed
+    if need_reconfigure:
+        logger.debug("Reconfiguring awxkit for AAP 2.5+")
+
+        # Remove all awxkit modules from sys.modules
+        for module_name in list(sys.modules.keys()):
+            if "awx" in module_name:
+                del sys.modules[module_name]
+
+        # Set environment variable for API path
+        os.environ["AWXKIT_API_BASE_PATH"] = "/api/controller/"
+
+        # Re-import awxkit - must use globals() to update module reference in this scope
+        import awxkit as awxkit_new
+
+        globals()["awxkit"] = awxkit_new
+
+        # Update the url prefix
+        global AAP_URL_PREFIX  # noqa: PLW0603
+        AAP_URL_PREFIX = "execution"
+
+        # re-onfigure ruamel yaml representer for PseudoNamespace
+        yaml.representer.add_representer(
+            awxkit_new.utils.PseudoNamespace,
+            lambda dumper, data: dumper.represent_dict(dict(data)),
+        )
+
+        # Set flag to avoid redundant reconfiguration
+        detect_and_reconfigure_for_aap25._configured = True
+        return True
+
+    return False
 
 
 def convert_pseudonamespaces(attr_dict):
@@ -76,20 +148,23 @@ class ATInventoryError(exceptions.ProviderError):
 
 
 @cache
-def get_awxkit_and_uname(config=None, root=None, url=None, token=None, uname=None, pword=None):
+def get_awxkit_and_uname(
+    awxkit_config=None, root=None, url=None, token=None, uname=None, pword=None
+):
     """Return an awxkit api object and resolved username."""
-    # Prefer token if its set, otherwise use username/password
-    # auth paths for the API taken from:
-    # https://github.com/ansible/awx/blob/ddb6c5d0cce60779be279b702a15a2fddfcd0724/awxkit/awxkit/cli/client.py#L85-L94
-    # unit test mock structure means the root API instance can't be loaded on the same line
-    config = config or awxkit.config
-    config.base_url = url
-    if root is None:
-        root = awxkit.api.Api()  # support mock stub for unit tests
+    if not isinstance(awxkit_config, MockStub):  # skip if we're in a unit test
+        # Configure for AAP 2.5+ if needed, with the URL we have
+        detect_and_reconfigure_for_aap25(base_url=url)
+
+    # Now proceed with the original function logic
+    awxkit_config = awxkit_config or awxkit.config
+    awxkit_config.base_url = url
+    if root is None:  # support mock stub for unit tests
+        root = awxkit.api.Api()
     if token:
         helpers.emit(auth_type="token")
         logger.info("Using token authentication")
-        config.token = token
+        awxkit_config.token = token
         try:
             root.connection.login(username=None, password=None, token=token, auth_type="Bearer")
         except awxkit.exceptions.Unauthorized as err:
@@ -112,8 +187,8 @@ def get_awxkit_and_uname(config=None, root=None, url=None, token=None, uname=Non
             "applications_auth.html#applications-tokens for more information"
         )
 
-        config.credentials = {"default": {"username": uname, "password": pword}}
-        config.use_sessions = True
+        awxkit_config.credentials = {"default": {"username": uname, "password": pword}}
+        awxkit_config.use_sessions = True
         root.load_session().get()
         versions = root.available_versions
         my_username = uname
@@ -141,6 +216,7 @@ class AnsibleTower(Provider):
             | Validator("ANSIBLETOWER.token", must_exist=True)
         ),
         Validator("ANSIBLETOWER.inventory", default=None),
+        Validator("ANSIBLETOWER.AAP_VERSION", default="", cast=str),
     ]
 
     _checkout_options = [
@@ -189,7 +265,7 @@ class AnsibleTower(Provider):
         config = kwargs.get("config")
         root = kwargs.get("root")
         self._v2, self.username = get_awxkit_and_uname(
-            config=config,
+            awxkit_config=config,
             root=root,
             url=self.url,
             token=self.token,
@@ -617,10 +693,10 @@ class AnsibleTower(Provider):
         job = target.launch(payload=payload)
         job_number = job.url.rstrip("/").split("/")[-1]
         job_api_url = url_parser.urljoin(self.url, str(job.url))
-        if self._is_aap:
-            job_ui_url = url_parser.urljoin(self.url, f"/#/jobs/{subject}/{job_number}/output")
-        else:
-            job_ui_url = url_parser.urljoin(self.url, f"/#/{subject}s/{job_number}")
+        # Need to change the url subject for job templates. If this increases, then come up with a better solution
+        job_ui_url = url_parser.urljoin(
+            self.url, f"/{AAP_URL_PREFIX}/jobs/{'playbook' if subject == 'job_template' else subject}/{job_number}/output"
+        )
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info(f"Waiting for job: \nAPI: {job_api_url}\nUI: {job_ui_url}")
         resilient_job_wait(job)
