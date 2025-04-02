@@ -182,6 +182,7 @@ class Host:
             "_broker_provider",
             "_broker_args",
             "tower_inventory",
+            "deploy_network_type",
             "job_id",
             "_attrs",
             "ip",
