@@ -411,18 +411,22 @@ class AnsibleTower(Provider):
 
         # Get broker_args from host facts if present
         broker_args = getattr(host_facts, "_broker_args", {})
+        broker_facts = getattr(host_facts, "_broker_facts", {})
 
-        host_info = {
-            "name": host.name,
-            "type": host.type,
-            "hostname": hostname,
-            "ip": host.variables.get("ansible_host"),
-            "tower_inventory": self._translate_inventory(host.inventory),
-            "_broker_provider": "AnsibleTower",
-            "_broker_provider_instance": self.instance,
-            # Get _broker_args from host facts if present
-            "_broker_args": {key: val for key, val in broker_args.items() if val},
-        }
+        host_info = {key: val for key, val in broker_facts.items() if val}
+        host_info.update(
+            {
+                "name": host.name,
+                "type": host.type,
+                "hostname": hostname,
+                "ip": host.variables.get("ansible_host"),
+                "tower_inventory": self._translate_inventory(host.inventory),
+                "_broker_provider": "AnsibleTower",
+                "_broker_provider_instance": self.instance,
+                # Get _broker_args from host facts if present
+                "_broker_args": {key: val for key, val in broker_args.items() if val},
+            }
+        )
 
         # Find and add extra fields
         interfaces = getattr(host_facts, "ansible_interfaces", [])
@@ -653,6 +657,8 @@ class AnsibleTower(Provider):
 
         :param target_vm: This should be a host object
         """
+        if provider_labels is None:
+            provider_labels = {}
         # check if an inventory was specified. if so overwrite the current inventory
         if new_inv := target_vm._broker_args.get("tower_inventory"):
             if new_inv != self._inventory:
