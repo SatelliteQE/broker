@@ -236,6 +236,10 @@ def checkout(ctx, background, nick, count, args_file, provider_labels, **kwargs)
     COMMAND: broker checkout --workflow "workflow-name" --workflow_arg1 something
 
     COMMAND: broker checkout --nick "nickname"
+
+    You can also checkout against a non-default provider instance, e.g:
+
+    COMMAND: broker checkout ... --AnsibleTower <instance name>
     """
     broker_args = helpers.clean_dict(kwargs)
     if nick:
