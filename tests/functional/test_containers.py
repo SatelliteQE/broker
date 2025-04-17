@@ -29,7 +29,9 @@ def checkin_containers():
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
+    "args_file",
+    [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")],
+    ids=lambda f: f.name.split(".")[0],
 )
 def test_checkout_scenarios(args_file, checkin_containers):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
@@ -37,7 +39,9 @@ def test_checkout_scenarios(args_file, checkin_containers):
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")], ids=lambda f: f.name.split(".")[0]
+    "args_file",
+    [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")],
+    ids=lambda f: f.name.split(".")[0],
 )
 def test_execute_scenarios(args_file):
     result = CliRunner().invoke(cli, ["execute", "--args-file", args_file])
@@ -73,15 +77,13 @@ def test_container_e2e():
         assert SETTINGS_PATH.name in res.stdout
         with NamedTemporaryFile() as tmp:
             c_host.session.sftp_read(f"{remote_dir}/{SETTINGS_PATH.name}", tmp.file.name)
-            data = c_host.session.sftp_read(
-                f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True
+            data = c_host.session.sftp_read(f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True)
+            assert SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes(), (
+                "Local file is different from the received one"
             )
-            assert (
-                SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes()
-            ), "Local file is different from the received one"
-            assert (
-                SETTINGS_PATH.read_bytes() == data
-            ), "Local file is different from the received one (return_data=True)"
+            assert SETTINGS_PATH.read_bytes() == data, (
+                "Local file is different from the received one (return_data=True)"
+            )
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # assert labels
         assert c_host._cont_inst.labels.get("broker.l1") == "v1"
@@ -110,12 +112,12 @@ def test_container_e2e_mp():
                 data = c_host.session.sftp_read(
                     f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True
                 )
-                assert (
-                    SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes()
-                ), "Local file is different from the received one"
-                assert (
-                    SETTINGS_PATH.read_bytes() == data
-                ), "Local file is different from the received one (return_data=True)"
+                assert SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes(), (
+                    "Local file is different from the received one"
+                )
+                assert SETTINGS_PATH.read_bytes() == data, (
+                    "Local file is different from the received one (return_data=True)"
+                )
                 assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
 
 

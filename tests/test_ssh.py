@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import time
-import shlex # Added import
+import shlex  # Added import
 
 import pytest
 
@@ -131,7 +131,7 @@ def test_shell_context(host):
     with host.session.shell() as sh:
         sh.send("echo test shell")
         sh.send("bad command")
-        time.sleep(0.5) # Allow time for command processing
+        time.sleep(0.5)  # Allow time for command processing
     assert "test shell" in sh.result.stdout
     if settings.ssh.backend == "hussh":
         assert "command not found" in sh.result.stderr
@@ -148,12 +148,12 @@ def test_pty_shell_context(host):
     with host.session.shell(pty=True) as sh:
         sh.send("echo test shell")
         sh.send("bad command")
-        time.sleep(0.5) # Allow time for command processing in PTY
+        time.sleep(0.5)  # Allow time for command processing in PTY
 
     # All backends capture output on context exit in sh.result
     if settings.ssh.backend == "hussh":
         # Hussh PTY stdout contains logout sequences, not command output after exit. Stderr is empty.
-        assert sh.result.status == 127 # Rely solely on the status code (command not found)
+        assert sh.result.status == 127  # Rely solely on the status code (command not found)
         # Cannot reliably check stdout for "test shell" for hussh PTY.
     else:
         # Paramiko/ssh2 capture command output in stdout even with PTY.
@@ -192,11 +192,13 @@ def test_tail(host):
         # ssh2 and paramiko backends simulate tail differently
         with host.session.tail_file("/root/hello.txt") as tf:
             # Initial read check not directly possible with simulation. Check initial size instead.
-            if hasattr(tf, 'initial_size'): # Paramiko specific check
-                 assert tf.initial_size == len(TEST_STR)
-            else: # ssh2 specific check via command execution
-                 initial_size_cmd = int(host.execute(f"stat -c %s {shlex.quote('/root/hello.txt')}").stdout.strip())
-                 assert initial_size_cmd == len(TEST_STR)
+            if hasattr(tf, "initial_size"):  # Paramiko specific check
+                assert tf.initial_size == len(TEST_STR)
+            else:  # ssh2 specific check via command execution
+                initial_size_cmd = int(
+                    host.execute(f"stat -c %s {shlex.quote('/root/hello.txt')}").stdout.strip()
+                )
+                assert initial_size_cmd == len(TEST_STR)
 
             host.execute("echo goodbye >> /root/hello.txt")
         # Both simulated backends get contents after context exit

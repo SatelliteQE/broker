@@ -5,6 +5,8 @@ import time
 
 import pexpect
 import pytest
+from pathlib import Path
+from broker import settings
 
 # Import both PodmanBind and DockerBind
 from broker.binds.containers import PodmanBind, DockerBind
@@ -19,19 +21,29 @@ def pytest_sessionstart(session):
     os.environ["BROKER_TEST_MODE"] = "True"
 
 
-@pytest.fixture
-def set_envars(request):
-    """Set and unset one or more environment variables"""
-    if isinstance(request.param, list):
-        for pair in request.param:
-            os.environ[pair[0]] = pair[1]
-        yield
-        for pair in request.param:
-            del os.environ[pair[0]]
-    else:
-        os.environ[request.param[0]] = request.param[1]
-        yield
-        del os.environ[request.param[0]]
+@pytest.fixture(scope="session")
+def broker_data_dir():
+    """Return path to the test data directory"""
+    return Path(os.path.dirname(__file__)) / "data"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_broker_dir(broker_data_dir):
+    """Set the Broker directory to the test data directory"""
+    settings.BROKER_DIRECTORY = broker_data_dir
+    settings.inventory_path = broker_data_dir / "inventory.yaml"
+
+
+@pytest.fixture(scope="session")
+def broker_settings_path(broker_data_dir):
+    """Return path to test settings file"""
+    return broker_data_dir / "broker_settings.yaml"
+
+
+@pytest.fixture(scope="session")
+def broker_settings(broker_settings_path):
+    """Create and return a broker settings object for testing"""
+    return settings.create_settings(config_file=broker_settings_path, perform_migrations=False)
 
 
 @pytest.fixture(scope="session")
@@ -42,6 +54,7 @@ def container_client():
     try:
         # Attempt to import and use podman first
         import podman
+
         client = PodmanBind(host="localhost")
         # Test if the client is functional
         client.client.images.list()
@@ -49,11 +62,12 @@ def container_client():
     except (ImportError, Exception) as e:
         # Store exception if Podman fails
         last_exception = e
-        client = None # Ensure client is reset if podman failed
+        client = None  # Ensure client is reset if podman failed
 
     try:
         # Fallback to docker if podman is not available or functional
         import docker
+
         client = DockerBind(host="localhost")
         # Test if the client is functional
         client.client.images.list()
@@ -63,7 +77,9 @@ def container_client():
         last_exception = e
 
     # Raise an error if neither is functional
-    raise ImportError(f"Neither podman nor docker library is installed or functional. Last error: {last_exception}")
+    raise ImportError(
+        f"Neither podman nor docker library is installed or functional. Last error: {last_exception}"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -78,7 +94,7 @@ def ensure_test_server_image(container_client):
         client.pull_image(TEST_SERVER_IMAGE)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")  # Removed autouse=True temporarily
 def run_test_server(ensure_test_server_image, container_client):
     """Run a test server in a container using the selected client."""
     # Use the client provided by the container_client fixture
@@ -149,9 +165,7 @@ def setup_agent_auth():
     os.environ["SSH_AGENT_PID"] = env["SSH_AGENT_PID"]
 
     # Add the keys to the ssh-agent
-    result = subprocess.run(
-        ["ssh-add", str(base_key)], capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(["ssh-add", str(base_key)], capture_output=True, text=True, check=False)
     print(result.stdout)
     print(result.stderr)
     # The auth_key is password protected
@@ -161,3 +175,11 @@ def setup_agent_auth():
     yield
     # Kill the ssh-agent after the tests have run
     subprocess.run(["ssh-agent", "-k"], check=True)
+
+
+@pytest.fixture
+def set_envars(monkeypatch, request):
+    """Set environment variables for a test and clean up afterward"""
+    for envar, value in request.param:
+        monkeypatch.setenv(envar, value)
+    yield
