@@ -47,7 +47,7 @@ class Host:
         "exposed_ports",
     )
 
-    def __init__(self, **kwargs):
+    def __init__(self, broker_settings=None, **kwargs):
         """Create a Host instance.
 
         Expected kwargs:
@@ -60,12 +60,22 @@ class Host:
             key_filename: (str) - Path to SSH key file to use for SSH connection
             ipv6 (bool): Whether or not to use IPv6. Defaults to False.
             ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
+
+        If `broker_settings` is provided, it will be used over Broker's global settings.
         """
-        global SETTINGS_VALIDATED  # noqa: PLW0603
-        if not SETTINGS_VALIDATED:
-            logger.debug("Validating ssh settings")
-            settings.validators.validate(only="SSH")
-            SETTINGS_VALIDATED = True
+        if broker_settings:
+            # Use the provided settings object instead of the global one
+            self._settings = broker_settings
+            logger.debug("Validating local ssh settings")
+            self._settings.validators.validate(only="SSH")
+        else:
+            # Use the global settings object
+            self._settings = settings.dynaconf_clone()
+            global SETTINGS_VALIDATED  # noqa: PLW0603
+            if not SETTINGS_VALIDATED:
+                logger.debug("Validating ssh settings")
+                self._settings.validators.validate(only="SSH")
+                SETTINGS_VALIDATED = True
         logger.debug(f"Constructing host using {kwargs=}")
         self.hostname = kwargs.get("hostname") or kwargs.get("ip")
         if not self.hostname:
@@ -77,13 +87,13 @@ class Host:
             else:
                 raise HostError("Host must be constructed with a hostname or ip")
         self.name = kwargs.pop("name", None)
-        self.username = kwargs.pop("username", settings.SSH.HOST_USERNAME)
-        self.password = kwargs.pop("password", settings.SSH.HOST_PASSWORD)
-        self.timeout = kwargs.pop("connection_timeout", settings.SSH.HOST_CONNECTION_TIMEOUT)
-        self.port = kwargs.pop("port", settings.SSH.HOST_SSH_PORT)
-        self.key_filename = kwargs.pop("key_filename", settings.SSH.HOST_SSH_KEY_FILENAME)
-        self.ipv6 = kwargs.pop("ipv6", settings.SSH.HOST_IPV6)
-        self.ipv4_fallback = kwargs.pop("ipv4_fallback", settings.SSH.HOST_IPV4_FALLBACK)
+        self.username = kwargs.pop("username", self._settings.SSH.HOST_USERNAME)
+        self.password = kwargs.pop("password", self._settings.SSH.HOST_PASSWORD)
+        self.timeout = kwargs.pop("connection_timeout", self._settings.SSH.HOST_CONNECTION_TIMEOUT)
+        self.port = kwargs.pop("port", self._settings.SSH.HOST_SSH_PORT)
+        self.key_filename = kwargs.pop("key_filename", self._settings.SSH.HOST_SSH_KEY_FILENAME)
+        self.ipv6 = kwargs.pop("ipv6", self._settings.SSH.HOST_IPV6)
+        self.ipv4_fallback = kwargs.pop("ipv4_fallback", self._settings.SSH.HOST_IPV4_FALLBACK)
         self.__dict__.update(kwargs)  # Make every other kwarg an attribute
         self._session = None
 
@@ -106,56 +116,54 @@ class Host:
                 from broker.session import ContainerSession
 
                 runtime = "podman" if "podman" in str(self._cont_inst.client) else "docker"
-                self._session = ContainerSession(self, runtime=runtime)
+                self._session = ContainerSession(
+                    self, runtime=runtime, broker_settings=self._settings
+                )
             else:
                 self.connect()
         return self._session
 
-    def connect(
-        self,
-        username=None,
-        password=None,
-        timeout=None,
-        port=22,
-        key_filename=None,
-        ipv6=False,
-        ipv4_fallback=True,
-    ):
-        """Connect to the host using SSH.
+    def connect(self, **kwargs):
+        """Create one or more connections to the target host."""
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+        if getattr(self, "is_container", None) or getattr(self, "_cont_inst", None):
+            from broker.session import ContainerSession
 
-        Args:
-            username (str): The username to use for the SSH connection.
-            password (str): The password to use for the SSH connection.
-            timeout (int): The timeout for the SSH connection in seconds.
-            port (int): The port to use for the SSH connection. Defaults to 22.
-            key_filename (str): The path to the private key file to use for the SSH connection.
-            ipv6 (bool): Whether or not to use IPv6. Defaults to False.
-            ipv4_fallback (bool): Whether or not to fallback to IPv4 if IPv6 fails. Defaults to True.
-        """
-        from broker.session import Session
+            self.session = ContainerSession(
+                self, kwargs.get("runtime"), broker_settings=self._settings
+            )
+        else:
+            logger.debug(f"Creating SSH session to {self.hostname}")
+            # Create a session using the entry-points based approach
+            from broker.session import make_session
 
-        username = username or self.username
-        password = password or self.password
-        timeout = self.timeout if timeout is None else timeout
-        _hostname = self.hostname
-        _port = self.port or port
-        ipv6 = ipv6 or self.ipv6
-        key_filename = key_filename or self.key_filename
-        if ":" in self.hostname and not ipv6:
-            _hostname, port = self.hostname.split(":")
-            _port = int(port)
-        ipv4_fallback = ipv4_fallback or self.ipv4_fallback
-        self.close()
-        self._session = Session(
-            hostname=_hostname,
-            username=username,
-            password=password,
-            port=_port,
-            key_filename=key_filename,
-            timeout=timeout,
-            ipv6=ipv6,
-            ipv4_fallback=ipv4_fallback,
-        )
+            self.session = make_session(
+                broker_settings=self._settings,
+                hostname=self.hostname,
+                port=getattr(self, "port", self._settings.get("SSH", {}).get("HOST_SSH_PORT", 22)),
+                username=getattr(
+                    self,
+                    "user",
+                    self._settings.get("SSH", {}).get("HOST_USERNAME", self.DEFAULT_USER),
+                ),
+                password=getattr(
+                    self,
+                    "password",
+                    self._settings.get("SSH", {}).get("HOST_PASSWORD", None),
+                ),
+                key_filename=getattr(
+                    self,
+                    "key_filename",
+                    self._settings.get("SSH", {}).get("HOST_SSH_KEY_FILENAME", None),
+                ),
+                timeout=getattr(
+                    self,
+                    "timeout",
+                    self._settings.get("SSH", {}).get("HOST_CONNECTION_TIMEOUT", 60),
+                ),
+                host=self.hostname,  # For hussh backend compatibility
+            )
 
     def close(self):
         """Close the SSH connection to the host."""

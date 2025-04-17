@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker"]
 authors = [{ name = "Jacob J Callahan", email = "jacob.callahan05@gmail.com" }]
-# license-files = ["LICENSE"]  - Not ready in setuptools until #4706 is released
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -30,7 +29,6 @@ dependencies = [
     "rich",
     "rich_click",
     "ruamel.yaml",
-    "setuptools",
     "ssh2-python",
 ]
 
@@ -61,6 +59,17 @@ broker = "broker.commands:cli"
 
 [tool.uv.build-backend]
 module-root = ""
+
+[project.entry-points."broker.ssh.session"]
+ansible-pylibssh = "broker.binds.pylibssh:Session"
+ssh2-python = "broker.binds.ssh2:Session"
+ssh2-python312 = "broker.binds.ssh2:Session"
+hussh = "broker.binds.hussh:Session"
+
+[project.entry-points."broker.ssh.interactive_shell"]
+ansible-pylibssh = "broker.binds.pylibssh:InteractiveShell"
+ssh2-python = "broker.binds.ssh2:InteractiveShell"
+ssh2-python312 = "broker.binds.ssh2:InteractiveShell"
 
 [tool.bumpver]
 current_version = "0.7.0"

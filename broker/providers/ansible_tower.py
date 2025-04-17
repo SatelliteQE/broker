@@ -38,12 +38,13 @@ yaml.representer.add_representer(
 )
 
 
-def detect_and_reconfigure_for_aap25(base_url):
+def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
     """Detect AAP 2.5+ and reconfigure awxkit if needed.
 
     This function can be called multiple times safely.
     Returns True if reconfiguration was done, False otherwise.
     """
+    _settings = broker_settings or settings
     # Exit immediately if we've already configured
     if getattr(detect_and_reconfigure_for_aap25, "_configured", False):
         return False
@@ -51,7 +52,7 @@ def detect_and_reconfigure_for_aap25(base_url):
     # Check to see if the user wants us to operate against AAP 2.4-
     need_reconfigure = False
     try:
-        if Version(settings.ANSIBLETOWER.get("AAP_VERSION")) < Version("2.5"):
+        if Version(_settings.ANSIBLETOWER.get("AAP_VERSION")) < Version("2.5"):
             return False
         need_reconfigure = True
     except (InvalidVersion, TypeError):
@@ -117,17 +118,18 @@ def convert_pseudonamespaces(attr_dict):
     return out_dict
 
 
-def resilient_job_wait(job, job_timeout=None, max_wait=None):
+def resilient_job_wait(job, job_timeout=None, max_wait=None, broker_settings=None):
     """Wait for a job to complete. Retry on errors.
 
     Args:
         job: The job object to wait for
         job_timeout: Timeout for individual job wait attempts
         max_wait: Maximum time to continue retrying before giving up
+        broker_settings: Optional settings object to use instead of the global one
     """
-    job_timeout = job_timeout or settings.ANSIBLETOWER.workflow_timeout
-    max_wait = max_wait or settings.ANSIBLETOWER.max_resilient_wait
-
+    _settings = broker_settings or settings
+    job_timeout = job_timeout or _settings.ANSIBLETOWER.workflow_timeout
+    max_wait = max_wait or _settings.ANSIBLETOWER.max_resilient_wait
     completed = False
     start_time = time.time()
 
@@ -173,11 +175,20 @@ class ATInventoryError(exceptions.ProviderError):
 
 
 @cache
-def get_awxkit_api(awxkit_config=None, root=None, url=None, token=None, uname=None, pword=None):
-    """Return an awxkit api object and token information."""
+def get_awxkit_and_uname(
+    awxkit_config=None,
+    root=None,
+    url=None,
+    token=None,
+    uname=None,
+    pword=None,
+    broker_settings=None,
+):
+    """Return an awxkit api object and resolved username."""
+    _settings = broker_settings or settings
     if not isinstance(awxkit_config, MockStub):  # skip if we're in a unit test
         # Configure for AAP 2.5+ if needed, with the URL we have
-        detect_and_reconfigure_for_aap25(base_url=url)
+        detect_and_reconfigure_for_aap25(base_url=url, broker_settings=_settings)
 
     # Now proceed with the original function logic
     awxkit_config = awxkit_config or awxkit.config
@@ -290,21 +301,22 @@ class AnsibleTower(Provider):
         """
         super().__init__(**kwargs)
         # get our instance settings
-        self.url = settings.ANSIBLETOWER.base_url
-        self.uname = settings.ANSIBLETOWER.get("username")
-        self.pword = settings.ANSIBLETOWER.get("password")
-        self.token = settings.ANSIBLETOWER.get("token")
-        self._inventory = kwargs.get("tower_inventory") or settings.ANSIBLETOWER.inventory
+        self.url = self._settings.ANSIBLETOWER.base_url
+        self.uname = self._settings.ANSIBLETOWER.get("username")
+        self.pword = self._settings.ANSIBLETOWER.get("password")
+        self.token = self._settings.ANSIBLETOWER.get("token")
+        self._inventory = kwargs.get("tower_inventory") or self._settings.ANSIBLETOWER.inventory
         # Init the class itself
         config = kwargs.get("config")
         root = kwargs.get("root")
-        self._v2, self._temp_token_desc = get_awxkit_api(
+        self._v2, self._temp_token_desc = get_awxkit_and_uname(
             awxkit_config=config,
             root=root,
             url=self.url,
             token=self.token,
             uname=self.uname,
             pword=self.pword,
+            broker_settings=self._settings,
         )
 
         # Get the username for the authenticated user
@@ -517,7 +529,7 @@ class AnsibleTower(Provider):
             return {
                 "reason": f"Unable to determine failure cause for {workflow.name} ar {workflow.url}"
             }
-        if settings.ANSIBLETOWER.error_scope == "last":
+        if self._settings.ANSIBLETOWER.error_scope == "last":
             return failure_messages[0]
         else:
             return failure_messages
@@ -681,7 +693,12 @@ class AnsibleTower(Provider):
                 logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
 
                 host_inst = host_classes[host_type](
-                    **{**broker_args, "hostname": hostname, "name": name}
+                    **{
+                        **broker_args,
+                        "hostname": hostname,
+                        "name": name,
+                        "broker_settings": self._settings,
+                    }
                 )
                 broker_facts["name"] = name
                 broker_facts["hostname"] = hostname
@@ -811,7 +828,7 @@ class AnsibleTower(Provider):
         return self.execute(
             workflow=settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
-            new_expire_time=new_expire_time or settings.ANSIBLETOWER.get("new_expire_time"),
+            new_expire_time=new_expire_time or self._settings.ANSIBLETOWER.get("new_expire_time"),
             provider_labels=provider_labels,
         )
 
@@ -827,7 +844,7 @@ class AnsibleTower(Provider):
         **kwargs,
     ):
         """Get a list of extra vars and their defaults from a workflow."""
-        results_limit = kwargs.get("results_limit", settings.ANSIBLETOWER.results_limit)
+        results_limit = kwargs.get("results_limit", self._settings.ANSIBLETOWER.results_limit)
         if workflow:
             if wfjt := self._v2.workflow_job_templates.get(name=workflow).results:
                 wfjt = wfjt.pop()

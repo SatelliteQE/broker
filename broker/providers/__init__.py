@@ -67,7 +67,7 @@ class ProviderMeta(ABCMeta):
                 if attr == "provider_help":
                     # register the help options based on the function arguments
                     for _name, param in inspect.signature(obj).parameters.items():
-                        if _name not in ("self", "kwargs"):
+                        if _name not in ("self", "kwargs", "broker_settings"):
                             # {_name: (cls, is_flag)}
                             PROVIDER_HELP[_name] = (
                                 new_cls,
@@ -108,12 +108,22 @@ class Provider(metaclass=ProviderMeta):
     # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
     _checkout_options = []
     _execute_options = []
-    _fresh_settings = settings.dynaconf_clone()
     _sensitive_attrs = []
 
-    def __init__(self, **kwargs):
-        self._construct_params = []
+    def __init__(self, broker_settings=None, **kwargs):
         cls_name = self.__class__.__name__
+        if broker_settings:
+            self._settings = broker_settings
+            # Add provider validators to custom settings
+            if validators := getattr(self.__class__, "_validators", None):
+                self._settings.validators.extend(validators)
+            logger.debug(
+                f"{cls_name} provider using custom settings object: {broker_settings.to_dict()}"
+            )
+        else:
+            self._settings = settings.dynaconf_clone()
+            logger.debug(f"{cls_name} provider using global settings")
+        self._construct_params = []
         logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
         self.instance = kwargs.pop(f"{cls_name}", None)
         self._validate_settings(self.instance)
@@ -130,8 +140,8 @@ class Provider(metaclass=ProviderMeta):
         """
         section_name = self.__class__.__name__.upper()
         # if the provider has instances, load the instance settings
-        if self._fresh_settings.get(section_name).get("instances"):
-            fresh_settings = self._fresh_settings.get(section_name).copy()
+        if self._settings.get(section_name, {}).get("instances"):
+            fresh_settings = self._settings.get(section_name).copy()
             instance_name = instance_name or getattr(self, "instance", None)
             # first check to see if we have a direct match
             if not (instance_values := fresh_settings.instances.get(instance_name)):
@@ -142,13 +152,13 @@ class Provider(metaclass=ProviderMeta):
                         break
             self.instance = instance_name  # store the instance name on the provider
             fresh_settings.update(instance_values)
-            settings[section_name] = fresh_settings
+            self._settings[section_name] = fresh_settings
             if not instance_values.get("override_envars"):
                 # if a provider instance doesn't want to override envars, load them
-                settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
+                self._settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
         # use selective validation to only validate the instance settings
         try:
-            settings.validators.validate(only=section_name)
+            self._settings.validators.validate(only=section_name)
         except dynaconf.ValidationError as err:
             raise exceptions.ConfigurationError(err) from err
 
@@ -160,10 +170,10 @@ class Provider(metaclass=ProviderMeta):
         """Construct a host object from a host class and include relevent provider params."""
 
     @abstractmethod
-    def provider_help(self):
+    def provider_help(self, broker_settings=None):
         """Help options that will be added to the CLI.
 
-        Anything other than 'self' and 'kwargs' will be added as a help option
+        Anything other than 'self', 'kwargs', and 'broker_settings' will be added as a help option
         To specify a flag, set the default value to a boolean
         Everything else should default to None
         """

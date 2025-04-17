@@ -166,16 +166,18 @@ def eval_filter(filter_list, raw_filter, filter_key="inv"):
     return [dict(item) if isinstance(item, MockStub) else item for item in filter_list]
 
 
-def resolve_nick(nick):
+def resolve_nick(nick, broker_settings=None):
     """Check if the nickname exists. Used to define broker arguments.
 
     :param nick: String representing the name of a nick
+    :param broker_settings: Optional settings object to use instead of global settings
 
     :return: a dictionary mapping argument names and values
     """
-    nick_names = settings.settings.get("NICKS") or {}
+    _settings = broker_settings or settings.settings
+    nick_names = _settings.get("NICKS") or {}
     if nick in nick_names:
-        return settings.settings.NICKS[nick].to_dict()
+        return _settings.NICKS[nick].to_dict()
     else:
         raise exceptions.UserError(f"Unknown nick: {nick}")
 
@@ -225,6 +227,8 @@ def resolve_file_args(broker_args):
 def load_inventory(filter=None):
     """Load all local hosts in inventory.
 
+    :param filter: A filter string to apply to the inventory.
+
     :return: list of dictionaries
     """
     inv_data = load_file(settings.inventory_path, warn=False)
@@ -237,7 +241,6 @@ def update_inventory(add=None, remove=None):
     """Update list of local hosts in the checkout interface.
 
     :param add: list of dictionaries representing new hosts
-
     :param remove: list of strings representing hostnames or names to be removed
 
     :return: no return value

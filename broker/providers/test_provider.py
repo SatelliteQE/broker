@@ -6,7 +6,6 @@ from dynaconf import Validator
 
 from broker import helpers
 from broker.providers import Provider
-from broker.settings import settings
 
 HOST_PROPERTIES = {
     "basic": {
@@ -27,8 +26,8 @@ class TestProvider(Provider):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.config = settings.TESTPROVIDER.config_value
-        self.foo = settings.TESTPROVIDER.foo
+        self.config = self._settings.TESTPROVIDER.config_value
+        self.foo = self._settings.TESTPROVIDER.foo
 
     def _host_release(self):
         caller_host = inspect.stack()[1][0].f_locals["host"]
@@ -50,7 +49,9 @@ class TestProvider(Provider):
         if provider_params:
             host_params = provider_params.copy()
             host_params.update(kwargs)
-            host_inst = host_classes[host_params["host_type"]](**host_params)
+            host_inst = host_classes[host_params["host_type"]](
+                broker_settings=self._settings, **host_params
+            )
         else:  # if we are reconstructing the host from the inventory
             host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
         self._set_attributes(host_inst, broker_args=kwargs)

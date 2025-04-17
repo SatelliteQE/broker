@@ -79,11 +79,26 @@ def api_stub():
 
 @pytest.fixture
 def config_stub():
-    return MockStub()
+    # This stub needs to provide the structure expected by AnsibleTower's __init__
+    # and other methods, specifically ANSIBLETOWER.inventory and other keys accessed via .get().
+    ansible_tower_settings = MockStub(
+        in_dict={  # Pass arguments as a dictionary to in_dict
+            "inventory": {},
+            "workflow_job_templates_name_prefix": "test_prefix_",
+            "hostname_override_variable": "ansible_host_override",
+            "ip_override_variable": "ansible_ip_override",
+            "release_workflow_name": "test_release_workflow",
+            "username_override": "test_user",
+            "password_override": "test_pass",
+            "job_vars_override": "test_job_vars",
+            "host_vars_override": "test_host_vars",
+        }
+    )
+    return MockStub(in_dict={"ANSIBLETOWER": ansible_tower_settings})
 
 
 @pytest.fixture
-def tower_stub(api_stub, config_stub):
+def tower_stub(api_stub, config_stub):  # config_stub is now injected
     return AnsibleTower(root=api_stub, config=config_stub)
 
 
