@@ -12,7 +12,6 @@ from logzero import logger
 from broker import exceptions, helpers
 from broker.binds import containers
 from broker.providers import Provider
-from broker.settings import settings
 
 
 def container_info(container_inst):
@@ -91,24 +90,24 @@ class Container(Provider):
         super().__init__(**kwargs)
         if kwargs.get("bind") is not None:
             self._runtime_cls = kwargs.pop("bind")
-        elif settings.container.runtime.lower() == "podman":
+        elif self._settings.Container.runtime.lower() == "podman":
             self._runtime_cls = containers.PodmanBind
-        elif settings.container.runtime.lower() == "docker":
+        elif self._settings.Container.runtime.lower() == "docker":
             self._runtime_cls = containers.DockerBind
         else:
             raise exceptions.ProviderError(
                 "Container",
-                f"Broker has no bind for {settings.container.runtime} containers",
+                f"Broker has no bind for {self._settings.Container.runtime} containers",
             )
         self.runtime = get_runtime(
             runtime_cls=self._runtime_cls,
-            host=settings.container.host,
-            username=settings.container.host_username,
-            password=settings.container.host_password,
-            port=settings.container.host_port,
-            timeout=settings.container.timeout,
+            host=self._settings.Container.host,
+            username=self._settings.Container.host_username,
+            password=self._settings.Container.host_password,
+            port=self._settings.Container.host_port,
+            timeout=self._settings.Container.timeout,
         )
-        self._name_prefix = settings.container.get("name_prefix", getpass.getuser())
+        self._name_prefix = self._settings.Container.get("name_prefix", getpass.getuser())
 
     def _ensure_image(self, name):
         """Check if an image exists on the provider, attempt a pull if not."""
@@ -163,7 +162,7 @@ class Container(Provider):
         """
         mapping = {}
         # create mapping for all exposed ports in the image
-        if settings.container.auto_map_ports or kwargs.get("auto_map_ports"):
+        if self._settings.Container.auto_map_ports or kwargs.get("auto_map_ports"):
             mapping = {
                 k: v or None
                 for k, v in self.runtime.image_info(image)["config"]["ExposedPorts"].items()
@@ -215,7 +214,9 @@ class Container(Provider):
             raise Exception(f"Could not determine container hostname:\n{cont_attrs}")
         name = cont_attrs["name"]
         logger.debug(f"hostname: {hostname}, name: {name}, host type: host")
-        host_inst = host_classes["host"](**{**kwargs, "hostname": hostname, "name": name})
+        host_inst = host_classes["host"](
+            **{**kwargs, "hostname": hostname, "name": name, "broker_settings": self._settings}
+        )
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
         # add the container's port mapping to the host instance only if there are any ports open
         if cont_attrs.get("ports"):
@@ -228,7 +229,7 @@ class Container(Provider):
         self, container_hosts=False, container_host=None, container_apps=False, **kwargs
     ):
         """Return useful information about container images."""
-        results_limit = kwargs.get("results_limit", settings.container.results_limit)
+        results_limit = kwargs.get("results_limit", self._settings.Container.results_limit)
         if container_host:
             logger.info(
                 f"Information for {container_host} container-host:\n"
@@ -277,6 +278,14 @@ class Container(Provider):
             kwargs["name"] = self._gen_name()
         kwargs["ports"] = self._port_mapping(container_host, **kwargs)
 
+        # Handle network configuration
+        if net_name := getattr(self._settings.Container, "network", None):
+            net_dict = {}
+            for name in net_name.split(","):
+                # Note: In real implementation, you might want to check if network exists
+                net_dict[name] = {"NetworkId": name}
+            kwargs["networks"] = net_dict
+
         envars = kwargs.get("environment", {})
         if isinstance(envars, str):
             envars = {var.split("=")[0]: var.split("=")[1] for var in envars.split(",")}
@@ -292,8 +301,8 @@ class Container(Provider):
 
         # process eventual provider labels for each setting level
         kwargs["provider_labels"] = kwargs.get("provider_labels", {})
-        kwargs["provider_labels"].update(settings.get("provider_labels", {}))
-        kwargs["provider_labels"].update(settings.CONTAINER.get("provider_labels", {}))
+        kwargs["provider_labels"].update(self._settings.get("provider_labels", {}))
+        kwargs["provider_labels"].update(self._settings.Container.get("provider_labels", {}))
         # prefix eventual label keys with 'broker.' to conform to the docker guidelines
         # https://docs.docker.com/config/labels-custom-metadata/#key-format-recommendations
         kwargs["provider_labels"] = {

@@ -53,7 +53,13 @@ class Broker:
     ProviderError = exceptions.ProviderError
     UserError = exceptions.UserError
 
-    def __init__(self, **kwargs):
+    def __init__(self, broker_settings=None, **kwargs):
+        if broker_settings:
+            self._settings = broker_settings
+            logger.debug(f"Using local settings object: {self._settings.to_dict()}")
+        else:
+            self._settings = settings.dynaconf_clone()
+            logger.debug("Using global settings.")
         kwargs = helpers.resolve_file_args(kwargs)
         logger.debug(f"Broker instantiated with {kwargs=}")
         self._hosts = kwargs.pop("hosts", [])
@@ -61,7 +67,7 @@ class Broker:
         # if a nick was specified, pull in the resolved arguments
         if "nick" in kwargs:
             nick = kwargs.pop("nick")
-            kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick))
+            kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick, self._settings))
             logger.debug(f"kwargs after nick resolution {kwargs=}")
         # Allow users to more simply pass a host class instead of a dict
         if "host_class" in kwargs:
@@ -77,7 +83,7 @@ class Broker:
         """Perform a general action against a provider's method."""
         count = self._kwargs.get("_count", 1)
         logger.debug(f"Resolving action {method} on provider {provider}.")
-        provider_inst = provider(**self._kwargs)
+        provider_inst = provider(broker_settings=self._settings, **self._kwargs)
         helpers.emit(
             {
                 "provider": provider_inst.__class__.__name__,
@@ -88,7 +94,9 @@ class Broker:
         method_obj = getattr(provider_inst, method)
         logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
         # Overkill for a single action, cleaner than splitting the logic
-        max_workers = min(count, int(settings.thread_limit)) if settings.thread_limit else None
+        max_workers = (
+            min(count, int(self._settings.thread_limit)) if self._settings.thread_limit else None
+        )
         with ThreadPoolExecutor(max_workers=max_workers) as workers:
             tasks = [workers.submit(method_obj, **self._kwargs) for _ in range(count)]
             result = []
@@ -207,7 +215,11 @@ class Broker:
         if not hosts:
             logger.debug("Checkin called with no hosts, taking no action")
             return
-        max_workers = min(len(hosts), int(settings.thread_limit)) if settings.thread_limit else None
+        max_workers = (
+            min(len(hosts), int(self._settings.thread_limit))
+            if self._settings.thread_limit
+            else None
+        )
         with ThreadPoolExecutor(max_workers=1 if sequential else max_workers) as workers:
             completed_checkins = as_completed(
                 # reversing over a copy of the list to avoid skipping
@@ -262,8 +274,9 @@ class Broker:
                 logger.info(f"Completed extend for {_host.hostname or _host.name}")
 
     @staticmethod
-    def sync_inventory(provider):
+    def sync_inventory(provider, broker_settings=None):
         """Acquire a list of hosts from a provider and update our inventory."""
+        _settings = broker_settings or settings
         additional_arg, instance = None, {}
         if "::" in provider:
             provider, instance = provider.split("::")
@@ -272,7 +285,9 @@ class Broker:
         logger.info(f"Pulling remote inventory from {f'{instance} ' if instance else ''}{provider}")
         if instance:
             instance = {provider: instance}
-        prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)
+        prov_inventory = PROVIDERS[provider](broker_settings=_settings, **instance).get_inventory(
+            additional_arg
+        )
         curr_inventory = [
             hostname if (hostname := host.get("hostname")) else host.get("name")
             for host in helpers.load_inventory(filter=f'@inv._broker_provider == "{provider}"')
@@ -290,7 +305,7 @@ class Broker:
             return
         if provider_instance := host_export_data.get("_broker_provider_instance"):
             host_export_data[provider.__name__] = provider_instance
-        provider_inst = provider(**host_export_data)
+        provider_inst = provider(broker_settings=self._settings, **host_export_data)
         host = provider_inst.construct_host(
             provider_params=None, host_classes=self.host_classes, **host_export_data
         )
@@ -306,7 +321,7 @@ class Broker:
 
     @classmethod
     @contextmanager
-    def multi_manager(cls, **multi_dict):
+    def multi_manager(cls, broker_settings=None, **multi_dict):
         """Allow a user to check out multiple hosts at once.
 
         Given a mapping of names to Broker argument dictionaries:
@@ -331,7 +346,10 @@ class Broker:
         a dictionary by argument name e.g. host_dict["rhel7"] is a ContentHost object
         """
         # create all the broker instances and perform checkouts in parallel
-        broker_instances = {name: cls(**kwargs) for name, kwargs in multi_dict.items()}
+        _settings = broker_settings or settings
+        broker_instances = {
+            name: cls(broker_settings=_settings, **kwargs) for name, kwargs in multi_dict.items()
+        }
         with ThreadPoolExecutor(max_workers=len(broker_instances)) as workers:
             completed_checkouts = as_completed(
                 workers.submit(broker.checkout) for broker in broker_instances.values()

@@ -21,12 +21,15 @@ class ContainerApiStub(MockStub):
      - self.runtime.get_logs(cont_inst)
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, config=None, **kwargs):  # Added config parameter
+        self.config = config or settings  # Store config, fallback to global settings
         in_dict = {
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
             "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
             "name": "f37d3058317f",  # self.runtime.get_attrs(cont_inst)["name"]
-            "ports": MockStub({'22/tcp': [{'HostIp': '', 'HostPort': '1337'}]}),  # self.runtime.get_attrs(cont_inst)["ports"]
+            "ports": MockStub(
+                {"22/tcp": [{"HostIp": "", "HostPort": "1337"}]}
+            ),  # self.runtime.get_attrs(cont_inst)["ports"]
         }
         if "job_id" in kwargs:
             # we need to load in an image object
@@ -39,7 +42,10 @@ class ContainerApiStub(MockStub):
 
     @property
     def networks(self):
-        return [MockStub(obj) for obj in json.loads(Path("tests/data/container/fake_networks.json").read_text())]
+        return [
+            MockStub(obj)
+            for obj in json.loads(Path("tests/data/container/fake_networks.json").read_text())
+        ]
 
     def get_network_by_attrs(self, attr_dict):
         """Return the first matching network that matches all attr_dict keys and values."""
@@ -57,13 +63,12 @@ class ContainerApiStub(MockStub):
         raise Broker.ProviderError(f"Unable to find image: {tag_name}")
 
     def create_container(self, container_host, **kwargs):
-        if net_name := settings.container.network:
+        # Use self.config instead of global settings for network
+        if net_name := self.config.container.get("network"):  # Use .get() for safety
             net_dict = {}
             for name in net_name.split(","):
                 if not self.get_network_by_attrs({"name": name}):
-                    raise Exception(
-                        f"Network '{name}' not found on container host."
-                    )
+                    raise Exception(f"Network '{name}' not found on container host.")
                 net_dict[name] = {"NetworkId": name}
             kwargs["networks"] = net_dict
         with open("tests/data/container/fake_containers.json") as container_file:
@@ -77,17 +82,31 @@ class ContainerApiStub(MockStub):
 
 
 @pytest.fixture
-def api_stub():
-    return ContainerApiStub()
+def config_stub():
+    container_settings = MockStub(
+        in_dict={
+            "host_username": "test_user",
+            "host_password": "test_password",
+            "host_port": None,
+            "network": None,
+            "runtime": "podman",
+        }
+    )
+    return MockStub(in_dict={"Container": container_settings})
 
 
 @pytest.fixture
-def container_stub(api_stub):
-    return Container(bind=api_stub)
+def api_stub(config_stub):  # api_stub now depends on config_stub
+    return ContainerApiStub(config=config_stub)
 
 
-def test_empty_init():
-    assert Container()
+@pytest.fixture
+def container_stub(api_stub, config_stub):
+    return Container(bind=api_stub, broker_settings=config_stub)
+
+
+def test_empty_init(config_stub):
+    assert Container(broker_settings=config_stub)
 
 
 def test_host_creation(container_stub):
@@ -98,16 +117,25 @@ def test_host_creation(container_stub):
     assert host.hostname == "f37d3058317f"
 
 
-def test_single_network(container_stub):
-    settings.container.network = "podman2"
-    cont = container_stub.run_container(container_host="ch-d:ubi8")
-    assert cont.kwargs["networks"] == {'podman2': {'NetworkId': 'podman2'}}
+def test_single_network(api_stub, config_stub):  # Changed to use api_stub directly
+    config_stub.Container.network = "podman2"  # Modify the stub
+    container_instance = Container(
+        bind=api_stub, broker_settings=config_stub
+    )  # Create new instance with modified config
+    cont = container_instance.run_container(container_host="ch-d:ubi8")
+    assert cont.kwargs["networks"] == {"podman2": {"NetworkId": "podman2"}}
 
 
-def test_multiple_networks(container_stub):
-    settings.container.network = "podman1,podman2"
-    cont = container_stub.run_container(container_host="ch-d:ubi8")
-    assert cont.kwargs["networks"] == {'podman1': {'NetworkId': 'podman1'}, 'podman2': {'NetworkId': 'podman2'}}
+def test_multiple_networks(api_stub, config_stub):  # Changed to use api_stub directly
+    config_stub.Container.network = "podman1,podman2"  # Modify the stub
+    container_instance = Container(
+        bind=api_stub, broker_settings=config_stub
+    )  # Create new instance with modified config
+    cont = container_instance.run_container(container_host="ch-d:ubi8")
+    assert cont.kwargs["networks"] == {
+        "podman1": {"NetworkId": "podman1"},
+        "podman2": {"NetworkId": "podman2"},
+    }
 
 
 def test_image_lookup_failure(container_stub):

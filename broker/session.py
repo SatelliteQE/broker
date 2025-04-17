@@ -10,6 +10,7 @@ Note: You typically want to use a Host object instance to create sessions,
 """
 
 from contextlib import contextmanager
+from importlib.metadata import entry_points
 from pathlib import Path
 import tempfile
 
@@ -19,53 +20,101 @@ from broker import helpers
 from broker.exceptions import NotImplementedError
 from broker.settings import settings
 
-SSH_BACKENDS = ("ssh2-python", "ansible-pylibssh", "hussh", "paramiko")
-SSH_BACKEND = settings.SSH.BACKEND
-
-logger.debug(f"{SSH_BACKEND=}")
-
-
-SSH_NOT_SUPPORTED_MSG = (
-    f"SSH backend {SSH_BACKEND!r} not supported.\nSupported ssh backends:\n{SSH_BACKENDS}"
-)
 SSH_NOT_INSTALLED_MSG = (
-    f"{SSH_BACKEND} is not installed.\n"
+    "{backend} is not installed.\n"
     "ssh actions will not work.\n"
-    f"To use ssh, run 'pip install broker[{SSH_BACKEND}]'."
+    "To use ssh, run 'pip install broker[{backend}]'."
 )
-SSH_IMPORT_MSG = ""
 
-try:
-    if SSH_BACKEND == "ansible-pylibssh":
-        from broker.binds.pylibssh import InteractiveShell, Session
-    elif SSH_BACKEND == "hussh":
-        from broker.binds.hussh import Session
-    elif SSH_BACKEND == "ssh2-python":
-        from broker.binds.ssh2 import InteractiveShell, Session
-    elif SSH_BACKEND == "paramiko":
-        from broker.binds.paramiko import InteractiveShell, Session  # noqa: F401
-    else:
-        SSH_IMPORT_MSG = SSH_NOT_SUPPORTED_MSG
-except ImportError:
-    SSH_IMPORT_MSG = SSH_IMPORT_MSG or SSH_NOT_INSTALLED_MSG
-finally:
-    if SSH_IMPORT_MSG:
-        logger.warning(SSH_IMPORT_MSG)
 
-        class Session:
-            """Default wrapper around ssh backend's auth/connection system."""
+def make_session(broker_settings=None, **kwargs):
+    """Create a Session instance using the configured backend.
 
-            def __init__(self, **kwargs):
-                """Initialize a Session object."""
+    Args:
+        broker_settings: Optional settings object to use instead of global settings
+        **kwargs: Additional arguments to pass to the Session constructor
+
+    Returns:
+        A Session instance from the configured backend
+    """
+    _settings = broker_settings or settings
+    backend = _settings.SSH.BACKEND
+
+    logger.debug(f"Attempting to load SSH backend: {backend}")
+
+    try:
+        # Look up the session class from entry points
+        session_eps = entry_points(group="broker.ssh.session")
+        # Get the specific backend requested or the first one registered
+        session_cls = None
+        for ep in session_eps:
+            if ep.name == backend:
+                session_cls = ep.load()
+                break
+
+        if not session_cls:
+            backends = [ep.name for ep in session_eps]
+            error_msg = f"SSH backend '{backend}' not supported. Supported backends: {backends}"
+            logger.error(error_msg)
+            raise ImportError(error_msg)
+
+        # Create and return the session instance
+        return session_cls(broker_settings=_settings, **kwargs)
+    except ImportError:
+        error_msg = SSH_NOT_INSTALLED_MSG.format(backend=backend)
+        logger.warning(error_msg)
+
+        # Create and return a dummy session that won't work but won't crash
+        class DummySession:
+            def __init__(self, broker_settings=None, **kwargs):
+                self._settings = broker_settings or settings
+
+        return DummySession(broker_settings=_settings, **kwargs)
+
+
+def get_interactive_shell(broker_settings=None):
+    """Get the InteractiveShell class for the configured backend.
+
+    Args:
+        broker_settings: Optional settings object to use instead of global settings
+
+    Returns:
+        The InteractiveShell class from the configured backend or None if not available
+    """
+    _settings = broker_settings or settings
+    backend = _settings.SSH.BACKEND
+
+    try:
+        # Look up the interactive shell class from entry points
+        shell_eps = entry_points(group="broker.ssh.interactive_shell")
+
+        # Get the specific backend requested
+        for ep in shell_eps:
+            if ep.name == backend:
+                return ep.load()
+
+        # If no matching backend was found for interactive shell
+        logger.debug(f"No interactive shell available for backend: {backend}")
+        return None
+    except ImportError:
+        return None
+
+
+# Expose the InteractiveShell for backwards compatibility
+InteractiveShell = get_interactive_shell()
+
+# Expose Session class (for backwards compatibility)
+Session = make_session
 
 
 class ContainerSession:
     """An approximation of ssh-based functionality from the Session class."""
 
-    def __init__(self, cont_inst, runtime=None):
+    def __init__(self, cont_inst, runtime=None, broker_settings=None):
         self._cont_inst = cont_inst
+        self._settings = broker_settings or settings
         if not runtime:
-            runtime = settings.CONTAINER.runtime
+            runtime = self._settings.CONTAINER.runtime
         self.runtime = runtime
 
     def run(self, command, demux=True, **kwargs):

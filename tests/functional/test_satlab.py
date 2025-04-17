@@ -33,7 +33,9 @@ def temp_inventory():
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
+    "args_file",
+    [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")],
+    ids=lambda f: f.name.split(".")[0],
 )
 def test_checkout_scenarios(args_file, temp_inventory):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
@@ -41,7 +43,9 @@ def test_checkout_scenarios(args_file, temp_inventory):
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")], ids=lambda f: f.name.split(".")[0]
+    "args_file",
+    [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("execute_")],
+    ids=lambda f: f.name.split(".")[0],
 )
 def test_execute_scenarios(args_file):
     result = CliRunner().invoke(cli, ["execute", "--args-file", args_file])
@@ -76,15 +80,13 @@ def test_tower_host():
         assert SETTINGS_PATH.name in res.stdout
         with NamedTemporaryFile() as tmp:
             r_host.session.sftp_read(f"{remote_dir}/{SETTINGS_PATH.name}", tmp.file.name)
-            data = r_host.session.sftp_read(
-                f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True
+            data = r_host.session.sftp_read(f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True)
+            assert SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes(), (
+                "Local file is different from the received one"
             )
-            assert (
-                SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes()
-            ), "Local file is different from the received one"
-            assert (
-                SETTINGS_PATH.read_bytes() == data
-            ), "Local file is different from the received one (return_data=True)"
+            assert SETTINGS_PATH.read_bytes() == data, (
+                "Local file is different from the received one (return_data=True)"
+            )
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test the tail_file context manager
         tailed_file = f"{remote_dir}/tail_me.txt"
@@ -109,12 +111,12 @@ def test_tower_host_mp():
                 data = r_host.session.sftp_read(
                     f"{remote_dir}/{SETTINGS_PATH.name}", return_data=True
                 )
-                assert (
-                    SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes()
-                ), "Local file is different from the received one"
-                assert (
-                    SETTINGS_PATH.read_bytes() == data
-                ), "Local file is different from the received one (return_data=True)"
+                assert SETTINGS_PATH.read_bytes() == Path(tmp.file.name).read_bytes(), (
+                    "Local file is different from the received one"
+                )
+                assert SETTINGS_PATH.read_bytes() == data, (
+                    "Local file is different from the received one (return_data=True)"
+                )
                 assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test remote copy from one host to another
         r_hosts[0].session.remote_copy(
@@ -127,7 +129,7 @@ def test_tower_host_mp():
 
 
 def test_tower_provider_labels():
-    """Assert labels being created on AAP and OSP metadata 
+    """Assert labels being created on AAP and OSP metadata
     being attached accordingly
     """
     with Broker(workflow="deploy-rhel", provider_labels={"l1": "v1", "l2": ""}) as r_host:
