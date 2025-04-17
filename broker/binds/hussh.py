@@ -6,6 +6,7 @@ Classes:
 Note: You typically want to use a Host object instance to create sessions,
       not these classes directly.
 """
+
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -86,7 +87,7 @@ class Session:
 
         # Copy from this host to destination host
         self.session.remote_copy(
-            source_path=source, dest_conn=dest_host.session.session, dest_path=dest_path
+            source_path=str(source), dest_conn=dest_host.session.session, dest_path=str(dest_path)
         )
 
     def run(self, command, timeout=0):
@@ -101,36 +102,36 @@ class Session:
 
     def scp_read(self, source, destination=None, return_data=False):
         """SCP read a remote file into a local destination or return a bytes object if return_data is True."""
-        destination = self._set_destination(source, destination)
+        destination = self._set_destination(str(source), str(destination))
         if return_data:
-            return self.session.scp_read(remote_path=source)
-        self.session.scp_read(remote_path=source, local_path=destination)
+            return self.session.scp_read(remote_path=str(source))
+        self.session.scp_read(remote_path=str(source), local_path=str(destination))
 
     def scp_write(self, source, destination=None, ensure_dir=True):
         """SCP write a local file to a remote destination."""
-        destination = self._set_destination(source, destination)
+        destination = self._set_destination(str(source), str(destination))
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
-        self.session.scp_write(source, destination)
+        self.session.scp_write(str(source), str(destination))
 
     def sftp_read(self, source, destination=None, return_data=False):
         """Read a remote file into a local destination or return a bytes object if return_data is True."""
         if return_data:
-            return self.session.sftp_read(remote_path=source).encode("utf-8")
+            return self.session.sftp_read(remote_path=str(source)).encode("utf-8")
 
-        destination = self._set_destination(source, destination)
+        destination = self._set_destination(str(source), str(destination))
 
         # Create the destination path if it doesn't exist
         Path(destination).parent.mkdir(parents=True, exist_ok=True)
 
-        self.session.sftp_read(remote_path=source, local_path=destination)
+        self.session.sftp_read(remote_path=str(source), local_path=str(destination))
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
         """Sftp write a local file to a remote destination."""
-        destination = self._set_destination(source, destination)
+        destination = self._set_destination(str(source), str(destination))
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
-        self.session.sftp_write(local_path=source, remote_path=destination)
+        self.session.sftp_write(local_path=str(source), remote_path=str(destination))
 
     def shell(self, pty=False):
         """Create and return an interactive shell instance."""
@@ -139,7 +140,7 @@ class Session:
     @contextmanager
     def tail_file(self, filename):
         """Tail a file on the remote host."""
-        with self.session.tail(filename) as _tailer:
+        with self.session.tail(str(filename)) as _tailer:
             yield (tailer := FileTailer(tailer=_tailer))
         tailer.contents = _tailer.contents
 
