@@ -16,12 +16,17 @@ class ForemanBind:
         "Content-Type": "application/json",
     }
 
-    def __init__(self, **kwargs):
-        self.foreman_username = kwargs.get("foreman_username", settings.foreman.foreman_username)
-        self.foreman_password = kwargs.get("foreman_password", settings.foreman.foreman_password)
-        self.url = kwargs.get("url", settings.foreman.foreman_url)
-        self.prefix = kwargs.get("prefix", settings.foreman.name_prefix)
-        self.verify = kwargs.get("verify", settings.foreman.verify)
+    def __init__(self, broker_settings=None, **kwargs):
+        self._settings = broker_settings or settings
+        self.foreman_username = kwargs.get(
+            "foreman_username", self._settings.foreman.foreman_username
+        )
+        self.foreman_password = kwargs.get(
+            "foreman_password", self._settings.foreman.foreman_password
+        )
+        self.url = kwargs.get("url", self._settings.foreman.foreman_url)
+        self.prefix = kwargs.get("prefix", self._settings.foreman.name_prefix)
+        self.verify = kwargs.get("verify", self._settings.foreman.verify)
 
         self.session = requests.session()
 

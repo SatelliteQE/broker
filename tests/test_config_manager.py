@@ -1,4 +1,5 @@
 """Test file for broker.config_manager module."""
+
 from ruamel.yaml import YAML
 from broker.config_manager import ConfigManager, GH_CFG
 from broker.settings import settings_path
@@ -24,6 +25,7 @@ def test_import_config():
     converted = yaml.load(result)
     assert isinstance(converted, dict)
 
+
 def test_get_e2e():
     """We should be able to get config chunks."""
     cfg_mgr = ConfigManager(settings_path)
@@ -31,26 +33,26 @@ def test_get_e2e():
     assert isinstance(whole_cfg, dict)
     assert whole_cfg == TEST_CFG_DATA
     # get a speficic chunk
-    logging_cfg = cfg_mgr.get('logging')
-    assert logging_cfg == TEST_CFG_DATA['logging']
+    logging_cfg = cfg_mgr.get("logging")
+    assert logging_cfg == TEST_CFG_DATA["logging"]
     # get a nested chunk
-    test_nick = cfg_mgr.get('nicks.test_nick')
-    assert test_nick == TEST_CFG_DATA['nicks']['test_nick']
+    test_nick = cfg_mgr.get("nicks.test_nick")
+    assert test_nick == TEST_CFG_DATA["nicks"]["test_nick"]
 
 
 def test_update_e2e():
     """We should be able to update config chunks."""
     cfg_mgr = ConfigManager(settings_path)
     # change logging level
-    cfg_mgr.update('logging.console_level', 'debug')
-    assert cfg_mgr.get('logging.console_level') == 'debug'
+    cfg_mgr.update("logging.console_level", "debug")
+    assert cfg_mgr.get("logging.console_level") == "debug"
     # ensure a backup was created
-    assert settings_path.with_suffix('.bak').exists()
+    assert settings_path.with_suffix(".bak").exists()
     # restore original config and make sure the value is reverted
     cfg_mgr.restore()
     # load a new instance of ConfigManager to ensure the change was reverted
     cfg_mgr = ConfigManager(settings_path)
-    assert cfg_mgr.get('logging.console_level') == TEST_CFG_DATA['logging']['console_level']
+    assert cfg_mgr.get("logging.console_level") == TEST_CFG_DATA["logging"]["console_level"]
 
 
 def test_nicks():
@@ -59,4 +61,4 @@ def test_nicks():
     nick_list = cfg_mgr.nicks()
     assert "test_nick" in nick_list
     test_nick = cfg_mgr.nicks("test_nick")
-    assert test_nick == TEST_CFG_DATA['nicks']['test_nick']
+    assert test_nick == TEST_CFG_DATA["nicks"]["test_nick"]

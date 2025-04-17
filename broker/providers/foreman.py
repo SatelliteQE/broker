@@ -10,7 +10,6 @@ from logzero import logger
 from broker.binds import foreman
 from broker.helpers import Result
 from broker.providers import Provider
-from broker.settings import settings
 
 
 class Foreman(Provider):
@@ -48,18 +47,25 @@ class Foreman(Provider):
             self._runtime_cls = foreman.ForemanBind
 
         self.runtime = self._runtime_cls(
-            foreman_username=settings.foreman.foreman_username,
-            foreman_password=settings.foreman.foreman_password,
-            url=settings.foreman.foreman_url,
-            prefix=settings.foreman.name_prefix,
-            verify=settings.foreman.verify,
+            broker_settings=self._settings,
+            foreman_username=kwargs.get(
+                "foreman_username", self._settings.foreman.foreman_username
+            ),
+            foreman_password=kwargs.get(
+                "foreman_password", self._settings.foreman.foreman_password
+            ),
+            url=kwargs.get("url", self._settings.foreman.foreman_url),
+            prefix=kwargs.get("prefix", self._settings.foreman.name_prefix),
+            verify=kwargs.get("verify", self._settings.foreman.verify),
         )
-        self.prefix = settings.foreman.name_prefix
+        self.prefix = self._settings.foreman.name_prefix
 
         self.organization_id = self.runtime.obtain_id_from_name(
-            "organizations", settings.foreman.organization
+            "organizations", self._settings.foreman.organization
         )
-        self.location_id = self.runtime.obtain_id_from_name("locations", settings.foreman.location)
+        self.location_id = self.runtime.obtain_id_from_name(
+            "locations", self._settings.foreman.location
+        )
 
     def release(self, host):
         """Release a host.
@@ -230,6 +236,7 @@ class Foreman(Provider):
                 **kwargs,
                 "hostname": name,
                 "name": name,
+                "broker_settings": self._settings,
             }
         )
         self._set_attributes(host_inst, broker_args=kwargs)

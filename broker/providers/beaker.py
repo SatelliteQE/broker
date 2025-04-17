@@ -11,7 +11,6 @@ from broker.binds.beaker import BeakerBind
 from broker.exceptions import BrokerError, ProviderError
 from broker.hosts import Host
 from broker.providers import Provider
-from broker.settings import settings
 
 
 @Provider.auto_hide
@@ -51,7 +50,7 @@ class Beaker(Provider):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.hub_url = settings.beaker.hub_url
+        self.hub_url = self._settings.beaker.hub_url
         self.runtime = kwargs.pop("bind", BeakerBind)(self.hub_url, **kwargs)
 
     def _host_release(self):
@@ -111,7 +110,9 @@ class Beaker(Provider):
             self._set_attributes(host_inst, broker_args=kwargs)
         else:
             host_info = self._compile_host_info(provider_params["hostname"], broker_info=False)
-            host_inst = host_classes[kwargs.get("type", "host")](**provider_params)
+            host_inst = host_classes[kwargs.get("type", "host")](
+                broker_settings=self._settings, **provider_params
+            )
             self._set_attributes(host_inst, broker_args=kwargs, misc_attrs=host_info)
         return host_inst
 
@@ -119,14 +120,14 @@ class Beaker(Provider):
     def submit_job(self, max_wait=None, **kwargs):
         """Submit a job to Beaker and wait for it to complete."""
         job = kwargs.get("job_xml") or kwargs.get("job_id")
-        max_wait = max_wait or settings.beaker.get("max_job_wait")
+        max_wait = max_wait or self._settings.beaker.get("max_job_wait")
         result = self.runtime.execute_job(job, max_wait)
         logger.debug(f"Job completed with results: {result}")
         return result
 
     def provider_help(self, jobs=False, job=None, **kwargs):
         """Print useful information from the Beaker provider."""
-        results_limit = kwargs.get("results_limit", settings.container.results_limit)
+        results_limit = kwargs.get("results_limit", self._settings.container.results_limit)
         if job:
             if not job.startswith("J:"):
                 job = f"J:{job}"
