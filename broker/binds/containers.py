@@ -1,7 +1,6 @@
 """A collection of classes to ease interaction with Docker and Podman libraries."""
 
 from broker.exceptions import UserError
-from broker.settings import settings
 
 HEADER_SIZE = 8
 STDOUT = 1
@@ -57,12 +56,15 @@ class ContainerBind:
 
     _sensitive_attrs = ["password", "host_password"]
 
-    def __init__(self, host=None, username=None, password=None, port=22, timeout=None):
+    def __init__(
+        self, host=None, username=None, password=None, port=22, timeout=None, broker_settings=None
+    ):
         self.host = host
         self.username = username
         self.password = password
         self.port = port
         self.timeout = timeout
+        self._settings = broker_settings
         self._client = None
         self._ClientClass = None
 
@@ -100,7 +102,7 @@ class ContainerBind:
 
     def create_container(self, image, command=None, **kwargs):
         """Create and return running container instance."""
-        if net_name := settings.container.network:
+        if net_name := self._settings.container.network:
             net_dict = {}
             for name in net_name.split(","):
                 if not self.get_network_by_attrs({"name": name}):
