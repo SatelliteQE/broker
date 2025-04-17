@@ -16,6 +16,7 @@ Note:
     This module (or parent directory) should be used as the main entry point for the Broker API.
 
 """
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 
@@ -102,8 +103,9 @@ class Broker:
                 provider_inst.construct_host(
                     provider_params=res, host_classes=self.host_classes, **self._kwargs
                 )
-                for res in result
                 if not isinstance(res, exceptions.ProviderError)
+                else res
+                for res in result
             ]
         else:
             return result if len(result) > 1 else result[0]
@@ -137,7 +139,9 @@ class Broker:
         helpers.emit(hosts=[host.to_dict() for host in hosts])
         self._hosts.extend(hosts)
         helpers.update_inventory([host.to_dict() for host in hosts])
-        if err:
+        if isinstance(err, exceptions.BrokerError):
+            raise err  # Let our own error raise cleanly
+        elif err:
             raise self.BrokerError(f"Error during checkout from {self}") from err
         return hosts if len(hosts) != 1 else hosts[0]
 
@@ -187,8 +191,7 @@ class Broker:
         # default to hosts listed on the instance
         hosts = host or self._hosts
         logger.debug(
-            f"Checkin called with: {hosts}, "
-            f'running {"sequential" if sequential else "concurrent"}'
+            f"Checkin called with: {hosts}, running {'sequential' if sequential else 'concurrent'}"
         )
         # normalize the type since the function accepts multiple types
         if isinstance(hosts, dict):
@@ -239,8 +242,7 @@ class Broker:
         # default to hosts listed on the instance
         hosts = host or self._hosts
         logger.debug(
-            f"Extend called with: {hosts}, "
-            f'running {"sequential" if sequential else "concurrent"}'
+            f"Extend called with: {hosts}, running {'sequential' if sequential else 'concurrent'}"
         )
         # normalize the type since the function accepts multiple types
         if isinstance(hosts, dict):
@@ -267,9 +269,7 @@ class Broker:
             provider, instance = provider.split("::")
         if ":" in provider:
             provider, additional_arg = provider.split(":")
-        logger.info(
-            f"Pulling remote inventory from {f'{instance } ' if instance else ''}{provider}"
-        )
+        logger.info(f"Pulling remote inventory from {f'{instance} ' if instance else ''}{provider}")
         if instance:
             instance = {provider: instance}
         prov_inventory = PROVIDERS[provider](**instance).get_inventory(additional_arg)

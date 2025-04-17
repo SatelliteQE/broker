@@ -28,8 +28,8 @@ click.rich_click.COMMAND_GROUPS = {
 }
 
 
-def loggedcli(group=None, *cli_args, **cli_kwargs):
-    """Update the group command wrapper function in order to add logging."""
+def guarded_command(group=None, *cli_args, **cli_kwargs):
+    """Wrap commands with logging and exception handling."""
     if not group:
         group = cli  # default to the main cli group
 
@@ -37,13 +37,23 @@ def loggedcli(group=None, *cli_args, **cli_kwargs):
         @group.command(*cli_args, **cli_kwargs)
         @wraps(func)
         def wrapper(*args, **kwargs):
-            logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=}")
-            retval = func(*args, **kwargs)
-            logger.log(
-                LOG_LEVEL.TRACE.value,
-                f"Finished {func=}(*{args=} **{kwargs=}) {retval=}",
-            )
-            return retval
+            try:
+                logger.log(LOG_LEVEL.TRACE.value, f"Calling {func=}(*{args=} **{kwargs=})")
+                retval = func(*args, **kwargs)
+                logger.log(
+                    LOG_LEVEL.TRACE.value,
+                    f"Finished {func=}(*{args=} **{kwargs=}) {retval=}",
+                )
+                helpers.emit(return_code=0)
+                return retval
+            except Exception as err:  # noqa: BLE001 -- we want to catch all exceptions
+                if not isinstance(err, exceptions.BrokerError):
+                    err = exceptions.BrokerError(err)
+                    logger.error(f"Command failed: {err.message}")
+                else:  # BrokerError children already log their messages
+                    logger.error(f"Command failed due to: {type(err).__name__}")
+                helpers.emit(return_code=err.error_code, error_message=str(err.message))
+                sys.exit(err.error_code)
 
         return wrapper
 
@@ -56,22 +66,6 @@ def parse_labels(provider_labels):
         label[0]: "=".join(label[1:])
         for label in [kv_pair.split("=") for kv_pair in provider_labels.split(",")]
     }
-
-
-class ExceptionHandler(click.RichGroup):
-    """Wraps click group to catch and handle raised exceptions."""
-
-    def __call__(self, *args, **kwargs):
-        """Override the __call__ method to catch and handle exceptions."""
-        try:
-            res = self.main(*args, **kwargs)
-            helpers.emit(return_code=0)
-            return res
-        except Exception as err:  # noqa: BLE001
-            if not isinstance(err, exceptions.BrokerError):
-                err = exceptions.BrokerError(err)
-            helpers.emit(return_code=err.error_code, error_message=str(err.message))
-            sys.exit(err.error_code)
 
 
 def provider_options(command):
@@ -101,7 +95,7 @@ def populate_providers(click_group):
     """
     for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
 
-        @loggedcli(
+        @guarded_command(
             group=click_group,
             name=prov,
             hidden=prov_class.hidden,
@@ -153,7 +147,7 @@ def populate_providers(click_group):
         )(provider_cmd)
 
 
-@click.group(cls=ExceptionHandler, invoke_without_command=True)
+@click.group(invoke_without_command=True)
 @click.option(
     "--log-level",
     type=click.Choice(["info", "warning", "error", "debug", "trace", "silent"]),
@@ -211,7 +205,7 @@ def cli(version):
         CONSOLE.print(table)
 
 
-@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@guarded_command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run checkout in the background")
 @click.option("-n", "--nick", type=str, help="Use a nickname defined in your settings")
 @click.option("-c", "--count", type=int, help="Number of times broker repeats the checkout")
@@ -257,7 +251,7 @@ def checkout(ctx, background, nick, count, args_file, provider_labels, **kwargs)
     Broker(**broker_args).checkout()
 
 
-@cli.group(cls=ExceptionHandler)
+@cli.group()
 def providers():
     """Get information about a provider and its actions."""
     pass
@@ -266,7 +260,7 @@ def providers():
 populate_providers(providers)
 
 
-@loggedcli()
+@guarded_command()
 @click.argument("hosts", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run checkin in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all hosts")
@@ -303,7 +297,7 @@ def checkin(hosts, background, all_, sequential, filter):
         Broker(hosts=to_remove).checkin(sequential=sequential)
 
 
-@loggedcli()
+@guarded_command()
 @click.option("--details", is_flag=True, help="Display all host details")
 @click.option("--list", "_list", is_flag=True, help="Display only hostnames and local ids")
 @click.option(
@@ -356,7 +350,7 @@ def inventory(details, _list, sync, filter):
     CONSOLE.print(table)
 
 
-@loggedcli()
+@guarded_command()
 @click.argument("hosts", type=str, nargs=-1)
 @click.option("-b", "--background", is_flag=True, help="Run extend in the background")
 @click.option("--all", "all_", is_flag=True, help="Select all hosts")
@@ -387,7 +381,7 @@ def extend(hosts, background, all_, sequential, filter, **kwargs):
     Broker(hosts=to_extend, **broker_args).extend(sequential=sequential)
 
 
-@loggedcli(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
+@guarded_command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 @click.option("-b", "--background", is_flag=True, help="Run execute in the background")
 @click.option("--nick", type=str, help="Use a nickname defined in your settings")
 @click.option("--output-format", "-o", type=click.Choice(["log", "raw", "yaml"]), default="log")
@@ -442,7 +436,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, provider
         click.echo(helpers.yaml_format(result))
 
 
-@cli.group(cls=ExceptionHandler)
+@cli.group()
 def config():
     """View and manage Broker's configuration.
 
@@ -456,7 +450,7 @@ def config():
     """
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.argument("chunk", type=str, required=False)
 @click.option("--no-syntax", is_flag=True, help="Disable syntax highlighting")
 def view(chunk, no_syntax):
@@ -468,7 +462,7 @@ def view(chunk, no_syntax):
         CONSOLE.print(Syntax(result, "yaml", background_color="default"))
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.argument("chunk", type=str, required=False)
 def edit(chunk):
     """Directly edit the broker configuration file.
@@ -479,7 +473,7 @@ def edit(chunk):
     ConfigManager(settings.settings_path).edit(chunk)
 
 
-@loggedcli(group=config, name="set")
+@guarded_command(group=config, name="set")
 @click.argument("chunk", type=str, required=True)
 @click.argument("new-value", type=str, required=True)
 def _set(chunk, new_value):
@@ -492,13 +486,13 @@ def _set(chunk, new_value):
     ConfigManager(settings.settings_path).update(chunk, new_value)
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 def restore():
     """Restore the broker configuration file to the last backup."""
     ConfigManager(settings.settings_path).restore()
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.argument("chunk", type=str, required=False)
 @click.option("--from", "_from", type=str, help="A file path or URL to initialize the config from.")
 def init(chunk=None, _from=None):
@@ -511,14 +505,14 @@ def init(chunk=None, _from=None):
     ConfigManager(settings.settings_path).init_config_file(chunk=chunk, _from=_from)
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 def nicks():
     """Get a list of nicks."""
     result = ConfigManager(settings.settings_path).nicks()
     CONSOLE.print("\n".join(result))
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.argument("nick", type=str, required=True)
 @click.option("--no-syntax", is_flag=True, help="Disable syntax highlighting")
 def nick(nick, no_syntax):
@@ -530,14 +524,14 @@ def nick(nick, no_syntax):
         CONSOLE.print(Syntax(result, "yaml", background_color="default"))
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.option("-f", "--force-version", type=str, help="Force the migration to a specific version")
 def migrate(force_version=None):
     """Migrate the broker configuration file to the latest version."""
     ConfigManager(settings.settings_path).migrate(force_version=force_version)
 
 
-@loggedcli(group=config)
+@guarded_command(group=config)
 @click.argument("chunk", type=str, required=False, default="base")
 def validate(chunk):
     """Validate top-level chunks of the broker configuration file.
