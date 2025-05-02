@@ -423,9 +423,9 @@ class Emitter:
             if not isinstance(arg, dict):
                 raise exceptions.BrokerError(f"Received an invalid data emission {arg}")
             kwargs.update(arg)
-        for key in kwargs:
-            if getattr(kwargs[key], "json", None):
-                kwargs[key] = kwargs[key].json
+        for key, value in kwargs.items():
+            if getattr(value, "json", None):
+                kwargs[key] = value.json
         with self.EMIT_LOCK:
             curr_data = json.loads(self.file.read_text() or "{}")
             curr_data.update(kwargs)
@@ -564,7 +564,7 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
     cmd_kwargs = cmd_kwargs if cmd_kwargs else {}
     try:
         return cmd(*cmd_args, **cmd_kwargs)
-    except Exception as err:  # noqa: BLE001 - Could be anything
+    except Exception as err:
         new_wait = _cur_timeout * 2
         if new_wait > max_timeout:
             raise err

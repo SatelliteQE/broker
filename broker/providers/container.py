@@ -119,7 +119,7 @@ class Container(Provider):
                 return
         try:
             self.runtime.pull_image(name)
-        except Exception as err:  # noqa: BLE001 - This could be a few things
+        except Exception as err:
             raise exceptions.ProviderError(
                 "Container", f"Unable to find image: {name}\n{err}"
             ) from err
@@ -319,7 +319,7 @@ class Container(Provider):
     def run_wait_container(self, image_name, **kwargs):
         """Run a container and wait for it to exit."""
         cont_inst = self.run_container(image_name, **kwargs)
-        cont_inst.wait(condition="excited")
+        cont_inst.wait(condition="exited")
         return self.runtime.get_logs(cont_inst)
 
     def _gen_name(self):
