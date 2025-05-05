@@ -1,4 +1,5 @@
 """A wrapper around the Beaker CLI."""
+
 import json
 from pathlib import Path
 import subprocess
