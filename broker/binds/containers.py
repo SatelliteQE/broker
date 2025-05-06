@@ -173,6 +173,9 @@ class PodmanBind(ContainerBind):
     def _sanitize_create_args(self, kwargs):
         from podman.domain.containers_create import CreateMixin
 
+        # Temporarily remove mounts so CreateMixin won't strip them out
+        mounts = kwargs.pop("mounts", None)
+
         try:
             CreateMixin._render_payload(kwargs)
         except TypeError as err:
@@ -183,7 +186,12 @@ class PodmanBind(ContainerBind):
                 .split(" ,")
             )
             kwargs = {k: v for k, v in kwargs.items() if k not in sanitized}
-            kwargs = self._sanitize_create_args(kwargs)
+            return self._sanitize_create_args(kwargs)
+        finally:
+            # Restore mounts so Podman sees bind-mount list intact
+            if mounts is not None:
+                kwargs["mounts"] = mounts
+
         return kwargs
 
 
@@ -206,6 +214,6 @@ class DockerBind(ContainerBind):
     def _sanitize_create_args(self, kwargs):
         from docker.models.containers import RUN_CREATE_KWARGS, RUN_HOST_CONFIG_KWARGS
 
-        special_kwargs = ["ports", "volumes", "network", "networking_config"]
+        special_kwargs = ["ports", "volumes", "network", "networking_config", "mounts"]
         accepted_kwargs = RUN_HOST_CONFIG_KWARGS + RUN_CREATE_KWARGS + special_kwargs
         return {k: v for k, v in kwargs.items() if k in accepted_kwargs}
