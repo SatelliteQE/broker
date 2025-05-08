@@ -1,5 +1,5 @@
 # Broker settings
-_version: 0.6.0
+_version: 0.6.9
 # Disable rich colors
 less_colors: False
 # different log levels for file and stdout
@@ -33,6 +33,7 @@ ssh:
 # Provider settings
 AnsibleTower:
     base_url: "https://<ansible tower host>/"
+    aap_version: null
     # Username is required for both token and password-based authentication
     username: "<username>"
     # token is the preferred authentication method
