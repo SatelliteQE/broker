@@ -74,6 +74,7 @@ def detect_and_reconfigure_for_aap25(base_url):
 
         # Re-import awxkit - must use globals() to update module reference in this scope
         import awxkit as awxkit_new
+
         globals()["awxkit"] = awxkit_new
 
         # Set flag to avoid redundant reconfiguration
