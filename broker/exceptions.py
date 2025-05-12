@@ -1,4 +1,5 @@
 """A collection of Broker-specific exceptions."""
+
 import logging
 
 from logzero import logger

@@ -7,6 +7,7 @@ Classes:
 Note: You typically want to use a Host object instance to create sessions,
       not these classes directly.
 """
+
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -81,7 +82,7 @@ class Session:
                 self.session.agent_auth(user)
             else:
                 raise exceptions.AuthenticationError("No password or key file provided.")
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             raise exceptions.AuthenticationError(
                 f"{auth_type}-based authentication failed."
             ) from err
@@ -120,9 +121,10 @@ class Session:
         sftp_up = dest_host.session.session.sftp_init()
         if ensure_dir:
             dest_host.session.run(f"mkdir -p {Path(dest_path).absolute().parent}")
-        with sftp_down.open(
-            source, _sftp.LIBSSH2_FXF_READ, _sftp.LIBSSH2_SFTP_S_IRUSR
-        ) as download, sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload:
+        with (
+            sftp_down.open(source, _sftp.LIBSSH2_FXF_READ, _sftp.LIBSSH2_SFTP_S_IRUSR) as download,
+            sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload,
+        ):
             for _size, data in download:
                 upload.write(data)
 
