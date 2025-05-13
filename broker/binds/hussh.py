@@ -64,7 +64,7 @@ class Session:
 
             self.session = Connection(host, **conn_kwargs)
 
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             raise exceptions.AuthenticationError(
                 f"{auth_type}-based authentication failed."
             ) from err

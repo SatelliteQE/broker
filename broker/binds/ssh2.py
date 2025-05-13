@@ -7,6 +7,7 @@ Classes:
 Note: You typically want to use a Host object instance to create sessions,
       not these classes directly.
 """
+
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -81,7 +82,7 @@ class Session:
                 self.session.agent_auth(user)
             else:
                 raise exceptions.AuthenticationError("No password or key file provided.")
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             raise exceptions.AuthenticationError(
                 f"{auth_type}-based authentication failed."
             ) from err
@@ -120,9 +121,10 @@ class Session:
         sftp_up = dest_host.session.session.sftp_init()
         if ensure_dir:
             dest_host.session.run(f"mkdir -p {Path(dest_path).absolute().parent}")
-        with sftp_down.open(
-            source, _sftp.LIBSSH2_FXF_READ, _sftp.LIBSSH2_SFTP_S_IRUSR
-        ) as download, sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload:
+        with (
+            sftp_down.open(source, _sftp.LIBSSH2_FXF_READ, _sftp.LIBSSH2_SFTP_S_IRUSR) as download,
+            sftp_up.open(dest_path, FILE_FLAGS, SFTP_MODE) as upload,
+        ):
             for _size, data in download:
                 upload.write(data)
 
@@ -150,7 +152,8 @@ class Session:
     def scp_write(self, source, destination=None, ensure_dir=True):
         """SCP write a local file to a remote destination."""
         destination = self._set_destination(source, destination)
-        fileinfo = (source := Path(source).stat())
+        source_path = Path(source)  # Store the Path object
+        fileinfo = source_path.stat()
 
         chan = self.session.scp_send64(
             destination,
@@ -161,7 +164,7 @@ class Session:
         )
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
-        with source.open("rb") as local:
+        with source_path.open("rb") as local:
             for data in local:
                 chan.write(data)
 

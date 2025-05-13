@@ -21,7 +21,7 @@ thread_limit: null
 # These can be left alone if you're not using Broker as a library
 ssh:
     # this is the library Broker should use to perform ssh actions
-    backend: ssh2-python312
+    backend: hussh
     host_username: root
     host_password: "<password>"
     host_ssh_port: 22

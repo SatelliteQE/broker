@@ -1,4 +1,5 @@
 """Beaker provider implementation."""
+
 import inspect
 
 import click
