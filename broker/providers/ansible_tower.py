@@ -695,7 +695,8 @@ class AnsibleTower(Provider):
         job_api_url = url_parser.urljoin(self.url, str(job.url))
         # Need to change the url subject for job templates. If this increases, then come up with a better solution
         job_ui_url = url_parser.urljoin(
-            self.url, f"/{AAP_URL_PREFIX}/jobs/{'playbook' if subject == 'job_template' else subject}/{job_number}/output"
+            self.url,
+            f"/{AAP_URL_PREFIX}/jobs/{'playbook' if subject == 'job_template' else subject}/{job_number}/output",
         )
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info(f"Waiting for job: \nAPI: {job_api_url}\nUI: {job_ui_url}")
