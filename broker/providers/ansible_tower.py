@@ -558,6 +558,19 @@ class AnsibleTower(Provider):
                     )
         return label_ids
 
+    def _verify_default_inventory(self, inv_id, subject):
+        """Verify that the user at least has view access to a workflow/template's default inventory."""
+        if inv_id is None:
+            raise exceptions.UserError(
+                f"The {subject} has no default inventory set, please specify one."
+            )
+        try:
+            self._translate_inventory(inv_id)
+        except ATInventoryError as err:
+            raise exceptions.UserError(
+                f"You don't have access to this {subject}'s default inventory, please specify one."
+            ) from err
+
     @cached_property
     def inventory(self):
         """Return the current tower inventory."""
@@ -667,6 +680,7 @@ class AnsibleTower(Provider):
             payload["inventory"] = self.inventory
             logger.info(f"Using tower inventory: {self._translate_inventory(self.inventory)}")
         else:
+            self._verify_default_inventory(inv_id=getattr(target, "inventory", None), subject=name)
             logger.info("No inventory specified, Ansible Tower will use a default.")
 
         # provider labels handling
