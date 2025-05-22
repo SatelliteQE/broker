@@ -4,6 +4,8 @@ from functools import cache, cached_property
 import inspect
 import json
 import os
+import random
+import string
 import sys
 from urllib import parse as url_parser
 
@@ -148,10 +150,8 @@ class ATInventoryError(exceptions.ProviderError):
 
 
 @cache
-def get_awxkit_and_uname(
-    awxkit_config=None, root=None, url=None, token=None, uname=None, pword=None
-):
-    """Return an awxkit api object and resolved username."""
+def get_awxkit_api(awxkit_config=None, root=None, url=None, token=None, uname=None, pword=None):
+    """Return an awxkit api object and token information."""
     if not isinstance(awxkit_config, MockStub):  # skip if we're in a unit test
         # Configure for AAP 2.5+ if needed, with the URL we have
         detect_and_reconfigure_for_aap25(base_url=url)
@@ -161,6 +161,37 @@ def get_awxkit_and_uname(
     awxkit_config.base_url = url
     if root is None:  # support mock stub for unit tests
         root = awxkit.api.Api()
+
+    temp_token_desc = None
+
+    # If no token was provided, try to create a temporary token
+    if not token and uname and pword:
+        helpers.emit(auth_type="password")
+        logger.warning(
+            "You should be using token-based authentication.\n"
+            "I will attempt to create and use a temporary token."
+        )
+
+        # Set up password-based auth temporarily to create a token
+        awxkit_config.credentials = {"default": {"username": uname, "password": pword}}
+        awxkit_config.use_sessions = True
+        root.load_session().get()
+        versions = root.available_versions
+
+        # Create temporary token with random description
+        try:
+            temp_token_desc = "Broker temp " + "".join(random.choices(string.ascii_letters, k=10))
+            if token := root.get_oauth2_token(description=temp_token_desc):
+                logger.info(
+                    f"Successfully created a temporary token with description: {temp_token_desc}."
+                )
+        except Exception as err:  # noqa: BLE001 - Don't currently know the specific exception
+            logger.debug(f"Error creating temporary token: {err}")
+            logger.warning(
+                "Failed to create temporary token. Continuing with password authentication"
+            )
+
+    # Now proceed with token authentication (either provided or newly created)
     if token:
         helpers.emit(auth_type="token")
         logger.info("Using token authentication")
@@ -170,29 +201,8 @@ def get_awxkit_and_uname(
         except awxkit.exceptions.Unauthorized as err:
             raise exceptions.AuthenticationError(err.args[0]) from err
         versions = root.get().available_versions
-        try:
-            # lookup the user that authenticated with the token
-            # If a username was specified in config, use that instead
-            my_username = uname or versions.v2.get().me.get().results[0].username
-        except (IndexError, AttributeError) as err:
-            # lookup failed for whatever reason
-            raise exceptions.ConfigurationError(
-                message="Failed to lookup a username for the given token, please check credentials",
-            ) from err
-    else:  # dynaconf validators should have checked that either token or password was provided
-        helpers.emit(auth_type="password")
-        logger.warning(
-            "You should probably be using token-based authentication.\n"
-            "See https://docs.ansible.com/automation-controller/latest/html/userguide/"
-            "applications_auth.html#applications-tokens for more information"
-        )
 
-        awxkit_config.credentials = {"default": {"username": uname, "password": pword}}
-        awxkit_config.use_sessions = True
-        root.load_session().get()
-        versions = root.available_versions
-        my_username = uname
-    return versions.v2.get(), my_username
+    return versions.v2.get(), temp_token_desc
 
 
 @Provider.auto_hide
@@ -264,7 +274,7 @@ class AnsibleTower(Provider):
         # Init the class itself
         config = kwargs.get("config")
         root = kwargs.get("root")
-        self._v2, self.username = get_awxkit_and_uname(
+        self._v2, self._temp_token_desc = get_awxkit_api(
             awxkit_config=config,
             root=root,
             url=self.url,
@@ -272,8 +282,26 @@ class AnsibleTower(Provider):
             uname=self.uname,
             pword=self.pword,
         )
+
+        # Get the username for the authenticated user
+        # If a username was specified in config, use that instead
+        self.username = self.uname or self._v2.me.get().results[0].username
         # Check to see if we're running AAP (ver 4.0+)
         self._is_aap = self._v2.ping.get().version[0] != "3"
+
+    def __del__(self):
+        """Clean up any temporary tokens we created."""
+        if getattr(self, "_temp_token_desc", None) and hasattr(self, "_v2"):
+            try:
+                # Find and delete the temporary token
+                tokens = self._v2.tokens.get(description=self._temp_token_desc).results
+                if tokens:
+                    for token in tokens:
+                        token.delete()
+                    logger.debug(f"Deleted temporary token: {self._temp_token_desc}")
+            except Exception as err:  # noqa: BLE001 - Not currently known
+                # Just log the error since we're in __del__
+                logger.debug(f"Failed to delete temporary token: {err}")
 
     @staticmethod
     def _pull_params(kwargs):
