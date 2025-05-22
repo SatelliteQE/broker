@@ -700,7 +700,7 @@ class AnsibleTower(Provider):
         kwargs["_broker_extra_vars"] = {
             k: v for k, v in kwargs.items() if k not in workflow_extra_vars
         }
-        payload["extra_vars"] = str(kwargs)
+        payload["extra_vars"] = json.dumps(kwargs)
         logger.debug(
             f"Launching {subject}: {url_parser.urljoin(self.url, str(target.url))}\n{payload=}"
         )
