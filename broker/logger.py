@@ -1,4 +1,5 @@
 """Module handling internal and dependency logging."""
+
 import copy
 from enum import IntEnum
 import logging
