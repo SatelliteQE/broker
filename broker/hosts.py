@@ -31,6 +31,20 @@ class Host:
     """
 
     default_timeout = 0  # timeout in ms, 0 is infinite
+    keep_keys = (
+        "hostname",
+        "_broker_provider",
+        "_broker_args",
+        "tower_inventory",
+        "deploy_network_type",
+        "job_id",
+        "_attrs",
+        "ip",
+        "os_distribution",
+        "os_distribution_version",
+        "reported_devices",
+        "exposed_ports",
+    )
 
     def __init__(self, **kwargs):
         """Create a Host instance.
@@ -176,27 +190,16 @@ class Host:
         return res
 
     def to_dict(self):
-        """Return a dict representation of the host."""
-        keep_keys = (
-            "hostname",
-            "_broker_provider",
-            "_broker_args",
-            "tower_inventory",
-            "deploy_network_type",
-            "job_id",
-            "_attrs",
-            "ip",
-            "os_distribution",
-            "os_distribution_version",
-            "reported_devices",
-            "exposed_ports",
-        )
+        """Convert the host instance to a dictionary representation.
+
+        Includes attributes specified in the `keep_keys` class attribute.
+        """
         ret_dict = {
             "name": getattr(self, "name", None),
             "_broker_provider_instance": self._prov_inst.instance,
             "type": "host",
         }
-        ret_dict.update({k: v for k, v in self.__dict__.items() if k in keep_keys})
+        ret_dict.update({k: v for k, v in self.__dict__.items() if k in self.keep_keys})
         return ret_dict
 
     def setup(self):
