@@ -172,3 +172,9 @@ def test_kwargs_from_click_ctx():
 
     kwargs = helpers.kwargs_from_click_ctx(ctx)
     assert kwargs == {"arg1": "value1", "arg2": "value2"}
+
+
+def test_resolve_nick_raises_error_for_unknown_nick():
+    """Test that resolve_nick raises UserError for a non-existent nick."""
+    with pytest.raises(exceptions.UserError, match=r"Unknown nick: nothere"):
+        helpers.resolve_nick("nothere")

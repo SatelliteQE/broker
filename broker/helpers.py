@@ -176,6 +176,8 @@ def resolve_nick(nick):
     nick_names = settings.settings.get("NICKS") or {}
     if nick in nick_names:
         return settings.settings.NICKS[nick].to_dict()
+    else:
+        raise exceptions.UserError(f"Unknown nick: {nick}")
 
 
 def load_file(file, warn=True):
