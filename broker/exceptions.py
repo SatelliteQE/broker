@@ -1,4 +1,5 @@
 """A collection of Broker-specific exceptions."""
+
 import logging
 
 from logzero import logger
@@ -84,3 +85,9 @@ class ForemanBindError(BrokerError):
     """Raised when a problem occurs at the Foreman bind level."""
 
     error_code = 14
+
+
+class ParamikoBindError(BrokerError):
+    """Raised when a problem occurs at the Paramiko bind level."""
+
+    error_code = 15
