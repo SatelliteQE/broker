@@ -14,6 +14,7 @@ Usage:
     host = Host(hostname="example.com", username="user", password="password")
     ```
 """
+
 from logzero import logger
 
 from broker.exceptions import HostError, NotImplementedError
