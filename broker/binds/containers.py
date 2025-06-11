@@ -187,10 +187,9 @@ class PodmanBind(ContainerBind):
             )
             kwargs = {k: v for k, v in kwargs.items() if k not in sanitized}
             return self._sanitize_create_args(kwargs)
-        finally:
-            # Restore mounts so Podman sees bind-mount list intact
-            if mounts is not None:
-                kwargs["mounts"] = mounts
+        # Restore mounts so Podman sees bind-mount list intact
+        if mounts is not None:
+            kwargs["mounts"] = mounts
 
         return kwargs
 
