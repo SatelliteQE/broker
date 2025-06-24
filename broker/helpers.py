@@ -562,12 +562,18 @@ def translate_timeout(timeout):
     return timeout if isinstance(timeout, int) else 0
 
 
-def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeout=1):
+def simple_retry(
+    cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeout=1, terminal_exceptions=None
+):
     """Re(Try) a function given its args and kwargs up until a max timeout."""
     cmd_args = cmd_args if cmd_args else []
     cmd_kwargs = cmd_kwargs if cmd_kwargs else {}
+    terminal_exceptions = terminal_exceptions or ()
+
     try:
         return cmd(*cmd_args, **cmd_kwargs)
+    except terminal_exceptions as err:
+        raise
     except Exception as err:
         new_wait = _cur_timeout * 2
         if new_wait > max_timeout:
@@ -577,7 +583,7 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
             f"\nTrying again in {_cur_timeout} seconds."
         )
         time.sleep(_cur_timeout)
-        simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait)
+        simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait, terminal_exceptions)
 
 
 class FileLock:
