@@ -43,6 +43,7 @@ Repository = "https://github.com/SatelliteQE/broker"
 beaker = ["beaker-client"]
 dev = ["pre-commit", "pytest", "ruff"]
 docker = ["docker", "paramiko"]
+openstack = ["openstacksdk"]
 podman = ["podman>=5.2"]
 setup = ["build", "twine"]
 
