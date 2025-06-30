@@ -1,4 +1,5 @@
 """Foreman provider implementation."""
+
 import inspect
 from uuid import uuid4
 

@@ -7,6 +7,7 @@ Classes:
 Note: You typically want to use a Host object instance to create sessions,
       not these classes directly.
 """
+
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -86,7 +87,7 @@ class Session:
                 raise exceptions.NotImplementedError("Session-based auth for ansible-pylibssh")
             else:
                 raise exceptions.AuthenticationError("No password or key file provided.")
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             raise exceptions.AuthenticationError(
                 f"{auth_type}-based authentication failed."
             ) from err

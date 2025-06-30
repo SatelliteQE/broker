@@ -568,7 +568,7 @@ def simple_retry(cmd, cmd_args=None, cmd_kwargs=None, max_timeout=60, _cur_timeo
     cmd_kwargs = cmd_kwargs if cmd_kwargs else {}
     try:
         return cmd(*cmd_args, **cmd_kwargs)
-    except Exception as err:  # noqa: BLE001 - Could be anything
+    except Exception as err:
         new_wait = _cur_timeout * 2
         if new_wait > max_timeout:
             raise err

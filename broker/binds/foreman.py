@@ -1,4 +1,5 @@
 """Foreman provider implementation."""
+
 import time
 
 from logzero import logger
@@ -138,9 +139,7 @@ class ForemanBind:
         """Return the uuid of a VM image on a specific compute resource."""
         try:
             return self._get(
-                "/api/compute_resources/"
-                f"{compute_resource_id}"
-                f"/images/?search=name={image_name}"
+                f"/api/compute_resources/{compute_resource_id}/images/?search=name={image_name}"
             )["results"][0]["uuid"]
         except IndexError:
             raise exceptions.ForemanBindError(f"Could not find {image_name} in VM images")
