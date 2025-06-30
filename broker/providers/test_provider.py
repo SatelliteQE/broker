@@ -1,4 +1,5 @@
 """A test provider for use in unit tests."""
+
 import inspect
 
 from dynaconf import Validator

@@ -119,7 +119,7 @@ class Container(Provider):
                 return
         try:
             self.runtime.pull_image(name)
-        except Exception as err:  # noqa: BLE001 - This could be a few things
+        except Exception as err:
             raise exceptions.ProviderError(
                 "Container", f"Unable to find image: {name}\n{err}"
             ) from err

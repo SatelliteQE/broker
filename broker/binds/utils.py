@@ -1,4 +1,5 @@
 """Module providing base SSH methods and classes."""
+
 import socket
 
 from logzero import logger
