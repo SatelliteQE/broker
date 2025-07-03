@@ -52,6 +52,6 @@ jobs:
         env:
           UV_SYSTEM_PYTHON: 1
         run: |
-          uv pip install "broker[dev,podman] @ ."
+          uv pip install "broker[dev,podman,openstack] @ ."
           broker --version
           pytest -v tests/ --ignore tests/functional
