@@ -190,12 +190,12 @@ class Provider(metaclass=ProviderMeta):
         return f"{self.__class__.__name__}({inner})"
 
     @staticmethod
-    def auto_hide(cls):
+    def auto_hide(decorated_provider):
         """Decorate a provider class to hide it from the CLI."""
-        if not settings.get(cls.__name__.upper(), False):
+        if not settings.get(decorated_provider.__name__.upper(), False):
             # import IPython; IPython.embed()
-            cls.hidden = True
-        return cls
+            decorated_provider.hidden = True
+        return decorated_provider
 
     @staticmethod
     def register_action(*as_names):

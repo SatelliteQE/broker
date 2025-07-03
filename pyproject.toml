@@ -151,6 +151,7 @@ ignore = [
     "D413",    # Missing blank line after last section
     "E501",    # line too long
     "E731",    # do not assign a lambda expression, use a def
+    "PLC0415", # ignore top-level import restrictions
     "PLR0913", # Too many arguments to function call ({c_args} > {max_args})
     "RUF012",  # Mutable class attributes should be annotated with typing.ClassVar
     "D107",    # Missing docstring in __init__
