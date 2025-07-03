@@ -427,9 +427,9 @@ class Emitter:
             if not isinstance(arg, dict):
                 raise exceptions.BrokerError(f"Received an invalid data emission {arg}")
             kwargs.update(arg)
-        for key in kwargs:
-            if getattr(kwargs[key], "json", None):
-                kwargs[key] = kwargs[key].json
+        for key, val in kwargs.items():
+            if getattr(val, "json", None):
+                kwargs[key] = val.json
         with self.EMIT_LOCK:
             curr_data = json.loads(self.file.read_text() or "{}")
             curr_data.update(kwargs)

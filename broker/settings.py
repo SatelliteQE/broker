@@ -23,7 +23,7 @@ from broker.exceptions import ConfigurationError
 
 INTERACTIVE_MODE = ConfigManager.interactive_mode
 BROKER_DIRECTORY = Path.home().joinpath(".broker")
-TEST_MODE = os.environ.get("BROKER_TEST_MODE", False)
+TEST_MODE = os.environ.get("BROKER_TEST_MODE", None)
 
 if TEST_MODE:  # when in test mode, don't use the real broker directory
     BROKER_DIRECTORY = Path("tests/data/")
