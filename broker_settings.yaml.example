@@ -1,5 +1,5 @@
 # Broker settings
-_version: 0.6.12
+_version: 0.7.0
 # Disable rich colors
 less_colors: False
 # different log levels for file and stdout
