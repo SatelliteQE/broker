@@ -1,9 +1,10 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm[toml]", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.7.19,<0.8.0"]
+build-backend = "uv_build"
 
 [project]
 name = "broker"
+version = "0.7.0"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -32,19 +33,23 @@ dependencies = [
     "setuptools",
     "ssh2-python",
 ]
-dynamic = [
-    "version",
-] # dynamic fields to update on build - version via setuptools_scm
 
 [project.urls]
 Repository = "https://github.com/SatelliteQE/broker"
 
 [project.optional-dependencies]
 beaker = ["beaker-client"]
-dev = ["docker", "pexpect", "pre-commit", "pytest", "pytest-randomly", "ruff"]
+dev = [
+    "docker",
+    "pexpect",
+    "pre-commit",
+    "pytest",
+    "pytest-randomly",
+    "ruff",
+    "bumpver",
+]
 docker = ["docker", "paramiko"]
 podman = ["podman>=5.2"]
-setup = ["build", "twine"]
 
 ssh2_python = ["ssh2-python"]
 ansible_pylibssh = ["ansible-pylibssh"]
@@ -54,15 +59,23 @@ paramiko = ["paramiko"]
 [project.scripts]
 broker = "broker.commands:cli"
 
-[tool.setuptools]
-platforms = ["any"]
-zip-safe = false
-include-package-data = true
+[tool.uv.build-backend]
+module-root = ""
 
-[tool.setuptools.packages.find]
-include = ["broker"]
+[tool.bumpver]
+current_version = "0.7.0"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "bump version to {new_version}"
+tag_message = "{new_version}"
+tag_scope = "default"
+commit = true
+tag = true
+push = false
 
-[tool.setuptools_scm] # same as use_scm_version=True in setup.py
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['^version = "{version}"', '^current_version = "{version}"']
+"broker_settings.yaml.example" = ["^_version: {version}"]
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
