@@ -7,6 +7,7 @@ import os
 import random
 import string
 import sys
+import time
 from urllib import parse as url_parser
 
 import click
@@ -116,17 +117,39 @@ def convert_pseudonamespaces(attr_dict):
     return out_dict
 
 
-def resilient_job_wait(job, timeout=None):
-    """Wait for a job to complete. Retry on errors."""
-    timeout = timeout or settings.ANSIBLETOWER.workflow_timeout
+def resilient_job_wait(job, job_timeout=None, max_wait=None):
+    """Wait for a job to complete. Retry on errors.
+
+    Args:
+        job: The job object to wait for
+        job_timeout: Timeout for individual job wait attempts
+        max_wait: Maximum time to continue retrying before giving up
+    """
+    job_timeout = job_timeout or settings.ANSIBLETOWER.workflow_timeout
+    max_wait = max_wait or settings.ANSIBLETOWER.max_resilient_wait
+
     completed = False
+    start_time = time.time()
+
     while not completed:
+        # Check if we've exceeded max wait time
+        if time.time() - start_time > max_wait:
+            raise JobExecutionError(
+                message_data={
+                    "error": "Maximum resilient wait time exceeded",
+                    "max_wait_seconds": max_wait,
+                    "elapsed_seconds": int(time.time() - start_time),
+                }
+            )
+
         try:
-            job.wait_until_completed(timeout=timeout)
+            job.wait_until_completed(timeout=job_timeout)
             completed = True
-        except (ConnectionError, awxkit.exceptions.Unknown) as err:
+        except (ConnectionError, awxkit.exceptions.Unknown, awxkit.exceptions.Forbidden) as err:
             logger.error(f"Error occurred while waiting for job: {err}")
             logger.info("Retrying job wait...")
+            # Add a small delay before retrying to avoid hammering the API
+            time.sleep(5)
 
 
 class JobExecutionError(exceptions.ProviderError):
@@ -227,6 +250,7 @@ class AnsibleTower(Provider):
         ),
         Validator("ANSIBLETOWER.inventory", default=None),
         Validator("ANSIBLETOWER.AAP_VERSION", default="", cast=str),
+        Validator("ANSIBLETOWER.max_resilient_wait", is_type_of=int, default=7200),
     ]
 
     _checkout_options = [

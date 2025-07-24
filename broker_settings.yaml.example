@@ -1,5 +1,5 @@
 # Broker settings
-_version: 0.6.9
+_version: 0.6.12
 # Disable rich colors
 less_colors: False
 # different log levels for file and stdout
@@ -44,6 +44,7 @@ AnsibleTower:
     extend_workflow: "extend-vm"
     new_expire_time: "+172800"
     workflow_timeout: 3600
+    max_resilient_wait: 7200
     results_limit: 50
 Container:
     instances:
