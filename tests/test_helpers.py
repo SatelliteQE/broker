@@ -29,17 +29,17 @@ def request_origin(request):
 
 
 @pytest.fixture(scope="module")
-def fake_inventory():
-    return helpers.load_file("tests/data/fake_inventory.yaml")
+def fake_inventory(broker_data_dir):
+    return helpers.load_file(broker_data_dir / "fake_inventory.yaml")
 
 
-def test_load_json_file():
-    data = helpers.load_file("tests/data/broker_args.json")
+def test_load_json_file(broker_data_dir):
+    data = helpers.load_file(broker_data_dir / "broker_args.json")
     assert data == BROKER_ARGS_DATA
 
 
-def test_load_yaml_file():
-    data = helpers.load_file("tests/data/broker_args.yaml")
+def test_load_yaml_file(broker_data_dir):
+    data = helpers.load_file(broker_data_dir / "broker_args.yaml")
     assert data == BROKER_ARGS_DATA
 
 
@@ -106,7 +106,7 @@ def test_find_origin_fixture(request_origin):
     assert "test_find_origin_fixture" in request_origin[0]
 
 
-@pytest.mark.parametrize("set_envars", [("BUILD_URL", "fake")], indirect=True)
+@pytest.mark.parametrize("set_envars", [[("BUILD_URL", "fake")]], indirect=True)
 def test_find_origin_jenkins(set_envars):
     origin = helpers.find_origin()
     assert len(origin) == 2
@@ -167,6 +167,7 @@ def test_dict_from_paths_nested():
 
 def test_kwargs_from_click_ctx():
     """Test that we can extract kwargs from a mixed-style click context object"""
+
     class ctx:
         args = ["--arg1", "value1", "--arg2=value2", "--some-flag"]
 

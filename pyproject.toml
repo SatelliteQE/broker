@@ -62,6 +62,22 @@ broker = "broker.commands:cli"
 [tool.uv.build-backend]
 module-root = ""
 
+[project.entry-points."broker.ssh.session"]
+ansible-pylibssh = "broker.binds.pylibssh:Session"
+ssh2-python = "broker.binds.ssh2:Session"
+ssh2-python312 = "broker.binds.ssh2:Session"
+hussh = "broker.binds.hussh:Session"
+
+[project.entry-points."broker.ssh.interactive_shell"]
+ansible-pylibssh = "broker.binds.pylibssh:InteractiveShell"
+ssh2-python = "broker.binds.ssh2:InteractiveShell"
+ssh2-python312 = "broker.binds.ssh2:InteractiveShell"
+
+[tool.setuptools]
+platforms = ["any"]
+zip-safe = false
+include-package-data = true
+
 [tool.bumpver]
 current_version = "0.7.0"
 version_pattern = "MAJOR.MINOR.PATCH"

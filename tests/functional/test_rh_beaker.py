@@ -29,7 +29,9 @@ def temp_inventory():
 
 
 @pytest.mark.parametrize(
-    "args_file", [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")], ids=lambda f: f.name.split(".")[0]
+    "args_file",
+    [f for f in SCENARIO_DIR.iterdir() if f.name.startswith("checkout_")],
+    ids=lambda f: f.name.split(".")[0],
 )
 def test_checkout_scenarios(args_file, temp_inventory):
     result = CliRunner().invoke(cli, ["checkout", "--args-file", args_file])
@@ -76,12 +78,12 @@ def test_beaker_host():
         with NamedTemporaryFile() as tmp:
             r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", tmp.file.name)
             data = r_host.session.sftp_read(f"{remote_dir}/{settings_path.name}", return_data=True)
-            assert (
-                settings_path.read_bytes() == Path(tmp.file.name).read_bytes()
-            ), "Local file is different from the received one"
-            assert (
-                settings_path.read_bytes() == data
-            ), "Local file is different from the received one (return_data=True)"
+            assert settings_path.read_bytes() == Path(tmp.file.name).read_bytes(), (
+                "Local file is different from the received one"
+            )
+            assert settings_path.read_bytes() == data, (
+                "Local file is different from the received one (return_data=True)"
+            )
             assert data == Path(tmp.file.name).read_bytes(), "Received files do not match"
         # test the tail_file context manager
         tailed_file = f"{remote_dir}/tail_me.txt"
