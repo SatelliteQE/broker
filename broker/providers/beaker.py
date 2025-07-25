@@ -11,7 +11,6 @@ from broker.binds.beaker import BeakerBind
 from broker.exceptions import BrokerError, ProviderError
 from broker.hosts import Host
 from broker.providers import Provider
-from broker.settings import settings
 
 
 @Provider.auto_hide

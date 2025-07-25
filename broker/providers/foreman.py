@@ -10,7 +10,6 @@ from logzero import logger
 from broker.binds import foreman
 from broker.helpers import Result
 from broker.providers import Provider
-from broker.settings import settings
 
 
 class Foreman(Provider):
@@ -49,8 +48,12 @@ class Foreman(Provider):
 
         self.runtime = self._runtime_cls(
             settings_obj=self._settings,
-            foreman_username=kwargs.get("foreman_username", self._settings.foreman.foreman_username),
-            foreman_password=kwargs.get("foreman_password", self._settings.foreman.foreman_password),
+            foreman_username=kwargs.get(
+                "foreman_username", self._settings.foreman.foreman_username
+            ),
+            foreman_password=kwargs.get(
+                "foreman_password", self._settings.foreman.foreman_password
+            ),
             url=kwargs.get("url", self._settings.foreman.foreman_url),
             prefix=kwargs.get("prefix", self._settings.foreman.name_prefix),
             verify=kwargs.get("verify", self._settings.foreman.verify),
@@ -60,7 +63,9 @@ class Foreman(Provider):
         self.organization_id = self.runtime.obtain_id_from_name(
             "organizations", self._settings.foreman.organization
         )
-        self.location_id = self.runtime.obtain_id_from_name("locations", self._settings.foreman.location)
+        self.location_id = self.runtime.obtain_id_from_name(
+            "locations", self._settings.foreman.location
+        )
 
     def release(self, host):
         """Release a host.

@@ -20,7 +20,6 @@ from broker import helpers
 from broker.exceptions import NotImplementedError
 from broker.settings import settings
 
-
 SSH_NOT_INSTALLED_MSG = (
     "{backend} is not installed.\n"
     "ssh actions will not work.\n"

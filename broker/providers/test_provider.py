@@ -6,7 +6,6 @@ from dynaconf import Validator
 
 from broker import helpers
 from broker.providers import Provider
-from broker.settings import settings
 
 HOST_PROPERTIES = {
     "basic": {

@@ -18,8 +18,12 @@ class ForemanBind:
 
     def __init__(self, settings_obj=None, **kwargs):
         self._settings = settings_obj or settings
-        self.foreman_username = kwargs.get("foreman_username", self._settings.foreman.foreman_username)
-        self.foreman_password = kwargs.get("foreman_password", self._settings.foreman.foreman_password)
+        self.foreman_username = kwargs.get(
+            "foreman_username", self._settings.foreman.foreman_username
+        )
+        self.foreman_password = kwargs.get(
+            "foreman_password", self._settings.foreman.foreman_password
+        )
         self.url = kwargs.get("url", self._settings.foreman.foreman_url)
         self.prefix = kwargs.get("prefix", self._settings.foreman.name_prefix)
         self.verify = kwargs.get("verify", self._settings.foreman.verify)

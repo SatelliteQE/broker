@@ -56,7 +56,9 @@ class ContainerBind:
 
     _sensitive_attrs = ["password", "host_password"]
 
-    def __init__(self, host=None, username=None, password=None, port=22, timeout=None, settings_obj=None):
+    def __init__(
+        self, host=None, username=None, password=None, port=22, timeout=None, settings_obj=None
+    ):
         self.host = host
         self.username = username
         self.password = password
