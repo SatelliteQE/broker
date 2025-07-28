@@ -572,7 +572,7 @@ def simple_retry(
 
     try:
         return cmd(*cmd_args, **cmd_kwargs)
-    except terminal_exceptions as err:
+    except terminal_exceptions:
         raise
     except Exception as err:
         new_wait = _cur_timeout * 2
