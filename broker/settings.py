@@ -36,7 +36,7 @@ inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
 cfg_manager = ConfigManager(settings_path)
 
 
-validators = [
+BASE_VALIDATORS = [
     Validator("SSH", is_type_of=dict, default={}),
     Validator("SSH.HOST_USERNAME", default="root"),
     Validator("SSH.HOST_PASSWORD", default="toor"),
@@ -102,7 +102,7 @@ def create_settings(config_dict=None, config_file=None, perform_migrations=True)
     new_settings = Dynaconf(
         settings_file=str(file_path) if file_exists else None,
         ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
-        validators=validators,
+        validators=BASE_VALIDATORS,
     )
 
     # to make doubly sure, remove the vault loader if set somehow

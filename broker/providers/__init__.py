@@ -38,8 +38,7 @@ from pathlib import Path
 import dynaconf
 from logzero import logger
 
-from broker import exceptions
-from broker.settings import settings
+from broker import exceptions, helpers
 
 # populate a list of all provider module names
 _provider_imports = [
@@ -78,10 +77,6 @@ class ProviderMeta(ABCMeta):
                     for action in obj._as_action:
                         PROVIDER_ACTIONS[action] = (new_cls, attr)
                         logger.debug(f"Registered action {action} for provider {name}")
-            # register provider settings validators
-            if validators := attrs.get("_validators"):
-                logger.debug(f"Adding {len(validators)} validators for {name}")
-                settings.validators.extend(validators)
         return new_cls
 
 
@@ -93,7 +88,6 @@ class Provider(metaclass=ProviderMeta):
 
     Attributes:
         _validators (list): A list of Dynaconf Validators specific to the provider.
-        hidden (bool): A flag to hide the provider from the CLI.
         _checkout_options (list): A list of checkout options to add to each command.
         _execute_options (list): A list of execute options to add to each command.
         _fresh_settings (dynaconf.Dynaconf): A clone of the global settings object.
@@ -102,8 +96,6 @@ class Provider(metaclass=ProviderMeta):
 
     # Populate with a list of Dynaconf Validators specific to your provider
     _validators = []
-    # Used to hide the provider from the CLI
-    hidden = False
     # Populate these to add your checkout and execute options to each command
     # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
     _checkout_options = []
@@ -121,7 +113,7 @@ class Provider(metaclass=ProviderMeta):
                 f"{cls_name} provider using custom settings object: {broker_settings.to_dict()}"
             )
         else:
-            self._settings = settings.dynaconf_clone()
+            self._settings = helpers.clone_global_settings()
             logger.debug(f"{cls_name} provider using global settings")
         self._construct_params = []
         logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
@@ -156,6 +148,8 @@ class Provider(metaclass=ProviderMeta):
             if not instance_values.get("override_envars"):
                 # if a provider instance doesn't want to override envars, load them
                 self._settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
+        # add our validators
+        self._settings.validators.extend(self._validators)
         # use selective validation to only validate the instance settings
         try:
             self._settings.validators.validate(only=section_name)
@@ -198,14 +192,6 @@ class Provider(metaclass=ProviderMeta):
             if not k.startswith("_") and not callable(v)
         )
         return f"{self.__class__.__name__}({inner})"
-
-    @staticmethod
-    def auto_hide(decorated_provider):
-        """Decorate a provider class to hide it from the CLI."""
-        if not settings.get(decorated_provider.__name__.upper(), False):
-            # import IPython; IPython.embed()
-            decorated_provider.hidden = True
-        return decorated_provider
 
     @staticmethod
     def register_action(*as_names):

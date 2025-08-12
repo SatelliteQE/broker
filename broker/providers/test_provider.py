@@ -21,7 +21,6 @@ class TestProvider(Provider):
     """Basic TestProvider class to test the Provider interface."""
 
     __test__ = False  # don't use for testing
-    hidden = True  # hide from click command generation
     _validators = [Validator("TESTPROVIDER.foo", must_exist=True)]
 
     def __init__(self, **kwargs):
