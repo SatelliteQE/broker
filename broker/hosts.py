@@ -18,7 +18,6 @@ Usage:
 from logzero import logger
 
 from broker.exceptions import HostError, NotImplementedError
-from broker.settings import settings
 
 SETTINGS_VALIDATED = False
 
@@ -31,7 +30,8 @@ class Host:
     It is recommended to subclass the `Host` class for custom behavior.
     """
 
-    default_timeout = 0  # timeout in ms, 0 is infinite
+    DEFAULT_TIMEOUT = 0  # timeout in ms, 0 is infinite
+    DEFAULT_USER = "root"
     keep_keys = (
         "hostname",
         "_broker_provider",
@@ -70,7 +70,9 @@ class Host:
             self._settings.validators.validate(only="SSH")
         else:
             # Use the global settings object
-            self._settings = settings.dynaconf_clone()
+            from broker.helpers import clone_global_settings
+
+            self._settings = clone_global_settings()
             global SETTINGS_VALIDATED  # noqa: PLW0603
             if not SETTINGS_VALIDATED:
                 logger.debug("Validating ssh settings")
@@ -130,7 +132,7 @@ class Host:
         if getattr(self, "is_container", None) or getattr(self, "_cont_inst", None):
             from broker.session import ContainerSession
 
-            self.session = ContainerSession(
+            self._session = ContainerSession(
                 self, kwargs.get("runtime"), broker_settings=self._settings
             )
         else:
@@ -138,7 +140,7 @@ class Host:
             # Create a session using the entry-points based approach
             from broker.session import make_session
 
-            self.session = make_session(
+            self._session = make_session(
                 broker_settings=self._settings,
                 hostname=self.hostname,
                 port=getattr(self, "port", self._settings.get("SSH", {}).get("HOST_SSH_PORT", 22)),
@@ -192,7 +194,7 @@ class Host:
         Returns:
             str: The output of the command executed on the host.
         """
-        timeout = self.default_timeout if timeout is None else timeout
+        timeout = self.DEFAULT_TIMEOUT if timeout is None else timeout
         logger.debug(f"{self.hostname} executing command: {command}")
         res = self.session.run(command, timeout=timeout)
         logger.debug(f"{self.hostname} command result:\n{res}")

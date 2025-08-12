@@ -4,7 +4,6 @@ import pytest
 from broker.broker import Broker
 from broker.helpers import MockStub
 from broker.providers.container import Container
-from broker.settings import settings
 
 
 class ContainerApiStub(MockStub):
@@ -17,12 +16,11 @@ class ContainerApiStub(MockStub):
      - self.runtime.containers
      - self.runtime.get_attrs(cont_inst)
      - helpers.yaml_format(self.runtime.image_info(image))
-     - self.runtime.create_container(container_host, **kwargs)
+     - self.runtime.create_container(container_host, net_name=self._settings.container.network, **kwargs)
      - self.runtime.get_logs(cont_inst)
     """
 
     def __init__(self, config=None, **kwargs):  # Added config parameter
-        self.config = config or settings  # Store config, fallback to global settings
         in_dict = {
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
             "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
@@ -62,9 +60,8 @@ class ContainerApiStub(MockStub):
                 return MockStub(image)
         raise Broker.ProviderError(f"Unable to find image: {tag_name}")
 
-    def create_container(self, container_host, **kwargs):
-        # Use self.config instead of global settings for network
-        if net_name := self.config.container.get("network"):  # Use .get() for safety
+    def create_container(self, container_host, net_name=None, **kwargs):
+        if net_name:
             net_dict = {}
             for name in net_name.split(","):
                 if not self.get_network_by_attrs({"name": name}):
@@ -92,7 +89,7 @@ def config_stub():
             "runtime": "podman",
         }
     )
-    return MockStub(in_dict={"Container": container_settings})
+    return MockStub(in_dict={"container": container_settings, "Container": container_settings})
 
 
 @pytest.fixture
@@ -118,7 +115,7 @@ def test_host_creation(container_stub):
 
 
 def test_single_network(api_stub, config_stub):  # Changed to use api_stub directly
-    config_stub.Container.network = "podman2"  # Modify the stub
+    config_stub.container.network = "podman2"  # Modify the stub
     container_instance = Container(
         bind=api_stub, broker_settings=config_stub
     )  # Create new instance with modified config
@@ -127,7 +124,7 @@ def test_single_network(api_stub, config_stub):  # Changed to use api_stub direc
 
 
 def test_multiple_networks(api_stub, config_stub):  # Changed to use api_stub directly
-    config_stub.Container.network = "podman1,podman2"  # Modify the stub
+    config_stub.container.network = "podman1,podman2"  # Modify the stub
     container_instance = Container(
         bind=api_stub, broker_settings=config_stub
     )  # Create new instance with modified config

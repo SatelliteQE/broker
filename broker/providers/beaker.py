@@ -13,7 +13,6 @@ from broker.hosts import Host
 from broker.providers import Provider
 
 
-@Provider.auto_hide
 class Beaker(Provider):
     """Beaker provider class providing a Broker interface around the Beaker bind."""
 
