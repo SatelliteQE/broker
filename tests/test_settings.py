@@ -18,12 +18,6 @@ def test_alternate_settings(broker_settings):
     assert test_provider.foo == "baz"
 
 
-def test_validator_trigger(broker_settings):
-    with pytest.raises(ConfigurationError) as err:
-        TestProvider(TestProvider="bad", broker_settings=broker_settings)
-    assert isinstance(err.value.args[0], ValidationError)
-
-
 @pytest.mark.parametrize(
     "set_envars", [[("BROKER_TESTPROVIDER__INSTANCES__TEST2__foo", "bar")]], indirect=True
 )

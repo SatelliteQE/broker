@@ -17,8 +17,8 @@ TEST_SERVER_IMAGE = "ghcr.io/jacobcallahan/hussh/hussh-test-server:latest"
 
 
 def pytest_sessionstart(session):
-    """Put Broker into test mode."""
-    os.environ["BROKER_TEST_MODE"] = "True"
+    """For things that need to happen before Broker is loaded."""
+    os.environ["BROKER_NO_GLOBAL_CONFIG"] = "True"
 
 
 @pytest.fixture(scope="session")
@@ -36,14 +36,73 @@ def set_broker_dir(broker_data_dir):
 
 @pytest.fixture(scope="session")
 def broker_settings_path(broker_data_dir):
-    """Return path to test settings file"""
+    """Return path to test settings file - for tests that need the actual file"""
     return broker_data_dir / "broker_settings.yaml"
 
 
 @pytest.fixture(scope="session")
-def broker_settings(broker_settings_path):
-    """Create and return a broker settings object for testing"""
-    return settings.create_settings(config_file=broker_settings_path, perform_migrations=False)
+def broker_settings():
+    """Create and return a broker settings object for testing with minimal test configuration"""
+    test_config = {
+        "SSH": {
+            "backend": "hussh",
+            "host_username": "root",
+            "host_password": "toor",
+            "host_ssh_port": 22,
+            "host_ssh_key_filename": "tests/data/ssh/test_key",
+            "host_ipv6": False,
+            "host_ipv4_fallback": True,
+        },
+        "LOGGING": {
+            "console_level": "info", 
+            "file_level": "debug",
+        },
+        "FOREMAN": {
+            "foreman_url": "https://test.fore.man",
+            "foreman_username": "admin",
+            "foreman_password": "secret",
+            "organization": "ORG",
+            "location": "LOC",
+            "verify": "./ca.crt",
+            "name_prefix": "broker",
+        },
+        "CONTAINER": {
+            "host_username": "username",
+            "host_password": "password",
+            "host_port": None,
+            "network": None,
+            "default": True,
+            "runtime": "podman",
+            "results_limit": 50,
+            "auto_map_ports": False,
+        },
+        "TESTPROVIDER": {
+            "instances": {
+                "test1": {
+                    "foo": "bar",
+                    "default": True,
+                },
+                "test2": {
+                    "foo": "baz",
+                    "override_envars": True,
+                },
+                "bad": {
+                    "nothing": False,
+                    # Note: deliberately missing 'foo' to trigger validation error
+                },
+            },
+            "config_value": "something",
+        },
+        "NICKS": {
+            "test_nick": {
+                "test_action": "fake",
+                "arg1": "abc",
+                "arg2": 123,
+                "arg3": True,
+            },
+        },
+    }
+    return settings.create_settings(config_dict=test_config, perform_migrations=False)
 
 
 @pytest.fixture(scope="session")

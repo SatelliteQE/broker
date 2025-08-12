@@ -41,7 +41,15 @@ def _host_release():
 
 
 @cache
-def get_runtime(runtime_cls=None, host=None, username=None, password=None, port=None, timeout=None):
+def get_runtime(
+    runtime_cls=None,
+    host=None,
+    username=None,
+    password=None,
+    port=None,
+    timeout=None,
+    broker_settings=None,
+):
     """Return a runtime instance."""
     return runtime_cls(
         host=host,
@@ -49,10 +57,10 @@ def get_runtime(runtime_cls=None, host=None, username=None, password=None, port=
         password=password,
         port=port,
         timeout=timeout,
+        broker_settings=broker_settings,
     )
 
 
-@Provider.auto_hide
 class Container(Provider):
     """Container provider class providing a Broker interface around the container binds."""
 
@@ -106,6 +114,7 @@ class Container(Provider):
             password=self._settings.Container.host_password,
             port=self._settings.Container.host_port,
             timeout=self._settings.Container.timeout,
+            broker_settings=self._settings,
         )
         self._name_prefix = self._settings.Container.get("name_prefix", getpass.getuser())
 
@@ -215,7 +224,7 @@ class Container(Provider):
         name = cont_attrs["name"]
         logger.debug(f"hostname: {hostname}, name: {name}, host type: host")
         host_inst = host_classes["host"](
-            **{**kwargs, "hostname": hostname, "name": name, "broker_settings": self._settings}
+            hostname=hostname, name=name, broker_settings=self._settings
         )
         self._set_attributes(host_inst, broker_args=kwargs, cont_inst=cont_inst)
         # add the container's port mapping to the host instance only if there are any ports open
@@ -314,7 +323,9 @@ class Container(Provider):
         )
         # rename the dict key to the name of the arg recognized by provider
         kwargs["labels"] = kwargs.pop("provider_labels")
-        container_inst = self.runtime.create_container(container_host, **kwargs)
+        container_inst = self.runtime.create_container(
+            container_host, net_name=self._settings.container.network, **kwargs
+        )
         container_inst.start()
         return container_inst
 

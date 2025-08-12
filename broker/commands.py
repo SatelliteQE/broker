@@ -71,7 +71,7 @@ def parse_labels(provider_labels):
 def provider_options(command):
     """Apply provider-specific decorators to each command this decorates."""
     for prov in PROVIDERS.values():
-        if prov.hidden:
+        if not settings.settings.get(prov.__name__):
             continue
         for option in getattr(prov, f"_{command.__name__}_options"):
             command = option(command)
@@ -94,11 +94,12 @@ def populate_providers(click_group):
     Note: This currently only works for the default instance for each provider
     """
     for prov, prov_class in (pairs for pairs in PROVIDERS.items()):
+        if not settings.settings.get(prov_class.__name__):
+            continue
 
         @guarded_command(
             group=click_group,
             name=prov,
-            hidden=prov_class.hidden,
             context_settings={
                 "allow_extra_args": True,
                 "ignore_unknown_options": True,

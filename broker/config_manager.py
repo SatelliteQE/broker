@@ -3,6 +3,7 @@
 import importlib
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import pkgutil
 import sys
@@ -41,12 +42,16 @@ class ConfigManager:
 
     interactive_mode = sys.stdin.isatty()
     version = version("broker")
+    no_global_config = False
 
     def __init__(self, settings_path=None):
         self._settings_path = settings_path
         if settings_path:
             if settings_path.exists():
                 self._cfg = yaml.load(self._settings_path)
+            elif self.no_global_config or os.environ.get("BROKER_NO_GLOBAL_CONFIG"):
+                logger.info("Continuing without global config file.")
+                return
             else:
                 click.secho(
                     f"Broker settings file not found at {settings_path.absolute()}.", fg="red"
@@ -215,6 +220,8 @@ class ConfigManager:
         if not raw_data:
             raise exceptions.ConfigurationError(
                 f"Broker settings file not found at {self._settings_path.absolute()}."
+                "\nIf you want to disable the global config file, "
+                "set a BROKER_NO_GLOBAL_CONFIG environment variable"
             )
         chunk_data = self.get(chunk, yaml.load(raw_data))
         if self.interactive_mode:
