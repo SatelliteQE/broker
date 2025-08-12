@@ -36,8 +36,6 @@ class Foreman(Provider):
     _execute_options = []
     _extend_options = []
 
-    hidden = False
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -231,14 +229,7 @@ class Foreman(Provider):
             self._set_attributes(host_inst, broker_args=kwargs)
             return host_inst
         name = provider_params["name"]
-        host_inst = host_classes["host"](
-            **{
-                **kwargs,
-                "hostname": name,
-                "name": name,
-                "broker_settings": self._settings,
-            }
-        )
+        host_inst = host_classes["host"](hostname=name, name=name, broker_settings=self._settings)
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
 

@@ -17,8 +17,7 @@ from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 
 from broker import exceptions
-from broker.helpers import MockStub, eval_filter, find_origin, yaml
-from broker.settings import settings
+from broker.helpers import MockStub, clone_global_settings, eval_filter, find_origin, yaml
 
 # Basic import first - we'll configure it properly later
 try:
@@ -44,7 +43,7 @@ def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
     This function can be called multiple times safely.
     Returns True if reconfiguration was done, False otherwise.
     """
-    _settings = broker_settings or settings
+    _settings = broker_settings or clone_global_settings()
     # Exit immediately if we've already configured
     if getattr(detect_and_reconfigure_for_aap25, "_configured", False):
         return False
@@ -127,7 +126,7 @@ def resilient_job_wait(job, job_timeout=None, max_wait=None, broker_settings=Non
         max_wait: Maximum time to continue retrying before giving up
         broker_settings: Optional settings object to use instead of the global one
     """
-    _settings = broker_settings or settings
+    _settings = broker_settings or clone_global_settings()
     job_timeout = job_timeout or _settings.ANSIBLETOWER.workflow_timeout
     max_wait = max_wait or _settings.ANSIBLETOWER.max_resilient_wait
     completed = False
@@ -185,7 +184,7 @@ def get_awxkit_and_uname(
     broker_settings=None,
 ):
     """Return an awxkit api object and resolved username."""
-    _settings = broker_settings or settings
+    _settings = broker_settings or clone_global_settings()
     if not isinstance(awxkit_config, MockStub):  # skip if we're in a unit test
         # Configure for AAP 2.5+ if needed, with the URL we have
         detect_and_reconfigure_for_aap25(base_url=url, broker_settings=_settings)
@@ -239,7 +238,6 @@ def get_awxkit_and_uname(
     return versions.v2.get(), temp_token_desc
 
 
-@Provider.auto_hide
 class AnsibleTower(Provider):
     """Ansible Tower provider provides a Broker-specific wrapper around awxkit."""
 
@@ -693,12 +691,7 @@ class AnsibleTower(Provider):
                 logger.debug(f"hostname: {hostname}, name: {name}, host type: {host_type}")
 
                 host_inst = host_classes[host_type](
-                    **{
-                        **broker_args,
-                        "hostname": hostname,
-                        "name": name,
-                        "broker_settings": self._settings,
-                    }
+                    hostname=hostname, name=name, broker_settings=self._settings, **broker_args
                 )
                 broker_facts["name"] = name
                 broker_facts["hostname"] = hostname
@@ -757,8 +750,8 @@ class AnsibleTower(Provider):
         provider_labels = kwargs.get("provider_labels", {})
         # include eventual common labels, specified at each level of configuration
         # typically imported from dynaconf env vars
-        provider_labels.update(settings.get("provider_labels", {}))
-        provider_labels.update(settings.ANSIBLETOWER.get("provider_labels", {}))
+        provider_labels.update(self._settings.get("provider_labels", {}))
+        provider_labels.update(self._settings.ANSIBLETOWER.get("provider_labels", {}))
         if provider_labels:
             payload["labels"] = self._resolve_labels(provider_labels, target)
             kwargs["provider_labels"] = provider_labels
@@ -826,7 +819,7 @@ class AnsibleTower(Provider):
                 if hasattr(self.__dict__, "inventory"):
                     del self.inventory  # clear the cached value
         return self.execute(
-            workflow=settings.ANSIBLETOWER.extend_workflow,
+            workflow=self._settings.ANSIBLETOWER.extend_workflow,
             target_vm=target_vm.name,
             new_expire_time=new_expire_time or self._settings.ANSIBLETOWER.get("new_expire_time"),
             provider_labels=provider_labels,
@@ -940,7 +933,7 @@ class AnsibleTower(Provider):
         if broker_args is None:
             broker_args = {}
         return self.execute(
-            workflow=settings.ANSIBLETOWER.release_workflow,
+            workflow=self._settings.ANSIBLETOWER.release_workflow,
             source_vm=name,
             **broker_args,
         )

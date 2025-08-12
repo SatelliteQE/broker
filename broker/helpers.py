@@ -22,7 +22,7 @@ from logzero import logger
 from rich.table import Table
 from ruamel.yaml import YAML
 
-from broker import exceptions, logger as b_log, settings
+from broker import exceptions
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
@@ -42,6 +42,13 @@ def _special_inventory_field(action_name):
         return func
 
     return decorator
+
+
+def clone_global_settings():
+    """Get broker settings by cloning the current global settings object."""
+    from broker.settings import settings
+
+    return settings.dynaconf_clone()
 
 
 def clean_dict(in_dict):
@@ -174,7 +181,7 @@ def resolve_nick(nick, broker_settings=None):
 
     :return: a dictionary mapping argument names and values
     """
-    _settings = broker_settings or settings.settings
+    _settings = broker_settings or clone_global_settings()
     nick_names = _settings.get("NICKS") or {}
     if nick in nick_names:
         return _settings.NICKS[nick].to_dict()
@@ -224,20 +231,21 @@ def resolve_file_args(broker_args):
     return final_args
 
 
-def load_inventory(filter=None):
+def load_inventory(filter=None, broker_settings=None):
     """Load all local hosts in inventory.
 
     :param filter: A filter string to apply to the inventory.
 
     :return: list of dictionaries
     """
-    inv_data = load_file(settings.inventory_path, warn=False)
+    _settings = broker_settings or clone_global_settings()
+    inv_data = load_file(_settings.inventory_path, warn=False)
     if inv_data and filter:
         inv_data = eval_filter(inv_data, filter)
     return inv_data or []
 
 
-def update_inventory(add=None, remove=None):
+def update_inventory(add=None, remove=None, broker_settings=None):
     """Update list of local hosts in the checkout interface.
 
     :param add: list of dictionaries representing new hosts
@@ -245,6 +253,7 @@ def update_inventory(add=None, remove=None):
 
     :return: no return value
     """
+    _settings = broker_settings or clone_global_settings()
     if add and not isinstance(add, list):
         add = [add]
     elif not add:
@@ -252,9 +261,9 @@ def update_inventory(add=None, remove=None):
     if remove and not isinstance(remove, list):
         remove = [remove]
     with INVENTORY_LOCK:
-        inv_data = load_inventory()
+        inv_data = load_inventory(broker_settings=_settings)
         if inv_data:
-            settings.inventory_path.unlink()
+            _settings.inventory_path.unlink()
 
         if remove:
             for host in inv_data[::-1]:
@@ -270,8 +279,8 @@ def update_inventory(add=None, remove=None):
         if add:
             inv_data.extend(add)
 
-        settings.inventory_path.touch()
-        yaml.dump(inv_data, settings.inventory_path)
+        _settings.inventory_path.touch()
+        yaml.dump(inv_data, _settings.inventory_path)
 
 
 def yaml_format(in_struct, force_yaml_dict=False):
@@ -506,6 +515,8 @@ def update_log_level(ctx, param, value):
         param: The Click parameter object.
         value: The new log level value.
     """
+    from broker import logger as b_log
+
     b_log.set_log_level(value)
     b_log.set_file_logging(value)
 
@@ -521,6 +532,8 @@ def fork_broker():
     if pid:
         logger.info(f"Running broker in the background with pid: {pid}")
         sys.exit(0)
+    from broker import logger as b_log
+
     b_log.set_log_level("silent")
     b_log.set_file_logging("silent")
 
