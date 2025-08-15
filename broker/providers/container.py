@@ -51,14 +51,7 @@ def get_runtime(
     broker_settings=None,
 ):
     """Return a runtime instance."""
-    return runtime_cls(
-        host=host,
-        username=username,
-        password=password,
-        port=port,
-        timeout=timeout,
-        broker_settings=broker_settings,
-    )
+    return runtime_cls(host=host, username=username, password=password, port=port, timeout=timeout)
 
 
 class Container(Provider):

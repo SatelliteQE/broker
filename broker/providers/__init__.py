@@ -100,6 +100,7 @@ class Provider(metaclass=ProviderMeta):
     # _checkout_options = [click.option("--workflow", type=str, help="Help text")]
     _checkout_options = []
     _execute_options = []
+    _extend_options = []
     _sensitive_attrs = []
 
     def __init__(self, broker_settings=None, **kwargs):

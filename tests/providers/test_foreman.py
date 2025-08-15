@@ -101,8 +101,7 @@ def broker_settings():
                 "name_prefix": "broker",
                 "verify": False,
             }
-        },
-        perform_migrations=False,
+        }
     )
 
 
