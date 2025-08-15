@@ -231,21 +231,22 @@ def resolve_file_args(broker_args):
     return final_args
 
 
-def load_inventory(filter=None, broker_settings=None):
+def load_inventory(filter=None):
     """Load all local hosts in inventory.
 
     :param filter: A filter string to apply to the inventory.
 
     :return: list of dictionaries
     """
-    _settings = broker_settings or clone_global_settings()
-    inv_data = load_file(_settings.inventory_path, warn=False)
+    from broker.settings import inventory_path
+
+    inv_data = load_file(inventory_path, warn=False)
     if inv_data and filter:
         inv_data = eval_filter(inv_data, filter)
     return inv_data or []
 
 
-def update_inventory(add=None, remove=None, broker_settings=None):
+def update_inventory(add=None, remove=None):
     """Update list of local hosts in the checkout interface.
 
     :param add: list of dictionaries representing new hosts
@@ -253,7 +254,8 @@ def update_inventory(add=None, remove=None, broker_settings=None):
 
     :return: no return value
     """
-    _settings = broker_settings or clone_global_settings()
+    from broker.settings import inventory_path
+
     if add and not isinstance(add, list):
         add = [add]
     elif not add:
@@ -261,9 +263,9 @@ def update_inventory(add=None, remove=None, broker_settings=None):
     if remove and not isinstance(remove, list):
         remove = [remove]
     with INVENTORY_LOCK:
-        inv_data = load_inventory(broker_settings=_settings)
+        inv_data = load_inventory()
         if inv_data:
-            _settings.inventory_path.unlink()
+            inventory_path.unlink()
 
         if remove:
             for host in inv_data[::-1]:
@@ -279,8 +281,8 @@ def update_inventory(add=None, remove=None, broker_settings=None):
         if add:
             inv_data.extend(add)
 
-        _settings.inventory_path.touch()
-        yaml.dump(inv_data, _settings.inventory_path)
+        inventory_path.touch()
+        yaml.dump(inv_data, inventory_path)
 
 
 def yaml_format(in_struct, force_yaml_dict=False):

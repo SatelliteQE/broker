@@ -33,7 +33,6 @@ BROKER_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 settings_path = BROKER_DIRECTORY.joinpath("broker_settings.yaml")
 inventory_path = BROKER_DIRECTORY.joinpath("inventory.yaml")
-cfg_manager = ConfigManager(settings_path)
 
 
 BASE_VALIDATORS = [
@@ -64,7 +63,7 @@ BASE_VALIDATORS = [
 ]
 
 
-def create_settings(config_dict=None, config_file=None, perform_migrations=True):
+def create_settings(config_dict=None, config_file=None, perform_migrations=False):
     """Create a new settings object with custom configuration.
 
     Args:
@@ -77,6 +76,7 @@ def create_settings(config_dict=None, config_file=None, perform_migrations=True)
     """
     file_path = config_file or settings_path
     file_exists = Path(file_path).exists() if file_path else False
+    cfg_manager = ConfigManager(settings_path)
 
     # Check for migrations if requested and file exists
     if perform_migrations and file_exists:
@@ -134,5 +134,29 @@ def create_settings(config_dict=None, config_file=None, perform_migrations=True)
     return new_settings
 
 
-# Create the global settings object
-settings = create_settings()
+class _SettingsProxy:
+    """Proxy object that creates settings on first access."""
+
+    def __init__(self):
+        self._settings = None
+
+    def _ensure_settings(self):
+        if self._settings is None:
+            self._settings = create_settings(perform_migrations=True)
+        return self._settings
+
+    def __getattr__(self, name):
+        return getattr(self._ensure_settings(), name)
+
+    def __getitem__(self, key):
+        return self._ensure_settings()[key]
+
+    def __setitem__(self, key, value):
+        self._ensure_settings()[key] = value
+
+    def __contains__(self, key):
+        return key in self._ensure_settings()
+
+
+# Create the global settings object (deferred)
+settings = _SettingsProxy()
