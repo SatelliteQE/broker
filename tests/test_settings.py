@@ -59,7 +59,7 @@ def test_purge_vault_envars(set_envars, broker_settings_path):
     from broker.settings import create_settings
 
     # Create settings with test path, no migrations
-    test_settings = create_settings(config_file=broker_settings_path, perform_migrations=False)
+    test_settings = create_settings(config_file=broker_settings_path)
 
     assert not test_settings.VAULT_ENABLED_FOR_DYNACONF
     assert os.environ["VAULT_ENABLED_FOR_DYNACONF"] == "1"

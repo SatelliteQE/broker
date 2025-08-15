@@ -102,7 +102,7 @@ def broker_settings():
             },
         },
     }
-    return settings.create_settings(config_dict=test_config, perform_migrations=False)
+    return settings.create_settings(config_dict=test_config)
 
 
 @pytest.fixture(scope="session")
