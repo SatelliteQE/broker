@@ -22,7 +22,7 @@ from contextlib import contextmanager
 
 from logzero import logger
 
-from broker import exceptions, helpers
+from broker import exceptions, helpers, logger as broker_logger
 from broker.hosts import Host
 from broker.providers import PROVIDER_ACTIONS, PROVIDERS, _provider_imports
 
@@ -56,6 +56,13 @@ class Broker:
         self._settings = broker_settings or helpers.clone_global_settings()
         if broker_settings:
             logger.debug(f"Using local settings object: {self._settings.to_dict()}")
+            if "logging" in broker_settings:
+                broker_logger.setup_logzero(
+                    level=broker_settings.logging.console_level,
+                    formatter=kwargs.pop("broker_log_formatter", None),
+                    file_level=broker_settings.logging.file_level,
+                    path=broker_settings.logging.get("file_path"),
+                )
         else:
             logger.debug("Using global settings.")
         kwargs = helpers.resolve_file_args(kwargs)
