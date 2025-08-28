@@ -146,7 +146,7 @@ class Host:
                 port=getattr(self, "port", self._settings.get("SSH", {}).get("HOST_SSH_PORT", 22)),
                 username=getattr(
                     self,
-                    "user",
+                    "username",
                     self._settings.get("SSH", {}).get("HOST_USERNAME", self.DEFAULT_USER),
                 ),
                 password=getattr(
