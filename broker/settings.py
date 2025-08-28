@@ -44,7 +44,7 @@ BASE_VALIDATORS = [
     Validator("SSH.HOST_SSH_KEY_FILENAME", default=None),
     Validator("SSH.HOST_IPV6", default=False),
     Validator("SSH.HOST_IPV4_FALLBACK", default=True),
-    Validator("SSH.BACKEND", default="ssh2-python312"),
+    Validator("SSH.BACKEND", default="hussh"),
     Validator("LOGGING", is_type_of=dict),
     Validator(
         "LOGGING.CONSOLE_LEVEL",
@@ -63,13 +63,75 @@ BASE_VALIDATORS = [
 ]
 
 
-def create_settings(config_dict=None, config_file=None, perform_migrations=False):
+def _handle_migrations(cfg_manager, file_exists):
+    """Handle settings file migrations if needed."""
+    if not (file_exists and cfg_manager._get_migrations()):
+        return
+
+    if INTERACTIVE_MODE:
+        click.secho(
+            "Broker settings file has pending migrations.\n"
+            "Continuing without running the migrations may cause errors.",
+            fg="red",
+        )
+        if click.confirm("Would you like to run the migrations now?"):
+            cfg_manager.migrate()
+        else:
+            click.secho("Continuing without running migrations.", fg="yellow")
+    else:
+        cfg_manager.migrate()
+
+
+def _handle_vault_env_vars():
+    """Temporarily remove vault environment variables and return them."""
+    vault_vars = {k: v for k, v in os.environ.items() if "VAULT_" in k}
+    for k in vault_vars:
+        del os.environ[k]
+    return vault_vars
+
+
+def _create_and_configure_settings(file_path, file_exists, config_dict):
+    """Create settings object and apply configuration."""
+    new_settings = Dynaconf(
+        settings_file=str(file_path) if file_exists else None,
+        ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
+        validators=BASE_VALIDATORS,
+    )
+
+    # Remove vault loader if set somehow
+    new_settings._loaders = [loader for loader in new_settings._loaders if "vault" not in loader]
+
+    # Add any configuration values passed in
+    if config_dict:
+        for key, value in config_dict.items():
+            new_settings[key] = value
+
+    return new_settings
+
+
+def _validate_settings(new_settings, skip_validation, file_exists, file_path):
+    """Validate settings and handle errors."""
+    try:
+        if skip_validation:
+            new_settings.validators.validate(only="LOGGING")
+        else:
+            new_settings.validators.validate()
+    except ValidationError as err:
+        if file_exists:
+            raise ConfigurationError(f"Configuration error in {file_path}: {err.args[0]}") from err
+        # If no file exists, just ensure defaults are applied
+
+
+def create_settings(
+    config_dict=None, config_file=None, perform_migrations=False, skip_validation=False
+):
     """Create a new settings object with custom configuration.
 
     Args:
         config_dict: Dictionary containing configuration values to overlay onto settings
         config_file: Path to a settings file to use instead of the default
         perform_migrations: Whether to check for and perform migrations
+        skip_validation: Whether to skip all (but logging) validations
 
     Returns:
         A dynaconf settings object
@@ -78,48 +140,18 @@ def create_settings(config_dict=None, config_file=None, perform_migrations=False
     file_exists = Path(file_path).exists() if file_path else False
     cfg_manager = ConfigManager(settings_path)
 
-    # Check for migrations if requested and file exists
-    if perform_migrations and file_exists:
-        if INTERACTIVE_MODE and cfg_manager._get_migrations():
-            click.secho(
-                "Broker settings file has pending migrations.\n"
-                "Continuing without running the migrations may cause errors.",
-                fg="red",
-            )
-            if click.confirm("Would you like to run the migrations now?"):
-                cfg_manager.migrate()
-            else:
-                click.secho("Continuing without running migrations.", fg="yellow")
-        elif cfg_manager._get_migrations():
-            cfg_manager.migrate()
+    # Handle migrations
+    if perform_migrations:
+        _handle_migrations(cfg_manager, file_exists)
 
-    # temporary fix for dynaconf #751
-    vault_vars = {k: v for k, v in os.environ.items() if "VAULT_" in k}
-    for k in vault_vars:
-        del os.environ[k]
+    # Handle vault environment variables
+    vault_vars = _handle_vault_env_vars()
 
-    # Create settings object
-    new_settings = Dynaconf(
-        settings_file=str(file_path) if file_exists else None,
-        ENVVAR_PREFIX_FOR_DYNACONF="BROKER",
-        validators=BASE_VALIDATORS,
-    )
+    # Create and configure settings
+    new_settings = _create_and_configure_settings(file_path, file_exists, config_dict)
 
-    # to make doubly sure, remove the vault loader if set somehow
-    new_settings._loaders = [loader for loader in new_settings._loaders if "vault" not in loader]
-
-    # Add any configuration values passed in
-    if config_dict:
-        for key, value in config_dict.items():
-            new_settings[key] = value
-
-    # Validate the logging settings
-    try:
-        new_settings.validators.validate(only="LOGGING")
-    except ValidationError as err:
-        if file_exists:
-            raise ConfigurationError(f"Configuration error in {file_path}: {err.args[0]}") from err
-        # If no file exists, just ensure defaults are applied
+    # Validate settings
+    _validate_settings(new_settings, skip_validation, file_exists, file_path)
 
     # Restore environment variables
     os.environ.update(vault_vars)

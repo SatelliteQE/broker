@@ -8,7 +8,7 @@ import awxkit
 import logzero
 import urllib3
 
-from broker.settings import BROKER_DIRECTORY, settings
+from broker.settings import BROKER_DIRECTORY
 
 
 class LOG_LEVEL(IntEnum):
@@ -19,6 +19,9 @@ class LOG_LEVEL(IntEnum):
     INFO = logging.INFO
     WARNING = logging.WARNING
     ERROR = logging.ERROR
+
+
+DEFAULT_FILE_LEVEL = LOG_LEVEL.DEBUG  # Default file logging level if not overridden
 
 
 class RedactingFilter(logging.Filter):
@@ -101,25 +104,24 @@ def formatter_factory(log_level, color=True):
     return formatter
 
 
-def set_log_level(level=settings.logging.console_level):
+def set_log_level(level):
     """Set the log level for logzero."""
     log_level = LOG_LEVEL.INFO if level == "silent" else resolve_log_level(level)
     logzero.formatter(formatter=formatter_factory(log_level))
     logzero.loglevel(level=log_level)
 
 
-def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
+def set_file_logging(level, path="logs/broker.log"):
     """Set the file logging for logzero."""
     silent = False
     if level == "silent":
         silent = True
         log_level = LOG_LEVEL.INFO
     else:
-        # Allow override of file logging level with --log-level, if the new level is lower than
-        # settings.logging.file_level. Otherwise, use the value from settings.
-        old_log_level = resolve_log_level(settings.logging.file_level)
+        # Allow override of file logging level with if the new level is lower than the default.
+        # Otherwise, use the default value.
         new_log_level = resolve_log_level(level)
-        log_level = new_log_level if new_log_level < old_log_level else old_log_level
+        log_level = new_log_level if new_log_level < DEFAULT_FILE_LEVEL else DEFAULT_FILE_LEVEL
 
     path = BROKER_DIRECTORY.joinpath(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -134,15 +136,16 @@ def set_file_logging(level=settings.logging.file_level, path="logs/broker.log"):
 
 
 def setup_logzero(
-    level=settings.logging.console_level,
+    level="info",
     formatter=None,
-    file_level=settings.logging.file_level,
+    file_level="debug",
     name=None,
     path="logs/broker.log",
 ):
     """Call logzero setup with the given settings."""
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    patch_awx_for_verbosity(awxkit.api)
+    level = level or "info"
+    file_level = file_level or "debug"
+    path = path or "logs/broker.log"
     set_log_level(level)
     set_file_logging(file_level, path)
     if formatter:
@@ -151,4 +154,6 @@ def setup_logzero(
     logzero.logger.addFilter(RedactingFilter(_sensitive))
 
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+patch_awx_for_verbosity(awxkit.api)
 setup_logzero()

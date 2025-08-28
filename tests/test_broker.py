@@ -70,9 +70,7 @@ def test_broker_checkin_n_sync_empty_hostname(broker_settings):
             pass
 
     # Verify cleanup before proceeding
-    assert not helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"'), (
-        "Inventory cleanup failed before test execution."
-    )
+    assert not helpers.load_inventory(filter='@inv._broker_provider == "TestProvider"'), "Inventory cleanup failed before test execution."
 
     broker_inst = broker.Broker(nick="test_nick", broker_settings=broker_settings)
     broker_inst.checkout()

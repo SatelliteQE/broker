@@ -28,8 +28,7 @@ dependencies = [
     "packaging",
     "rich",
     "rich_click",
-    "ruamel.yaml",
-    "ssh2-python",
+    "ruamel.yaml"
 ]
 
 [project.urls]

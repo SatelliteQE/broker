@@ -20,7 +20,7 @@ class ContainerApiStub(MockStub):
      - self.runtime.get_logs(cont_inst)
     """
 
-    def __init__(self, config=None, **kwargs):  # Added config parameter
+    def __init__(self, **kwargs):
         in_dict = {
             "images": [MockStub({"tags": "ch-d:ubi8"})],  # self.runtime.images
             "containers": [MockStub({"tags": "f37d3058317f"})],  # self.runtime.containers
@@ -93,8 +93,8 @@ def config_stub():
 
 
 @pytest.fixture
-def api_stub(config_stub):  # api_stub now depends on config_stub
-    return ContainerApiStub(config=config_stub)
+def api_stub():  # api_stub now depends on config_stub
+    return ContainerApiStub()
 
 
 @pytest.fixture
