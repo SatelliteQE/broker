@@ -5,7 +5,8 @@ import time
 from logzero import logger
 import requests
 
-from broker import exceptions, helpers
+from broker import exceptions
+from broker.settings import clone_global_settings
 
 
 class ForemanBind:
@@ -16,7 +17,7 @@ class ForemanBind:
     }
 
     def __init__(self, broker_settings=None, **kwargs):
-        self._settings = broker_settings or helpers.clone_global_settings()
+        self._settings = broker_settings or clone_global_settings()
         self.foreman_username = kwargs.get(
             "foreman_username", self._settings.foreman.foreman_username
         )

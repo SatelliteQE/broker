@@ -25,6 +25,7 @@ from logzero import logger
 from broker import exceptions, helpers, logger as broker_logger
 from broker.hosts import Host
 from broker.providers import PROVIDER_ACTIONS, PROVIDERS, _provider_imports
+from broker.settings import clone_global_settings
 
 # load all the provider class so they are registered
 for _import in _provider_imports:
@@ -53,7 +54,7 @@ class Broker:
     UserError = exceptions.UserError
 
     def __init__(self, broker_settings=None, **kwargs):
-        self._settings = broker_settings or helpers.clone_global_settings()
+        self._settings = broker_settings or clone_global_settings()
         if broker_settings:
             logger.debug(f"Using local settings object: {self._settings.to_dict()}")
             if "logging" in broker_settings:
@@ -281,7 +282,7 @@ class Broker:
     @staticmethod
     def sync_inventory(provider, broker_settings=None):
         """Acquire a list of hosts from a provider and update our inventory."""
-        _settings = broker_settings or helpers.clone_global_settings()
+        _settings = broker_settings or clone_global_settings()
         additional_arg, instance = None, {}
         if "::" in provider:
             provider, instance = provider.split("::")
@@ -351,7 +352,7 @@ class Broker:
         a dictionary by argument name e.g. host_dict["rhel7"] is a ContentHost object
         """
         # create all the broker instances and perform checkouts in parallel
-        _settings = broker_settings or helpers.clone_global_settings()
+        _settings = broker_settings or clone_global_settings()
         broker_instances = {
             name: cls(broker_settings=_settings, **kwargs) for name, kwargs in multi_dict.items()
         }
