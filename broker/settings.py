@@ -2,8 +2,6 @@
 
 Useful items:
     settings: The settings object.
-    init_settings: Function to initialize the settings file.
-    validate_settings: Function to validate the settings file.
     INTERACTIVE_MODE: Whether or not Broker is running in interactive mode.
     BROKER_DIRECTORY: The directory where Broker looks for its files.
     settings_path: The path to the settings file.
@@ -164,6 +162,11 @@ def create_settings(
         )
 
     return new_settings
+
+
+def clone_global_settings():
+    """Get broker settings by cloning the current global settings object."""
+    return settings.dynaconf_clone()
 
 
 class _SettingsProxy:

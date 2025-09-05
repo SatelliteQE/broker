@@ -38,7 +38,8 @@ from pathlib import Path
 import dynaconf
 from logzero import logger
 
-from broker import exceptions, helpers
+from broker import exceptions
+from broker.settings import clone_global_settings
 
 # populate a list of all provider module names
 _provider_imports = [
@@ -114,7 +115,7 @@ class Provider(metaclass=ProviderMeta):
                 f"{cls_name} provider using custom settings object: {broker_settings.to_dict()}"
             )
         else:
-            self._settings = helpers.clone_global_settings()
+            self._settings = clone_global_settings()
             logger.debug(f"{cls_name} provider using global settings")
         self._construct_params = []
         logger.debug(f"{cls_name} provider instantiated with {kwargs=}")
