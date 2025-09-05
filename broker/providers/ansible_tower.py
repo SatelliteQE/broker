@@ -16,7 +16,8 @@ from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 
 from broker import exceptions
-from broker.helpers import MockStub, clone_global_settings, eval_filter, find_origin, yaml
+from broker.helpers import MockStub, eval_filter, find_origin, yaml
+from broker.settings import clone_global_settings
 
 # Basic import first - we'll configure it properly later
 try:

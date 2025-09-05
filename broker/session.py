@@ -18,6 +18,7 @@ from logzero import logger
 
 from broker import helpers
 from broker.exceptions import NotImplementedError
+from broker.settings import clone_global_settings
 
 SSH_NOT_INSTALLED_MSG = (
     "{backend} is not installed.\n"
@@ -36,7 +37,7 @@ def make_session(broker_settings=None, **kwargs):
     Returns:
         A Session instance from the configured backend
     """
-    _settings = broker_settings or helpers.clone_global_settings()
+    _settings = broker_settings or clone_global_settings()
     backend = _settings.SSH.BACKEND
 
     logger.debug(f"Attempting to load SSH backend: {backend}")
@@ -66,7 +67,7 @@ def make_session(broker_settings=None, **kwargs):
         # Create and return a dummy session that won't work but won't crash
         class DummySession:
             def __init__(self, broker_settings=None, **kwargs):
-                self._settings = broker_settings or helpers.clone_global_settings()
+                self._settings = broker_settings or clone_global_settings()
 
         return DummySession(broker_settings=_settings, **kwargs)
 
@@ -80,7 +81,7 @@ def get_interactive_shell(broker_settings=None):
     Returns:
         The InteractiveShell class from the configured backend or None if not available
     """
-    _settings = broker_settings or helpers.clone_global_settings()
+    _settings = broker_settings or clone_global_settings()
     backend = _settings.SSH.BACKEND
 
     try:
@@ -111,7 +112,7 @@ class ContainerSession:
 
     def __init__(self, cont_inst, runtime=None, broker_settings=None):
         self._cont_inst = cont_inst
-        self._settings = broker_settings or helpers.clone_global_settings()
+        self._settings = broker_settings or clone_global_settings()
         if not runtime:
             runtime = self._settings.CONTAINER.runtime
         self.runtime = runtime
