@@ -23,6 +23,7 @@ from rich.table import Table
 from ruamel.yaml import YAML
 
 from broker import exceptions
+from broker.settings import clone_global_settings
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
@@ -42,13 +43,6 @@ def _special_inventory_field(action_name):
         return func
 
     return decorator
-
-
-def clone_global_settings():
-    """Get broker settings by cloning the current global settings object."""
-    from broker.settings import settings
-
-    return settings.dynaconf_clone()
 
 
 def clean_dict(in_dict):

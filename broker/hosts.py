@@ -70,7 +70,7 @@ class Host:
             self._settings.validators.validate(only="SSH")
         else:
             # Use the global settings object
-            from broker.helpers import clone_global_settings
+            from broker.settings import clone_global_settings
 
             self._settings = clone_global_settings()
             global SETTINGS_VALIDATED  # noqa: PLW0603
