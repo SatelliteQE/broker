@@ -3,6 +3,7 @@
 import importlib
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import pkgutil
 import sys
@@ -39,7 +40,8 @@ class ConfigManager:
     e.g. broker config view AnsibleTower.instances.my_instance
     """
 
-    interactive_mode = sys.stdin.isatty()
+    _env_val = os.environ.get("BROKER_INTERACTIVE_MODE", "").lower()
+    interactive_mode = False if _env_val in ("false", "0") else sys.stdin.isatty()
     version = version("broker")
 
     def __init__(self, settings_path=None):
