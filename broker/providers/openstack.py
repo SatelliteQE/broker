@@ -53,7 +53,6 @@ class OpenStack(Provider):
         super().__init__(**kwargs)
         self._connection = None
 
-
     @property
     def connection(self):
         """Get OpenStack connection."""
