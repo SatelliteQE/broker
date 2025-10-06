@@ -110,8 +110,20 @@ def container_client():
     """Provide a container client, preferring Podman, falling back to Docker."""
     client = None
     last_exception = None
+
+    # Try podman with default connection first
     try:
-        # Attempt to import and use podman first
+        import podman
+        client = PodmanBind()  # Don't specify host to use default connection
+        # Test if the client is functional
+        client.client.images.list()
+        return client
+    except (ImportError, Exception) as e:
+        last_exception = e
+        client = None
+
+    # Try podman with localhost
+    try:
         import podman
 
         client = PodmanBind(host="localhost")
@@ -153,7 +165,7 @@ def ensure_test_server_image(container_client):
         client.pull_image(TEST_SERVER_IMAGE)
 
 
-@pytest.fixture(scope="session")  # Removed autouse=True temporarily
+@pytest.fixture(scope="session")  # Removed autouse=True
 def run_test_server(ensure_test_server_image, container_client):
     """Run a test server in a container using the selected client."""
     # Use the client provided by the container_client fixture
