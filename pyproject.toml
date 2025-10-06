@@ -46,6 +46,7 @@ dev = [
     "bumpver",
 ]
 docker = ["docker", "paramiko"]
+openstack = ["openstacksdk"]
 podman = ["podman>=5.2"]
 
 ssh2_python = ["ssh2-python"]

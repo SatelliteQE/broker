@@ -14,22 +14,22 @@ IMG_FILE = Path("tests/data/ssh/puppy.jpeg").resolve()
 
 
 @pytest.fixture
-def host():
+def host(run_test_server):
     """Return a basic Host object."""
     return Host(hostname="localhost", port=8022, password="toor")
 
 
-def test_password_auth():
+def test_password_auth(run_test_server):
     """Test that we can establish a connection with password-based authentication."""
     assert Host(hostname="localhost", port=8022, password="toor")
 
 
-def test_key_auth():
+def test_key_auth(run_test_server):
     """Test that we can establish a connection with key-based authentication."""
     assert Host(hostname="localhost", port=8022, key_filename="tests/data/ssh/test_key")
 
 
-def test_key_with_password_auth():
+def test_key_with_password_auth(run_test_server):
     """Test that we can establish a connection with key-based authentication and a password."""
     assert Host(
         hostname="localhost",
