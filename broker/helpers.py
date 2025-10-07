@@ -737,7 +737,7 @@ def temporary_tar(paths):
     temp_tar.unlink()
 
 
-def dictlist_to_table(dict_list, title=None, _id=False):
+def dictlist_to_table(dict_list, title=None, _id=False, headers=False):
     """Convert a list of dictionaries to a rich table."""
     # I like pretty colors, so let's cycle through them
     column_colors = ["cyan", "magenta", "green", "yellow", "blue", "red"]
@@ -757,4 +757,23 @@ def dictlist_to_table(dict_list, title=None, _id=False):
         row = [str(id_num)] if _id else []
         row.extend([str(value) for value in data_dict.values()])
         table.add_row(*row)
+    if not headers:
+        table.show_header = False
+    return table
+
+
+def dict_to_table(in_dict, title=None, headers=None):
+    """Convert a dictionary into a rich table."""
+    # need to normalize the values first
+    in_dict = {k: str(v) for k, v in in_dict.items()}
+    table = Table(title=title)
+    if isinstance(headers, tuple | list):
+        table.add_column(headers[0], style="cyan")
+        table.add_column(headers[1], style="magenta")
+    else:
+        table.add_column("key", style="cyan")
+        table.add_column("value", style="magenta")
+        table.show_header = False
+    for key, val in in_dict.items():
+        table.add_row(key, val)
     return table
