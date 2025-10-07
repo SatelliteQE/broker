@@ -124,17 +124,17 @@ def populate_providers(click_group):
             broker_inst.provider_help(ctx.info_name)
 
         # iterate through available actions and populate options from them
-        for option, (p_cls, is_flag) in PROVIDER_HELP.items():
+        for option, (p_cls, is_flag, alt_text) in PROVIDER_HELP.items():
             if p_cls is not prov_class:
                 continue
             option = option.replace("_", "-")  # noqa: PLW2901
             if is_flag:
                 provider_cmd = click.option(
-                    f"--{option}", is_flag=True, help=f"Get available {option}"
+                    f"--{option}", is_flag=True, help=alt_text or f"Get available {option}"
                 )(provider_cmd)
             else:
                 provider_cmd = click.option(
-                    f"--{option}", type=str, help=f"Get information about a {option}"
+                    f"--{option}", type=str, help=alt_text or f"Get information about a {option}"
                 )(provider_cmd)
         provider_cmd = click.option(
             "--results-limit",
