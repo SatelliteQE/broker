@@ -72,6 +72,7 @@ class ProviderMeta(ABCMeta):
                             PROVIDER_HELP[_name] = (
                                 new_cls,
                                 isinstance(param.default, bool),
+                                getattr(obj, "_help_overrides", {}).get(_name),
                             )
                             logger.debug(f"Registered help option {_name} for provider {_name}")
                 elif hasattr(obj, "_as_action"):
@@ -207,3 +208,13 @@ class Provider(metaclass=ProviderMeta):
             return func
 
         return decorator
+
+    @staticmethod
+    def help_override(**overrides):
+        """Decorate the provider_help function to overwrite auto-generated help text."""
+
+        def wrapper(func):
+            func._help_overrides = overrides
+            return func
+
+        return wrapper

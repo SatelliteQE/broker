@@ -15,6 +15,7 @@ from dynaconf import Validator
 from logzero import logger
 from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
+from rich.console import Console
 
 from broker import exceptions
 from broker.helpers import MockStub, eval_filter, find_origin, yaml
@@ -826,6 +827,7 @@ class AnsibleTower(Provider):
             provider_labels=provider_labels,
         )
 
+    @Provider.help_override(tower_inventory="Filter results by the specified inventory.")
     def provider_help(  # noqa: PLR0911, PLR0912, PLR0915 - Possible TODO refactor
         self,
         workflows=False,
@@ -835,10 +837,15 @@ class AnsibleTower(Provider):
         templates=False,
         inventories=False,
         inventory=None,
+        flavors=False,
+        tower_inventory=None,
         **kwargs,
     ):
         """Get a list of extra vars and their defaults from a workflow."""
         results_limit = kwargs.get("results_limit", self._settings.ANSIBLETOWER.results_limit)
+        rich_console = Console(no_color=self._settings.less_colors)
+        # if a user passes a different tower inventory, let's try using that
+        self._inventory = tower_inventory
         if workflow:
             if wfjt := self._v2.workflow_job_templates.get(name=workflow).results:
                 wfjt = wfjt.pop()
@@ -846,11 +853,17 @@ class AnsibleTower(Provider):
                 logger.warning(f"Workflow {workflow} not found!")
                 return
             default_inv = self._v2.inventory.get(id=wfjt.inventory).results.pop()
-            logger.info(
-                f"\nDescription:\n{wfjt.description}\n\n"
-                f"Accepted additional nick fields:\n{helpers.yaml_format(wfjt.extra_vars)}"
-                f"tower_inventory: {default_inv['name']}"
+            top_table = helpers.dict_to_table(
+                {"Description": wfjt.description, "Inventory": default_inv["name"]},
+                title=f"{workflow} information",
             )
+            rich_console.print(top_table)
+            extras_table = helpers.dict_to_table(
+                json.loads(wfjt.extra_vars),
+                title="Workflow Variables",
+                headers=("Variable", "Default Value"),
+            )
+            rich_console.print(extras_table)
         elif workflows:
             workflows = [
                 workflow.name
@@ -863,16 +876,24 @@ class AnsibleTower(Provider):
             if res_filter := kwargs.get("results_filter"):
                 workflows = eval_filter(workflows, res_filter, "res")
                 workflows = workflows if isinstance(workflows, list) else [workflows]
-            workflows = "\n".join(workflows[:results_limit])
-            logger.info(f"Available workflows:\n{workflows}")
+            workflow_table = helpers.dictlist_to_table(
+                [{"name": workflow} for workflow in workflows[:results_limit]],
+                title="Available Workflows",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(workflow_table)
         elif inventory:
             if inv := self._v2.inventory.get(name=inventory, kind="").results:
                 inv = inv.pop()
             else:
                 logger.warning(f"Inventory {inventory} not found!")
                 return
-            inv = {"Name": inv.name, "ID": inv.id, "Description": inv.description}
-            logger.info(f"Accepted additional nick fields:\n{helpers.yaml_format(inv)}")
+            inv_table = helpers.dict_to_table(
+                {"ID": inv.id, "Name": inv.name, "Description": inv.description},
+                title="Inventory Details",
+            )
+            rich_console.print(inv_table)
         elif inventories:
             inv = [inv.name for inv in self._v2.inventory.get(kind="", page_size=1000).results]
             if not inv:
@@ -881,8 +902,13 @@ class AnsibleTower(Provider):
             if res_filter := kwargs.get("results_filter"):
                 inv = eval_filter(inv, res_filter, "res")
                 inv = inv if isinstance(inv, list) else [inv]
-            inv = "\n".join(inv[:results_limit])
-            logger.info(f"Available Inventories:\n{inv}")
+            inv_table = helpers.dictlist_to_table(
+                [{"name": i} for i in inv[:results_limit]],
+                title="Available Inventories",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(inv_table)
         elif job_template:
             if jt := self._v2.job_templates.get(name=job_template).results:
                 jt = jt.pop()
@@ -890,11 +916,17 @@ class AnsibleTower(Provider):
                 logger.warning(f"Job Template {job_template} not found!")
                 return
             default_inv = self._v2.inventory.get(id=jt.inventory).results.pop()
-            logger.info(
-                f"\nDescription:\n{jt.description}\n\n"
-                f"Accepted additional nick fields:\n{helpers.yaml_format(jt.extra_vars)}"
-                f"tower_inventory: {default_inv['name']}"
+            top_table = helpers.dict_to_table(
+                {"Description": jt.description, "Inventory": default_inv["name"]},
+                title=f"{job_template} information",
             )
+            rich_console.print(top_table)
+            extras_table = helpers.dict_to_table(
+                json.loads(jt.extra_vars),
+                title="Job Template Variables",
+                headers=("Variable", "Default Value"),
+            )
+            rich_console.print(extras_table)
         elif job_templates:
             job_templates = [
                 job_template.name
@@ -909,8 +941,13 @@ class AnsibleTower(Provider):
                 job_templates = (
                     job_templates if isinstance(job_templates, list) else [job_templates]
                 )
-            job_templates = "\n".join(job_templates[:results_limit])
-            logger.info(f"Available job templates:\n{job_templates}")
+            job_template_table = helpers.dictlist_to_table(
+                [{"name": job_template} for job_template in job_templates[:results_limit]],
+                title="Available Job Templates",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(job_template_table)
         elif templates:
             templates = list(
                 set(
@@ -926,8 +963,27 @@ class AnsibleTower(Provider):
             if res_filter := kwargs.get("results_filter"):
                 templates = eval_filter(templates, res_filter, "res")
                 templates = templates if isinstance(templates, list) else [templates]
-            templates = "\n".join(templates[:results_limit])
-            logger.info(f"Available templates:\n{templates}")
+            template_table = helpers.dictlist_to_table(
+                [{"name": template} for template in templates[:results_limit]],
+                title="Available Templates",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(template_table)
+        elif flavors:
+            flavors = self.execute(workflow="list-flavors", artifacts="last")["data_out"][
+                "list_flavors"
+            ]
+            if not flavors:
+                logger.warning("No flavors found!")
+                return
+            if res_filter := kwargs.get("results_filter"):
+                flavors = eval_filter(flavors, res_filter, "res")
+                flavors = flavors if isinstance(flavors, list) else [flavors]
+            flavor_table = helpers.dictlist_to_table(
+                flavors[:results_limit], title="Available Flavors", _id=False
+            )
+            rich_console.print(flavor_table)
 
     def release(self, name, broker_args=None):
         """Release the host back to the tower instance via the release workflow."""
