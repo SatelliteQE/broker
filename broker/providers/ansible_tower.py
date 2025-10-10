@@ -17,26 +17,14 @@ from requests.exceptions import ConnectionError
 from rich.console import Console
 from rich.prompt import Prompt
 
-from broker import exceptions
+from broker import exceptions, helpers
 from broker.helpers import MockStub, eval_filter, find_origin, update_inventory, yaml
+from broker.providers import Provider
 from broker.settings import clone_global_settings
 
-# Basic import first - we'll configure it properly later
-try:
-    import awxkit
-except ImportError as err:
-    raise exceptions.UserError(message="Unable to import awxkit. Is it installed?") from err
-
-from broker import helpers
-from broker.providers import Provider
-
+# Module-level variables for deferred imports
+awxkit = None
 AAP_URL_PREFIX = "#"  # Used to construct the UI URL
-
-# Configure ruamel yaml representer for PseudoNamespace
-yaml.representer.add_representer(
-    awxkit.utils.PseudoNamespace,
-    lambda dumper, data: dumper.represent_dict(dict(data)),
-)
 
 
 def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
@@ -45,6 +33,8 @@ def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
     This function can be called multiple times safely.
     Returns True if reconfiguration was done, False otherwise.
     """
+    global awxkit, AAP_URL_PREFIX  # noqa: PLW0603
+
     _settings = broker_settings or clone_global_settings()
     # Exit immediately if we've already configured
     if getattr(detect_and_reconfigure_for_aap25, "_configured", False):
@@ -84,18 +74,14 @@ def detect_and_reconfigure_for_aap25(base_url, broker_settings=None):
         # Set environment variable for API path
         os.environ["AWXKIT_API_BASE_PATH"] = "/api/controller/"
 
-        # Re-import awxkit - must use globals() to update module reference in this scope
-        import awxkit as awxkit_new
+        # Re-import awxkit
+        import awxkit
 
-        globals()["awxkit"] = awxkit_new
-
-        # Update the url prefix
-        global AAP_URL_PREFIX  # noqa: PLW0603
         AAP_URL_PREFIX = "execution"
 
-        # re-onfigure ruamel yaml representer for PseudoNamespace
+        # Configure ruamel yaml representer for PseudoNamespace
         yaml.representer.add_representer(
-            awxkit_new.utils.PseudoNamespace,
+            awxkit.utils.PseudoNamespace,
             lambda dumper, data: dumper.represent_dict(dict(data)),
         )
 
@@ -282,6 +268,24 @@ class AnsibleTower(Provider):
             root: awxkit api root object
         """
         super().__init__(**kwargs)
+
+        # Import awxkit on first use
+        global awxkit  # noqa: PLW0603
+        if awxkit is None:
+            try:
+                import awxkit as awxkit_module
+
+                awxkit = awxkit_module
+                # Configure ruamel yaml representer for PseudoNamespace
+                yaml.representer.add_representer(
+                    awxkit.utils.PseudoNamespace,
+                    lambda dumper, data: dumper.represent_dict(dict(data)),
+                )
+            except ImportError as err:
+                raise exceptions.UserError(
+                    message="Unable to import awxkit. Is it installed? Install with 'pip install awxkit' or 'pip install broker[ansibletower]'"
+                ) from err
+
         # get our instance settings
         self.url = self._settings.ANSIBLETOWER.base_url
         self.uname = self._settings.ANSIBLETOWER.get("username")

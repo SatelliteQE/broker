@@ -4,7 +4,6 @@ import copy
 from enum import IntEnum
 import logging
 
-import awxkit
 import logzero
 import urllib3
 
@@ -60,8 +59,13 @@ logging.addLevelName("TRACE", LOG_LEVEL.TRACE)
 logzero.DEFAULT_COLORS[LOG_LEVEL.TRACE.value] = logzero.colors.Fore.MAGENTA
 
 
-def patch_awx_for_verbosity(api):
+def try_patch_awx_for_verbosity():
     """Patch the awxkit API to enable trace-level logging of API calls to Ansible provider."""
+    try:
+        from awxkit import api
+    except ImportError:
+        logzero.logger.debug("awxkit not installed, skipping awxkit logging patch")
+        return
     awx_log = api.client.log
     awx_log.parent = logzero.logger
 
@@ -155,5 +159,5 @@ def setup_logzero(
 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-patch_awx_for_verbosity(awxkit.api)
+try_patch_awx_for_verbosity()
 setup_logzero()

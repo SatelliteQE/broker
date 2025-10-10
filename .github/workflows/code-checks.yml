@@ -82,7 +82,7 @@ jobs:
         env:
           UV_SYSTEM_PYTHON: 1
         run: |
-          uv pip install "broker[dev,podman,openstack] @ ."
+          uv pip install "broker[ansibletower,dev,podman,openstack] @ ."
           broker config init --from tests/data/broker_settings.yaml
           broker config view
           pytest -v tests/ --ignore tests/functional --ignore tests/test_ssh.py
