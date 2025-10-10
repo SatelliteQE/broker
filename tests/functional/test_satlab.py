@@ -25,6 +25,8 @@ def skip_if_not_configured():
 @pytest.fixture(scope="module")
 def temp_inventory():
     """Temporarily move the local inventory, then move it back when done"""
+    if not inventory_path.exists():
+        inventory_path.write_text("[]")
     backup_path = inventory_path.rename(f"{inventory_path.absolute()}.bak")
     yield
     CliRunner().invoke(cli, ["checkin", "--all", "--filter", "_broker_provider<AnsibleTower"])
