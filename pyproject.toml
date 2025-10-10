@@ -21,20 +21,20 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "awxkit",
     "click",
     "dynaconf>=3.1.6,<4.0.0",
     "logzero",
     "packaging",
     "rich",
     "rich_click",
-    "ruamel.yaml"
+    "ruamel.yaml",
 ]
 
 [project.urls]
 Repository = "https://github.com/SatelliteQE/broker"
 
 [project.optional-dependencies]
+ansibletower = ["awxkit"]
 beaker = ["beaker-client"]
 dev = [
     "docker",

@@ -1,0 +1,2 @@
+workflow: deploy-rhel
+deploy_rhel_version: "9.6"

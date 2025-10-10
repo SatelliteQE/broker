@@ -12,13 +12,10 @@ from logzero import logger
 from broker import exceptions, helpers
 from broker.providers import Provider
 
-try:
-    import openstack
-    from openstack.exceptions import OpenStackCloudException, ResourceNotFound
-except ImportError as e:
-    raise ImportError(
-        "openstacksdk is required for the OpenStack provider. Please install it with 'pip install openstacksdk'"
-    ) from e
+# Deferred imports - will be imported when first OpenStack instance is created
+openstack = None
+OpenStackCloudException = None
+ResourceNotFound = None
 
 
 @contextmanager
@@ -51,6 +48,17 @@ class OpenStack(Provider):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Import openstack dependencies on first use
+        global openstack, OpenStackCloudException, ResourceNotFound  # noqa: PLW0603
+        if openstack is None:
+            try:
+                import openstack
+                from openstack.exceptions import OpenStackCloudException, ResourceNotFound
+            except ImportError as e:
+                raise ImportError(
+                    "openstacksdk is required for the OpenStack provider. "
+                    "Please install it with 'pip install openstacksdk' or 'pip install broker[openstack]'"
+                ) from e
         self._connection = None
 
     @property
