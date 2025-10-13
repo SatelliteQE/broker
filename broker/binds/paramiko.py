@@ -198,7 +198,7 @@ class Session:
     def run(self, command, timeout=0):
         """Run a command on the host and return the results."""
         timeout = None if timeout == 0 else timeout
-        stdin, stdout, stderr = self.client.exec_command(command, timeout=timeout)
+        _, stdout, stderr = self.client.exec_command(command, timeout=timeout)
         stdout.channel.recv_exit_status()  # Wait for command termination
         return helpers.Result(
             status=stdout.channel.exit_status,

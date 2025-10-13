@@ -348,7 +348,6 @@ def test_checkout_without_key_name(api_stub):
     assert result["instance_id"] == "test-server-id"
 
 
-
 def test_resolution_fallback_strategies(openstack_stub):
     """Test resource resolution strategies."""
     assert openstack_stub._resolve_image("rhel-9-latest") == "rhel9-image-id"
