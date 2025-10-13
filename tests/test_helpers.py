@@ -167,7 +167,6 @@ def test_dict_from_paths_nested():
 
 def test_kwargs_from_click_ctx():
     """Test that we can extract kwargs from a mixed-style click context object"""
-
     class ctx:
         args = ["--arg1", "value1", "--arg2=value2", "--some-flag"]
 

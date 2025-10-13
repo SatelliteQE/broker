@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.7.0"
+version = "0.7.0rc1"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,25 +34,41 @@ dependencies = [
 Repository = "https://github.com/SatelliteQE/broker"
 
 [project.optional-dependencies]
+ansible_pylibssh = ["ansible-pylibssh"]
 ansibletower = ["awxkit"]
 beaker = ["beaker-client"]
 dev = [
+    "bumpver",
     "docker",
     "pexpect",
     "pre-commit",
     "pytest",
     "pytest-randomly",
     "ruff",
-    "bumpver",
 ]
 docker = ["docker", "paramiko"]
-openstack = ["openstacksdk"]
-podman = ["podman>=5.2"]
-
-ssh2_python = ["ssh2-python"]
-ansible_pylibssh = ["ansible-pylibssh"]
 hussh = ["hussh>=0.1.7"]
+openstack = ["openstacksdk"]
 paramiko = ["paramiko"]
+podman = ["podman>=5.2"]
+ssh2_python = ["ssh2-python"]
+all = [
+    "ansible-pylibssh",
+    "awxkit",
+    "beaker-client",
+    "bumpver",
+    "docker",
+    "hussh>=0.1.7",
+    "openstacksdk",
+    "paramiko",
+    "pexpect",
+    "pre-commit",
+    "pytest",
+    "pytest-randomly",
+    "podman>=5.2",
+    "ruff",
+    "ssh2-python",
+]
 
 [project.scripts]
 broker = "broker.commands:cli"
