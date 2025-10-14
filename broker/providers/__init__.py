@@ -51,7 +51,7 @@ PROVIDERS = {}
 # action: (InterfaceClass, "method_name")
 PROVIDER_ACTIONS = {}
 # action: (InterfaceClass, "method_name")
-PROVIDER_HELP = {}
+PROVIDER_HELP = []
 
 
 class ProviderMeta(ABCMeta):
@@ -68,13 +68,16 @@ class ProviderMeta(ABCMeta):
                     # register the help options based on the function arguments
                     for _name, param in inspect.signature(obj).parameters.items():
                         if _name not in ("self", "kwargs", "broker_settings"):
-                            # {_name: (cls, is_flag)}
-                            PROVIDER_HELP[_name] = (
-                                new_cls,
-                                isinstance(param.default, bool),
-                                getattr(obj, "_help_overrides", {}).get(_name),
+                            # (name, prov_cls, is_flag, help_override)
+                            PROVIDER_HELP.append(
+                                (
+                                    _name,
+                                    new_cls,
+                                    isinstance(param.default, bool),
+                                    getattr(obj, "_help_overrides", {}).get(_name),
+                                )
                             )
-                            logger.debug(f"Registered help option {_name} for provider {_name}")
+                            logger.debug(f"Registered help option {_name} for provider {name}")
                 elif hasattr(obj, "_as_action"):
                     for action in obj._as_action:
                         PROVIDER_ACTIONS[action] = (new_cls, attr)
