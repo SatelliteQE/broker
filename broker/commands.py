@@ -124,7 +124,7 @@ def populate_providers(click_group):
             broker_inst.provider_help(ctx.info_name)
 
         # iterate through available actions and populate options from them
-        for option, (p_cls, is_flag, alt_text) in PROVIDER_HELP.items():
+        for option, p_cls, is_flag, alt_text in PROVIDER_HELP:
             if p_cls is not prov_class:
                 continue
             option = option.replace("_", "-")  # noqa: PLW2901

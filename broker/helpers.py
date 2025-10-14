@@ -743,7 +743,7 @@ def temporary_tar(paths):
     temp_tar.unlink()
 
 
-def dictlist_to_table(dict_list, title=None, _id=False, headers=False):
+def dictlist_to_table(dict_list, title=None, _id=False, headers=True):
     """Convert a list of dictionaries to a rich table."""
     # I like pretty colors, so let's cycle through them
     column_colors = ["cyan", "magenta", "green", "yellow", "blue", "red"]

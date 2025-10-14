@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.7.0rc1"
+version = "0.7.0rc2"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,7 @@ dependencies = [
     "dynaconf>=3.1.6,<4.0.0",
     "logzero",
     "packaging",
+    "requests",
     "rich",
     "rich_click",
     "ruamel.yaml",

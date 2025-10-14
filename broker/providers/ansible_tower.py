@@ -216,7 +216,7 @@ def get_awxkit_and_uname(
     # Now proceed with token authentication (either provided or newly created)
     if token:
         helpers.emit(auth_type="token")
-        logger.info("Using token authentication")
+        logger.debug("Using token authentication")
         awxkit_config.token = token
         try:
             root.connection.login(username=None, password=None, token=token, auth_type="Bearer")
