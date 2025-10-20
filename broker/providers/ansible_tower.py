@@ -106,18 +106,17 @@ def convert_pseudonamespaces(attr_dict):
     return out_dict
 
 
-def resilient_job_wait(job, job_timeout=None, max_wait=None, broker_settings=None):
+def resilient_job_wait(job, broker_settings, job_timeout=None, max_wait=None):
     """Wait for a job to complete. Retry on errors.
 
     Args:
         job: The job object to wait for
+        broker_settings: Settings object to use instead of the global one
         job_timeout: Timeout for individual job wait attempts
         max_wait: Maximum time to continue retrying before giving up
-        broker_settings: Optional settings object to use instead of the global one
     """
-    _settings = broker_settings or clone_global_settings()
-    job_timeout = job_timeout or _settings.ANSIBLETOWER.workflow_timeout
-    max_wait = max_wait or _settings.ANSIBLETOWER.max_resilient_wait
+    job_timeout = job_timeout or broker_settings.ANSIBLETOWER.workflow_timeout
+    max_wait = max_wait or broker_settings.ANSIBLETOWER.max_resilient_wait
     completed = False
     start_time = time.time()
 
@@ -312,7 +311,7 @@ class AnsibleTower(Provider):
 
         # get our instance settings
         self.url = self._settings.ANSIBLETOWER.base_url
-        self.uname = self._settings.ANSIBLETOWER.get("username")
+        uname = self._settings.ANSIBLETOWER.get("username")
         self.pword = self._settings.ANSIBLETOWER.get("password")
         self.token = self._settings.ANSIBLETOWER.get("token")
         self.dangling_behavior = self._settings.ANSIBLETOWER.get("dangling_behavior")
@@ -325,14 +324,14 @@ class AnsibleTower(Provider):
             root=root,
             url=self.url,
             token=self.token,
-            uname=self.uname,
+            uname=uname,
             pword=self.pword,
             broker_settings=self._settings,
         )
 
         # Get the username for the authenticated user
         # If a username was specified in config, use that instead
-        self.username = self.uname or self._v2.me.get().results[0].username
+        self.username = uname or self._v2.me.get().results[0].username
         # Check to see if we're running AAP (ver 4.0+)
         self._is_aap = self._v2.ping.get().version[0] != "3"
 
@@ -838,7 +837,7 @@ class AnsibleTower(Provider):
         )
         helpers.emit(api_url=job_api_url, ui_url=job_ui_url)
         logger.info(f"Waiting for job: \nAPI: {job_api_url}\nUI: {job_ui_url}")
-        resilient_job_wait(job)
+        resilient_job_wait(job, broker_settings=self._settings)
         if job.status != "successful":
             failure_message = self._get_failure_messages(job)
             message_data = {
@@ -861,7 +860,7 @@ class AnsibleTower(Provider):
 
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned."""
-        user = user or self.uname
+        user = user or self.username
         invs = [
             inv
             for inv in self._v2.inventory.get(page_size=200).results
