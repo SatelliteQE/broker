@@ -1,0 +1,273 @@
+# Tox configuration for the broker project
+# https://tox.wiki/en/stable/config.html
+
+requires = ["tox>=4.20"]
+env_list = ["py310", "py311", "py312", "py313", "py314", "lint"]
+
+# Labels for grouping test environments
+[labels]
+test = ["py310", "py311", "py312", "py313", "py314"]
+ssh = ["ssh-hussh", "ssh-paramiko", "ssh2-python"]
+functional = ["func-containers", "func-beaker", "func-satlab"]
+all = [
+    "py310",
+    "py311",
+    "py312",
+    "py313",
+    "py314",
+    "lint",
+    "ssh-hussh",
+    "ssh-paramiko",
+    "ssh2-python",
+    "func-containers",
+    "func-beaker",
+    "func-satlab",
+]
+
+# Base configuration for all run environments
+[env_run_base]
+description = "Run unit tests with {base_python}"
+package = "wheel"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["ansibletower", "podman", "openstack"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = [
+    [
+        "broker",
+        "config",
+        "init",
+        "--from",
+        "{tox_root}/tests/data/broker_settings.yaml",
+    ],
+]
+commands = [
+    [
+        "pytest",
+        "-v",
+        "{tox_root}/tests/",
+        "--ignore",
+        "{tox_root}/tests/functional",
+        "--ignore",
+        "{tox_root}/tests/test_ssh.py",
+        "{posargs}",
+    ],
+]
+
+# Linting environment
+[env.lint]
+description = "Run code quality checks with ruff"
+skip_install = true
+deps = ["ruff"]
+commands_pre = []
+commands = [
+    [
+        "ruff",
+        "check",
+        "{tox_root}",
+    ],
+    [
+        "ruff",
+        "format",
+        "--check",
+        "{tox_root}",
+    ],
+]
+
+# Code formatting environment
+[env.format]
+description = "Format code with ruff"
+skip_install = true
+deps = ["ruff"]
+commands = [
+    [
+        "ruff",
+        "check",
+        "--fix",
+        "{tox_root}",
+    ],
+    [
+        "ruff",
+        "format",
+        "{tox_root}",
+    ],
+]
+
+# SSH Backend Testing Environments
+[env.ssh-hussh]
+description = "Test SSH functionality with hussh backend"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["hussh"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "hussh" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = [
+    [
+        "broker",
+        "config",
+        "init",
+        "--from",
+        "{tox_root}/tests/data/broker_settings.yaml",
+    ],
+]
+commands = [["pytest", "-v", "{tox_root}/tests/test_ssh.py", "{posargs}"]]
+
+[env.ssh-paramiko]
+description = "Test SSH functionality with paramiko backend"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["paramiko"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "paramiko" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = [
+    [
+        "broker",
+        "config",
+        "init",
+        "--from",
+        "{tox_root}/tests/data/broker_settings.yaml",
+    ],
+]
+commands = [["pytest", "-v", "{tox_root}/tests/test_ssh.py", "{posargs}"]]
+
+[env.ssh2-python]
+description = "Test SSH functionality with ssh2-python backend"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["ssh2_python"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "ssh2-python" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = [
+    [
+        "broker",
+        "config",
+        "init",
+        "--from",
+        "{tox_root}/tests/data/broker_settings.yaml",
+    ],
+]
+commands = [["pytest", "-v", "{tox_root}/tests/test_ssh.py", "{posargs}"]]
+
+# Functional Testing Environments
+[env.func-containers]
+description = "Run container-related functional tests"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["docker", "podman"]
+set_env = { BROKER_NON_INTERACTIVE = "1" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = []
+commands = [
+    [
+        "pytest",
+        "-v",
+        "{tox_root}/tests/functional/test_containers.py",
+        "{posargs}",
+    ],
+]
+
+[env.func-beaker]
+description = "Run Beaker-related functional tests"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["beaker"]
+set_env = { BROKER_NON_INTERACTIVE = "1" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = []
+commands = [
+    [
+        "pytest",
+        "-v",
+        "{tox_root}/tests/functional/test_rh_beaker.py",
+        "{posargs}",
+    ],
+]
+
+[env.func-satlab]
+description = "Run Satlab-related functional tests"
+deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
+extras = ["ansibletower"]
+set_env = { BROKER_NON_INTERACTIVE = "1" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = []
+commands = [
+    [
+        "pytest",
+        "-v",
+        "{tox_root}/tests/functional/test_satlab.py",
+        "{posargs}",
+    ],
+]
+
+# Quick validation environment
+[env.quick]
+description = "Quick validation - runs linting and minimal tests"
+deps = ["pytest>=8", "pytest-randomly", "ruff", "docker", "pexpect"]
+extras = ["ansibletower", "podman", "openstack"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1" }
+pass_env = ["CI", "BROKER_*"]
+allowlist_externals = ["broker"]
+commands_pre = [
+    [
+        "broker",
+        "config",
+        "init",
+        "--from",
+        "{tox_root}/tests/data/broker_settings.yaml",
+    ],
+]
+commands = [
+    [
+        "ruff",
+        "check",
+        "{tox_root}",
+    ],
+    [
+        "pytest",
+        "-v",
+        "{tox_root}/tests/test_broker.py",
+        "{tox_root}/tests/test_helpers.py",
+        "{posargs}",
+    ],
+]
+
+# Clean environment
+[env.clean]
+description = "Clean up temporary files and caches"
+skip_install = true
+allowlist_externals = ["rm", "find", "sh"]
+commands_pre = []
+commands = [
+    [
+        "python",
+        "-c",
+        "import shutil; shutil.rmtree('.pytest_cache', ignore_errors=True)",
+    ],
+    [
+        "python",
+        "-c",
+        "import shutil; shutil.rmtree('build', ignore_errors=True)",
+    ],
+    [
+        "python",
+        "-c",
+        "import shutil; shutil.rmtree('dist', ignore_errors=True)",
+    ],
+    [
+        "python",
+        "-c",
+        "import pathlib, shutil; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('*.egg-info')]",
+    ],
+    [
+        "python",
+        "-c",
+        "import pathlib, shutil; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]",
+    ],
+    [
+        "python",
+        "-c",
+        "print('Note: .tox directory preserved during clean. Use \"rm -rf .tox\" manually if needed.')",
+    ],
+]
