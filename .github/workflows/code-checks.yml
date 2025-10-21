@@ -47,7 +47,7 @@ jobs:
 
       - name: Get changed common SSH files
         id: changed_common_ssh_files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           files: |
             broker/session.py
@@ -59,19 +59,19 @@ jobs:
 
       - name: Get changed Hussh files
         id: changed_hussh_files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           files: broker/binds/hussh.py
 
       - name: Get changed Paramiko files
         id: changed_paramiko_files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           files: broker/binds/paramiko.py
 
       - name: Get changed ssh2 files
         id: changed_ssh2_files
-        uses: tj-actions/changed-files@v46
+        uses: tj-actions/changed-files@v47
         with:
           files: broker/binds/ssh2.py
 
