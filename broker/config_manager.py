@@ -40,7 +40,7 @@ class ConfigManager:
     e.g. broker config view AnsibleTower.instances.my_instance
     """
 
-    interactive_mode = sys.stdin.isatty()
+    interactive_mode = not os.environ.get("BROKER_NON_INTERACTIVE") and sys.stdin.isatty()
     version = version("broker")
     no_global_config = False
 
@@ -82,7 +82,7 @@ class ConfigManager:
                 proceed = click.confirm(f"Get example file from {source}?")
             except click.core.Abort:
                 # We're likely in a different non-interactive environment (container?)
-                self._interactive_mode = False
+                self.interactive_mode = False
         if not proceed:
             return
         # get example file from source
@@ -149,12 +149,22 @@ class ConfigManager:
         if C_SEP in chunk:
             curr, chunk = chunk.split(C_SEP, 1)
             # curr = int(curr) if curr.isdigit() else curr
-            return self.get(chunk, curr_chunk=curr_chunk[curr])
+            try:
+                next_chunk = curr_chunk[curr]
+            except (KeyError, TypeError):
+                if suppress:
+                    return
+                raise exceptions.UserError(f"Chunk '{curr}' not found in the config.")
+            if next_chunk is None:
+                if suppress:
+                    return
+                raise exceptions.UserError(f"Chunk '{curr}' is None in the config.")
+            return self.get(chunk, curr_chunk=next_chunk, suppress=suppress)
         else:
             # chunk = int(chunk) if chunk.isdigit() else chunk
             try:
                 return curr_chunk[chunk]
-            except KeyError:
+            except (KeyError, TypeError):
                 if suppress:
                     return
                 raise exceptions.UserError(f"Chunk '{chunk}' not found in the config.")
