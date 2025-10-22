@@ -99,7 +99,7 @@ commands = [
 description = "Test SSH functionality with hussh backend"
 deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
 extras = ["hussh"]
-set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "hussh" }
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH__BACKEND = "hussh" }
 pass_env = ["CI", "BROKER_*"]
 allowlist_externals = ["broker"]
 commands_pre = [
@@ -117,7 +117,7 @@ commands = [["pytest", "-v", "{tox_root}/tests/test_ssh.py", "{posargs}"]]
 description = "Test SSH functionality with paramiko backend"
 deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
 extras = ["paramiko"]
-set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "paramiko" }
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH__BACKEND = "paramiko" }
 pass_env = ["CI", "BROKER_*"]
 allowlist_externals = ["broker"]
 commands_pre = [
@@ -134,8 +134,8 @@ commands = [["pytest", "-v", "{tox_root}/tests/test_ssh.py", "{posargs}"]]
 [env.ssh2-python]
 description = "Test SSH functionality with ssh2-python backend"
 deps = ["pytest>=8", "pytest-randomly", "docker", "pexpect"]
-extras = ["ssh2_python"]
-set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH_BACKEND = "ssh2-python" }
+extras = ["ssh2-python"]
+set_env = { BROKER_DIRECTORY = "{env_tmp_dir}", BROKER_NON_INTERACTIVE = "1", BROKER_SSH__BACKEND = "ssh2-python" }
 pass_env = ["CI", "BROKER_*"]
 allowlist_externals = ["broker"]
 commands_pre = [

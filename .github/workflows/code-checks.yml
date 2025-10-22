@@ -91,7 +91,7 @@ jobs:
         if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_hussh_files.outputs.any_changed == 'true'
         env:
           UV_SYSTEM_PYTHON: 1
-          BROKER_SSH_BACKEND: hussh
+          BROKER_SSH__BACKEND: hussh
         run: |
           uv pip install "broker[hussh] @ ."
           pytest -v tests/test_ssh.py
@@ -100,7 +100,7 @@ jobs:
         if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_paramiko_files.outputs.any_changed == 'true'
         env:
           UV_SYSTEM_PYTHON: 1
-          BROKER_SSH_BACKEND: paramiko
+          BROKER_SSH__BACKEND: paramiko
         run: |
           uv pip install "broker[paramiko] @ ."
           pytest -v tests/test_ssh.py
@@ -109,7 +109,7 @@ jobs:
         if: steps.changed_common_ssh_files.outputs.any_changed == 'true' || steps.changed_ssh2_files.outputs.any_changed == 'true'
         env:
           UV_SYSTEM_PYTHON: 1
-          BROKER_SSH_BACKEND: ssh2-python
+          BROKER_SSH__BACKEND: ssh2-python
         run: |
           uv pip install "broker[ssh2-python] @ ."
           pytest -v tests/test_ssh.py
