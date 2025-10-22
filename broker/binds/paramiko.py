@@ -25,7 +25,6 @@ class Session:
         key_path_str = str(Path(key_filename).expanduser().resolve())
         key_types = [
             paramiko.RSAKey,
-            paramiko.DSSKey,
             paramiko.ECDSAKey,
             paramiko.Ed25519Key,
         ]
@@ -90,7 +89,7 @@ class Session:
             # Establish socket connection
             sock = socket.create_connection((self.hostname, self.port), self.timeout)
         except OSError as e:
-            raise exceptions.ConnectionError(f"Failed to connect socket: {e}") from e
+            raise exceptions.ParamikoBindError(f"Failed to connect socket: {e}") from e
 
         self.transport = paramiko.Transport(sock)
         try:
@@ -100,7 +99,7 @@ class Session:
 
         except paramiko.SSHException as e:
             self.transport.close()
-            raise exceptions.ConnectionError(f"Failed to start SSH transport: {e}") from e
+            raise exceptions.ParamikoBindError(f"Failed to start SSH transport: {e}") from e
 
         # Load host keys and implement AutoAddPolicy behavior
         try:
@@ -182,7 +181,7 @@ class Session:
             ) from err
         except Exception as err:  # Catch-all for unexpected auth errors
             self.transport.close()
-            raise exceptions.ConnectionError(
+            raise exceptions.ParamikoBindError(
                 f"Unexpected error during SSH {auth_method} auth: {err}"
             ) from err
 
@@ -291,7 +290,7 @@ class Session:
             if isinstance(e, exceptions.ParamikoBindError):
                 raise  # Propagate the specific permission error
             else:
-                raise exceptions.ConnectionError(f"Remote copy failed: {e}") from e
+                raise exceptions.ParamikoBindError(f"Remote copy failed: {e}") from e
 
     def shell(self, pty=False):
         """Create and return an interactive shell instance."""
@@ -309,7 +308,7 @@ class Session:
             with self.client.open_sftp() as sftp:
                 initial_size = sftp.stat(filename).st_size
         except Exception as e:  # Handle SFTP errors (e.g., file not found)
-            raise exceptions.ConnectionError(f"Could not get initial size for tail: {e}") from e
+            raise exceptions.ParamikoBindError(f"Could not get initial size for tail: {e}") from e
 
         tailer = FileTailer(initial_size=initial_size)  # Helper object to store results
         yield tailer
