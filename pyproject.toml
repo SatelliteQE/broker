@@ -54,6 +54,7 @@ openstack = ["openstacksdk"]
 paramiko = ["paramiko"]
 podman = ["podman>=5.2"]
 ssh2_python = ["ssh2-python"]
+satlab = ["awxkit", "podman>=5.2", "hussh>=0.1.7"]
 all = [
     "ansible-pylibssh",
     "awxkit",
