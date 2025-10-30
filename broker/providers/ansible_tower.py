@@ -656,6 +656,23 @@ class AnsibleTower(Provider):
                 compiled[key] = val
             return compiled
 
+    @staticmethod
+    def _parse_string_value(value):
+        """Parse a string value if it looks like JSON or YAML, otherwise return as-is."""
+        if not isinstance(value, str):
+            return value
+        # Try to parse as JSON first (most explicit format)
+        try:
+            parsed = json.loads(value)
+            # Only return parsed value if it's a complex type (list/dict)
+            # Keep simple values as strings to preserve user intent
+            if isinstance(parsed, (list, dict)):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+        # Return the original string value
+        return value
+
     def _resolve_labels(self, labels, target):
         """Fetch and return ids of the given labels.
 
@@ -816,6 +833,10 @@ class AnsibleTower(Provider):
         if provider_labels:
             payload["labels"] = self._resolve_labels(provider_labels, target)
             kwargs["provider_labels"] = provider_labels
+
+        # Parse string values that look like JSON/YAML structures
+        for key, value in kwargs.items():
+            kwargs[key] = self._parse_string_value(value)
 
         # Save custom, non-workflow extra vars to a named variable.
         # The workflow can save these values to job artifacts / host facts.
