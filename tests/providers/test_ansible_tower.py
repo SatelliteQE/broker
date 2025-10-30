@@ -129,3 +129,25 @@ def test_host_release_dual_params(tower_stub):
     host._broker_args["source_vm"] = "fake-physical-host"
     assert host._broker_args["source_vm"] == host.name
     host.release()
+
+
+def test_pull_extra_vars_with_json_list():
+    """Test _pull_extra_vars with JSON list of dicts (e.g., from broker CLI args)."""
+    # Simulates JSON passed from broker CLI like:
+    # --rhel_compose_repositories '[{"name":"baseos",...},{"name":"appstream",...}]'
+    json_str = '[{"name":"baseos","description":"baseos","file":"os_repo.repo","baseurl":"http://download.com/compose/BaseOS/x86_64/os"},{"name":"appstream","description":"appstream","file":"os_repo.repo","baseurl":"http://download.com/compose/AppStream/x86_64/os"}]'
+    result = AnsibleTower._pull_extra_vars(json_str)
+    assert result == [
+        {
+            "name": "baseos",
+            "description": "baseos",
+            "file": "os_repo.repo",
+            "baseurl": "http://download.com/compose/BaseOS/x86_64/os",
+        },
+        {
+            "name": "appstream",
+            "description": "appstream",
+            "file": "os_repo.repo",
+            "baseurl": "http://download.com/compose/AppStream/x86_64/os",
+        },
+    ]
