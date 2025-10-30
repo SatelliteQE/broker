@@ -151,3 +151,39 @@ def test_pull_extra_vars_with_json_list():
             "baseurl": "http://download.com/compose/AppStream/x86_64/os",
         },
     ]
+
+
+def test_parse_string_value_with_json_list():
+    """Test _parse_string_value parses JSON list strings correctly."""
+    json_str = '[{"name":"baseos","file":"os_repo.repo"},{"name":"appstream","file":"app_repo.repo"}]'
+    result = AnsibleTower._parse_string_value(json_str)
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0]["name"] == "baseos"
+    assert result[1]["name"] == "appstream"
+
+
+def test_parse_string_value_with_json_dict():
+    """Test _parse_string_value parses JSON dict strings correctly."""
+    json_str = '{"key1":"value1","key2":"value2"}'
+    result = AnsibleTower._parse_string_value(json_str)
+    assert isinstance(result, dict)
+    assert result == {"key1": "value1", "key2": "value2"}
+
+
+def test_parse_string_value_preserves_simple_strings():
+    """Test _parse_string_value keeps simple strings as-is."""
+    # Regular strings should not be parsed
+    assert AnsibleTower._parse_string_value("simple-string") == "simple-string"
+    assert AnsibleTower._parse_string_value("this-is-its-value") == "this-is-its-value"
+    # Numbers in strings should stay as strings
+    assert AnsibleTower._parse_string_value("123") == "123"
+    assert AnsibleTower._parse_string_value("true") == "true"
+
+
+def test_parse_string_value_with_non_string():
+    """Test _parse_string_value returns non-strings as-is."""
+    assert AnsibleTower._parse_string_value(123) == 123
+    assert AnsibleTower._parse_string_value(True) is True
+    assert AnsibleTower._parse_string_value(None) is None
+    assert AnsibleTower._parse_string_value({"key": "value"}) == {"key": "value"}
