@@ -152,6 +152,48 @@ def test_pull_extra_vars_with_json_list():
         },
     ]
 
+def test_pull_extra_vars_with_nested_dict():
+    """Test _pull_extra_vars with YAML containing nested dictionary from issue reproducer."""
+    yaml_str = """leapp_env_vars:
+  LEAPP_UNSUPPORTED: '1'
+  LEAPP_DEVEL_TARGET_RELEASE: '9.7'
+target: ''
+target_vm: ''"""
+    result = AnsibleTower._pull_extra_vars(yaml_str)
+    assert result == {
+        "leapp_env_vars": {
+            "LEAPP_UNSUPPORTED": "1",
+            "LEAPP_DEVEL_TARGET_RELEASE": "9.7",
+        },
+        "target": "",
+        "target_vm": "",
+    }
+
+
+def test_pull_extra_vars_with_complex_structures():
+    """Test _pull_extra_vars with complex YAML containing nested dicts and lists."""
+    yaml_str = """config:
+  servers:
+    - name: server1
+      port: 8080
+    - name: server2
+      port: 8081
+  settings:
+    debug: true
+    timeout: 30
+environment: production"""
+    result = AnsibleTower._pull_extra_vars(yaml_str)
+    assert result == {
+        "config": {
+            "servers": [
+                {"name": "server1", "port": 8080},
+                {"name": "server2", "port": 8081},
+            ],
+            "settings": {"debug": True, "timeout": 30},
+        },
+        "environment": "production",
+    }
+
 
 def test_parse_string_value_with_json_list():
     """Test _parse_string_value parses JSON list strings correctly."""

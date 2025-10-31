@@ -17,6 +17,7 @@ from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 from rich.console import Console
 from rich.prompt import Prompt
+from ruamel.yaml import YAML, YAMLError
 
 from broker import exceptions, helpers
 from broker.helpers import MockStub, eval_filter, find_origin, update_inventory, yaml
@@ -640,21 +641,22 @@ class AnsibleTower(Provider):
 
     @staticmethod
     def _pull_extra_vars(extra_vars):
-        """Pull extra vars from a json string or pseudo-dictionary."""
+        """Pull extra vars from a json string or YAML-formatted string."""
         if not extra_vars:
             return {}
         try:
             return json.loads(extra_vars)
         except json.JSONDecodeError:
             logger.warning(
-                f"Job uses non-json extra_vars:\n{extra_vars}\n"
-                "Attempting to parse as pseudo-dictionary."
+                f"Job uses non-json extra_vars:\n{extra_vars}\nAttempting to parse as YAML."
             )
-            compiled = {}
-            for line in extra_vars.splitlines():
-                key, val = line.split(": ")
-                compiled[key] = val
-            return compiled
+            try:
+                # Use safe YAML loader to prevent arbitrary code execution
+                safe_yaml = YAML(typ="safe", pure=True)
+                return safe_yaml.load(extra_vars) or {}
+            except YAMLError as err:
+                logger.warning(f"Failed to parse extra_vars as YAML: {err}")
+                return {}
 
     @staticmethod
     def _parse_string_value(value):
