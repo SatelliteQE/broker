@@ -6,4 +6,6 @@ repos:
   hooks:
     - id: ruff  # Linter
       args: [--fix, --exit-non-zero-on-fix]
+      exclude: ^tests/
     - id: ruff-format  # Formatter
+      exclude: ^tests/
