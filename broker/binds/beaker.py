@@ -1,12 +1,13 @@
 """A wrapper around the Beaker CLI."""
 
 import json
+import logging
 from pathlib import Path
 import subprocess
 import time
 from xml.etree import ElementTree as ET
 
-from logzero import logger
+logger = logging.getLogger(__name__)
 
 from broker import helpers
 from broker.exceptions import BeakerBindError

@@ -19,6 +19,15 @@ TEST_SERVER_IMAGE = "ghcr.io/jacobcallahan/hussh/hussh-test-server:latest"
 def pytest_sessionstart(session):
     """For things that need to happen before Broker is loaded."""
     os.environ["BROKER_NO_GLOBAL_CONFIG"] = "True"
+    
+    # Set up logging for the test session
+    from broker.logging import setup_logging
+    setup_logging(
+        console_level="warning",
+        file_level="debug",
+        log_path="logs/broker_tests.log",
+        structured=False,
+    )
 
 
 @pytest.fixture(scope="session")
