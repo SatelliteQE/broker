@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.7.3"
+version = "0.8.0"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,8 +24,8 @@ classifiers = [
 dependencies = [
     "click",
     "dynaconf>=3.1.6,<4.0.0",
-    "logzero",
     "packaging",
+    "python-json-logger",
     "requests",
     "rich",
     "rich_click",
@@ -39,7 +39,16 @@ Repository = "https://github.com/SatelliteQE/broker"
 ansible_pylibssh = ["ansible-pylibssh"]
 ansibletower = ["awxkit"]
 beaker = ["beaker-client"]
-dev = ["docker", "pexpect", "pre-commit", "pytest", "pytest-randomly", "ruff"]
+dev = [
+    "docker",
+    "pexpect",
+    "pre-commit",
+    "pytest",
+    "pytest-randomly",
+    "ruff",
+    "tox",
+    "tox-uv",
+]
 docker = ["docker", "paramiko"]
 hussh = ["hussh>=0.1.7"]
 openstack = ["openstacksdk"]
@@ -83,7 +92,15 @@ paramiko = "broker.binds.paramiko:InteractiveShell"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-v", "-l", "--color=yes", "--code-highlight=yes"]
+addopts = [
+    "-v",
+    "-l",
+    "--color=yes",
+    "--code-highlight=yes",
+    "--ignore=tests/functional",
+    "--ignore=tests/test_ssh.py",
+]
+norecursedirs = ["broker", ".tox", ".git", "*.egg"]
 
 [tool.ruff]
 line-length = 100
@@ -167,6 +184,7 @@ ignore = [
     "D413",    # Missing blank line after last section
     "E501",    # line too long
     "E731",    # do not assign a lambda expression, use a def
+    "G004",    # Logging statement uses f-string (modern Python accepts this)
     "PLC0415", # ignore top-level import restrictions
     "PLR0913", # Too many arguments to function call ({c_args} > {max_args})
     "RUF012",  # Mutable class attributes should be annotated with typing.ClassVar
@@ -182,7 +200,9 @@ known-first-party = ["broker"]
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-# None at this time
+"broker/commands.py" = ["E402"]    # Intentional: logging setup before imports
+"broker/providers/*.py" = ["E402"] # logger defined before other imports
+"broker/binds/*.py" = ["E402"]     # logger defined before other imports
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25

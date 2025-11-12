@@ -47,10 +47,6 @@ commands = [
         "pytest",
         "-v",
         "{tox_root}/tests/",
-        "--ignore",
-        "{tox_root}/tests/functional",
-        "--ignore",
-        "{tox_root}/tests/test_ssh.py",
         "{posargs}",
     ],
 ]

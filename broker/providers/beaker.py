@@ -1,10 +1,12 @@
 """Beaker provider implementation."""
 
 import inspect
+import logging
 
 import click
 from dynaconf import Validator
-from logzero import logger
+
+logger = logging.getLogger(__name__)
 
 from broker import helpers
 from broker.binds.beaker import BeakerBind
