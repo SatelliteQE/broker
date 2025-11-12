@@ -15,9 +15,11 @@ Usage:
     ```
 """
 
-from logzero import logger
+import logging
 
 from broker.exceptions import HostError, NotImplementedError
+
+logger = logging.getLogger(__name__)
 
 SETTINGS_VALIDATED = False
 
