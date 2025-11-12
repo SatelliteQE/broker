@@ -54,6 +54,8 @@ BASE_VALIDATORS = [
         is_in=["error", "warning", "info", "debug", "trace", "silent"],
         default="debug",
     ),
+    Validator("LOGGING.LOG_PATH", default="logs/broker.log"),
+    Validator("LOGGING.STRUCTURED", default=False),
     Validator("THREAD_LIMIT", default=None),
     Validator("INVENTORY_FIELDS", is_type_of=dict),
     Validator("INVENTORY_LIST_VARS", is_type_of=str, default="hostname | name"),

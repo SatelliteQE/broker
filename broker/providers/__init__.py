@@ -33,13 +33,15 @@ Note: The `Provider` class should not be used directly.
 
 from abc import ABCMeta, abstractmethod
 import inspect
+import logging
 from pathlib import Path
 
 import dynaconf
-from logzero import logger
 
 from broker import exceptions
 from broker.settings import clone_global_settings
+
+logger = logging.getLogger(__name__)
 
 # populate a list of all provider module names
 _provider_imports = [

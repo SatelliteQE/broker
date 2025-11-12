@@ -1,8 +1,9 @@
 """Module providing base SSH methods and classes."""
 
+import logging
 import socket
 
-from logzero import logger
+logger = logging.getLogger(__name__)
 
 from broker import exceptions
 

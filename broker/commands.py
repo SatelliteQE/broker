@@ -1,10 +1,16 @@
 """Defines the CLI commands for Broker."""
 
 from functools import wraps
+import logging
 import signal
 import sys
 
-from logzero import logger
+# CRITICAL: Import and setup basic logging BEFORE any other broker imports
+# This captures import-time logs from metaclasses and module initialization
+from broker.logging import setup_logging
+
+setup_logging(console_level=logging.INFO)  # Basic setup until settings are loaded
+
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
@@ -13,8 +19,19 @@ import rich_click as click
 from broker import exceptions, helpers, settings
 from broker.broker import Broker
 from broker.config_manager import ConfigManager
-from broker.logger import LOG_LEVEL
+from broker.logging import LOG_LEVEL
 from broker.providers import PROVIDER_ACTIONS, PROVIDER_HELP, PROVIDERS
+
+# Now configure logging with actual settings
+setup_logging(
+    console_level=settings.settings.logging.console_level,
+    file_level=settings.settings.logging.file_level,
+    log_path=settings.settings.logging.log_path,
+    structured=settings.settings.logging.structured,
+)
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 CONSOLE = Console(no_color=settings.settings.less_colors)  # rich console for pretty printing
