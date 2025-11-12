@@ -6,7 +6,9 @@ The new file must be named `vX_Y_Z.py` where X_Y_Z is the version you are migrat
 e.g. cp example_migration.py v0_6_1.py
 """
 
-from logzero import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 TO_VERSION = "0.6.1"
 

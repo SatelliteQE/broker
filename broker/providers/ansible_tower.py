@@ -3,6 +3,7 @@
 from functools import cache, cached_property
 import inspect
 import json
+import logging
 import os
 import random
 import string
@@ -12,7 +13,8 @@ from urllib import parse as url_parser
 
 import click
 from dynaconf import Validator
-from logzero import logger
+
+logger = logging.getLogger(__name__)
 from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 from rich.console import Console
@@ -670,7 +672,7 @@ class AnsibleTower(Provider):
             parsed = json.loads(value)
             # Only return parsed value if it's a complex type (list/dict)
             # Keep simple values as strings to preserve user intent
-            if isinstance(parsed, (list, dict)):
+            if isinstance(parsed, list | dict):
                 return parsed
         except (json.JSONDecodeError, ValueError):
             pass

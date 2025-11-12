@@ -1,11 +1,13 @@
 """Foreman provider implementation."""
 
 import inspect
+import logging
 from uuid import uuid4
 
 import click
 from dynaconf import Validator
-from logzero import logger
+
+logger = logging.getLogger(__name__)
 
 from broker.binds import foreman
 from broker.helpers import Result
