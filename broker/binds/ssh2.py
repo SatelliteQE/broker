@@ -9,9 +9,10 @@ Note: You typically want to use a Host object instance to create sessions,
 """
 
 from contextlib import contextmanager
+import logging
 from pathlib import Path
 
-from logzero import logger
+logger = logging.getLogger(__name__)
 from ssh2 import sftp as _sftp
 from ssh2.exceptions import SocketSendError
 from ssh2.session import Session as _Session

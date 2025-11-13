@@ -3,11 +3,13 @@
 from functools import cache
 import getpass
 import inspect
+import logging
 from uuid import uuid4
 
 import click
 from dynaconf import Validator
-from logzero import logger
+
+logger = logging.getLogger(__name__)
 
 from broker import exceptions, helpers
 from broker.binds import containers

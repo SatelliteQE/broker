@@ -19,13 +19,15 @@ Note:
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
+import logging
 
-from logzero import logger
-
-from broker import exceptions, helpers, logger as broker_logger
+from broker import exceptions, helpers
 from broker.hosts import Host
+from broker.logging import setup_logging
 from broker.providers import PROVIDER_ACTIONS, PROVIDERS, _provider_imports
 from broker.settings import clone_global_settings
+
+logger = logging.getLogger(__name__)
 
 # load all the provider class so they are registered
 for _import in _provider_imports:
@@ -58,11 +60,11 @@ class Broker:
         if broker_settings:
             logger.debug(f"Using local settings object: {self._settings.to_dict()}")
             if "logging" in broker_settings:
-                broker_logger.setup_logzero(
-                    level=broker_settings.logging.console_level,
-                    formatter=kwargs.pop("broker_log_formatter", None),
+                setup_logging(
+                    console_level=broker_settings.logging.console_level,
                     file_level=broker_settings.logging.file_level,
-                    path=broker_settings.logging.get("file_path"),
+                    log_path=broker_settings.logging.log_path,
+                    structured=broker_settings.logging.structured,
                 )
         else:
             logger.debug("Using global settings.")

@@ -9,6 +9,7 @@ import getpass
 import inspect
 from io import BytesIO
 import json
+import logging
 import os
 from pathlib import Path
 import sys
@@ -18,12 +19,13 @@ import time
 from uuid import uuid4
 
 import click
-from logzero import logger
 from rich.table import Table
 from ruamel.yaml import YAML
 
 from broker import exceptions
 from broker.settings import clone_global_settings
+
+logger = logging.getLogger(__name__)
 
 FilterTest = namedtuple("FilterTest", "haystack needle test")
 INVENTORY_LOCK = threading.Lock()
@@ -511,10 +513,9 @@ def update_log_level(ctx, param, value):
         param: The Click parameter object.
         value: The new log level value.
     """
-    from broker import logger as b_log
+    from broker.logging import setup_logging
 
-    b_log.set_log_level(value)
-    b_log.set_file_logging(value)
+    setup_logging(console_level=value)
 
 
 def set_emit_file(ctx, param, value):
@@ -528,10 +529,9 @@ def fork_broker():
     if pid:
         logger.info(f"Running broker in the background with pid: {pid}")
         sys.exit(0)
-    from broker import logger as b_log
+    from broker.logging import setup_logging
 
-    b_log.set_log_level("silent")
-    b_log.set_file_logging("silent")
+    setup_logging(console_level="silent", file_level="silent")
 
 
 def handle_keyboardinterrupt(*args):

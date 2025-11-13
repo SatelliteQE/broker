@@ -1,8 +1,9 @@
 """Foreman provider implementation."""
 
+import logging
 import time
 
-from logzero import logger
+logger = logging.getLogger(__name__)
 import requests
 
 from broker import exceptions
