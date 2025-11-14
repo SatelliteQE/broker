@@ -558,7 +558,7 @@ class AnsibleTower(Provider):
                     hosts.append(vm_name)
         return list(set(hosts))
 
-    def handle_dangling_hosts(self, job):
+    def handle_dangling_hosts(self, job, reason=None):
         """Attempt to check in dangling hosts associated with the given job."""
         dangling_hosts = self._try_get_dangling_hosts(job)
         if not dangling_hosts:
@@ -568,6 +568,8 @@ class AnsibleTower(Provider):
         for dangling_host in dangling_hosts:
             logger.warning(f"Found dangling host: {dangling_host}")
             if dangling_behavior == "prompt":
+                if reason:
+                    logger.warning(f"Failure reason: {reason}")
                 choice = Prompt.ask(
                     "What would you like to do with this host? [c/s/cA/sA]\n"
                     "Checkin (c), Store (s), Checkin All (cA), Store All (sA)",
@@ -873,7 +875,9 @@ class AnsibleTower(Provider):
             if not isinstance(failure_message, list):
                 failure_message = [failure_message]
             if not any("was automatically checked-in" in msg["reason"] for msg in failure_message):
-                self.handle_dangling_hosts(job)
+                self.handle_dangling_hosts(
+                    job, reason=failure_message[0].get("reason", failure_message[0])
+                )
             else:
                 logger.warning(f"Apparently it is in the failure message...\n{failure_message}")
             raise JobExecutionError(message_data=message_data["Reason(s)"])
