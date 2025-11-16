@@ -52,7 +52,7 @@ SSH tests should only be executed when a change is made that could impact the be
 uv pip install "broker[hussh] @ ."
 ```
 
-Then use the following command to run the tests, targetting the specific ssh backend.
+Then use the following command to run the tests, targeting the specific ssh backend.
 
 ```bash
 BROKER_SSH__BACKEND=hussh pytest -v tests/test_ssh.py
@@ -61,7 +61,7 @@ BROKER_SSH__BACKEND=hussh pytest -v tests/test_ssh.py
 Tox is likely the best way to run the tests for this project, since it handles everything for you.
 
 ```bash
-# General unit tests accross all supported python versions
+# General unit tests across all supported python versions
 tox
 
 # Quick tests that also do linting
