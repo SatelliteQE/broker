@@ -1,9 +1,0 @@
-[
-  {
-    "id": 50,
-    "type": "job_template",
-    "url": "/api/v2/job_templates/50/",
-    "name": "test-playbook",
-    "extra_vars": "{\"playbook_var\": \"test_value\"}"
-  }
-]
