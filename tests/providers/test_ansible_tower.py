@@ -1,8 +1,28 @@
 import json
 import pytest
+import sys
+from unittest.mock import MagicMock
+
 from broker.broker import Broker
 from broker.providers.ansible_tower import AnsibleTower
 from broker.helpers import MockStub
+from broker import settings
+
+
+# Create a mock PseudoNamespace class for awxkit
+class MockPseudoNamespace(dict):
+    """Mock class for awxkit.utils.PseudoNamespace"""
+    pass
+
+
+# Mock awxkit at module level before AnsibleTower tries to import it
+mock_awxkit = MagicMock()
+mock_awxkit.utils.PseudoNamespace = MockPseudoNamespace
+sys.modules['awxkit'] = mock_awxkit
+sys.modules['awxkit.config'] = MagicMock()
+sys.modules['awxkit.api'] = MagicMock()
+sys.modules['awxkit.utils'] = mock_awxkit.utils
+sys.modules['awxkit.exceptions'] = MagicMock()
 
 
 class AwxkitApiStub(MockStub):
@@ -14,6 +34,7 @@ class AwxkitApiStub(MockStub):
      - v2.ping.get().version
      - v2.jobs.get(id=child_id).results.pop()
      - v2.workflow_job_templates.get(name=workflow).results.pop()
+     - v2.job_templates.get(name=job_template).results.pop()
      - wfjt.launch(payload={"extra_vars": str(kwargs).replace("--", "")})
      - job.wait_until_completed()
      - merge_dicts(artifacts, at_object.artifacts)
@@ -21,12 +42,17 @@ class AwxkitApiStub(MockStub):
     """
 
     def __init__(self, **kwargs):
+        self.item_type = kwargs.pop("item_type", None)
         if "job_id" in kwargs:
             # we're a job, so load in job information
             super().__init__(self._load_job(kwargs.pop("job_id")))
         elif "name" in kwargs:
-            # workflow job template lookup
-            super().__init__(self._load_workflow(kwargs.pop("name")))
+            # Check if it's a job template or workflow
+            if self.item_type == "job_template":
+                super().__init__(self._load_job_template(kwargs.pop("name")))
+            else:
+                # workflow job template lookup
+                super().__init__(self._load_workflow(kwargs.pop("name")))
         else:
             super().__init__()
         self.version = "3.7.1"
@@ -47,6 +73,14 @@ class AwxkitApiStub(MockStub):
             if workflow["name"] == workflow_name:
                 return workflow
 
+    @staticmethod
+    def _load_job_template(job_template_name):
+        with open("tests/data/ansible_tower/fake_job_templates.json") as jt_file:
+            jt_data = json.load(jt_file)
+        for jt in jt_data:
+            if jt["name"] == job_template_name:
+                return jt
+
     def get_related(self, related=None):
         with open("tests/data/ansible_tower/fake_children.json") as child_file:
             child_data = json.load(child_file)
@@ -57,12 +91,17 @@ class AwxkitApiStub(MockStub):
             # requesting a job by id
             return AwxkitApiStub(job_id=kwargs.pop("id"))
         if "name" in kwargs:
-            # requesting a workflow job template by name
-            return AwxkitApiStub(name=kwargs.pop("name"))
+            # Use the item_type from self to know what to load
+            name = kwargs.pop("name")
+            return AwxkitApiStub(name=name, item_type=self.item_type)
         return self
 
     def launch(self, payload={}):
-        return AwxkitApiStub(job_id=343, **payload)
+        stub = AwxkitApiStub(job_id=343)
+        # Merge payload into the stub to reflect what was actually sent
+        if "extra_vars" in payload:
+            stub["extra_vars"] = payload["extra_vars"]
+        return stub
 
     def pop(self, item=None):
         """awxkit uses pop() on objects, this allows for that and normal use"""
@@ -74,15 +113,20 @@ class AwxkitApiStub(MockStub):
 
 @pytest.fixture
 def api_stub():
-    return AwxkitApiStub()
+    stub = AwxkitApiStub()
+    # Set up job_templates path to return job templates
+    stub.job_templates = AwxkitApiStub(item_type="job_template")
+    stub.workflow_job_templates = AwxkitApiStub(item_type="workflow")
+    return stub
 
 
 @pytest.fixture
-def config_stub():
-    # This stub needs to provide the structure expected by AnsibleTower's __init__
-    # and other methods, specifically ANSIBLETOWER.inventory and other keys accessed via .get().
-    ansible_tower_settings = MockStub(
-        in_dict={  # Pass arguments as a dictionary to in_dict
+def tower_settings():
+    # Create proper broker settings for AnsibleTower tests
+    test_config = {
+        "ANSIBLETOWER": {
+            "base_url": "https://tower.example.com",
+            "token": "fake_token",
             "inventory": {},
             "workflow_job_templates_name_prefix": "test_prefix_",
             "hostname_override_variable": "ansible_host_override",
@@ -93,13 +137,13 @@ def config_stub():
             "job_vars_override": "test_job_vars",
             "host_vars_override": "test_host_vars",
         }
-    )
-    return MockStub(in_dict={"ANSIBLETOWER": ansible_tower_settings})
+    }
+    return settings.create_settings(config_dict=test_config)
 
 
 @pytest.fixture
-def tower_stub(api_stub, config_stub):  # config_stub is now injected
-    return AnsibleTower(root=api_stub, config=config_stub)
+def tower_stub(api_stub, tower_settings):
+    return AnsibleTower(root=api_stub, broker_settings=tower_settings)
 
 
 def test_execute(tower_stub):
@@ -120,6 +164,15 @@ def test_workflow_lookup_failure(tower_stub):
     with pytest.raises(Broker.UserError) as err:
         tower_stub.execute(workflow="this-does-not-exist")
     assert "Workflow not found by name: this-does-not-exist" in err.value.message
+
+
+def test_execute_job_template_sets_origin(tower_stub):
+    """Test that executing a job template sets the _broker_origin field."""
+    job = tower_stub.execute(job_template="test-playbook")
+    # Check that the job was launched with origin information in extra_vars
+    extra_vars = json.loads(job["extra_vars"])
+    assert "_broker_origin" in extra_vars
+    assert "_broker_extra_vars" in extra_vars
 
 
 def test_host_release_dual_params(tower_stub):
