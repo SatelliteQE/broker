@@ -134,5 +134,17 @@ def test_multi_manager(broker_settings):
         assert host_dict["test_2"][1].hostname == "test.host.example.com"
 
 
+def test_origin_captured_before_threading(broker_settings):
+    """Test that origin is captured before threading and passed to provider methods."""
+    broker_inst = Broker(nick="test_nick", broker_settings=broker_settings)
+    # Verify that _broker_origin is captured during checkout
+    host_checkout = broker_inst.checkout()
+    # After checkout, the _kwargs should contain _broker_origin
+    assert "_broker_origin" in broker_inst._kwargs
+    # The origin should indicate it came from a test
+    assert "test_origin_captured_before_threading" in broker_inst._kwargs["_broker_origin"]
+    broker_inst.checkin()
+
+
 class SomeException(Exception):
     pass

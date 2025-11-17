@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from concurrent.futures import ThreadPoolExecutor
 import pytest
 from broker import helpers
 from broker import exceptions
@@ -111,6 +112,27 @@ def test_find_origin_jenkins(set_envars):
     origin = helpers.find_origin()
     assert len(origin) == 2
     assert origin[1] == "fake"
+
+
+def test_find_origin_in_thread():
+    """Test that origin captured before threading can be passed to threads."""
+    # Capture origin in main thread (simulating what Broker._act does)
+    origin = helpers.find_origin()
+    
+    # Define a function that would be run in a thread
+    def thread_func(origin_arg):
+        # In a thread, find_origin() wouldn't see the test frame
+        # but we can use the passed origin_arg instead
+        return origin_arg
+    
+    # Submit to thread pool (simulating what Broker._act does)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(thread_func, origin)
+        result = future.result()
+    
+    # Verify the origin was properly passed through
+    assert result[0].startswith("test_find_origin_in_thread")
+    assert len(result) == 2
 
 
 def test_flatten_duplicate():
