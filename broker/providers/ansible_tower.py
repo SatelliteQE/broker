@@ -811,10 +811,16 @@ class AnsibleTower(Provider):
         elif name := kwargs.get("job_template"):
             subject = "job_template"
             get_path = self._v2.job_templates
-            origin = find_origin()
-            kwargs["_broker_origin"] = origin[0]
-            if origin[1]:
-                kwargs["_jenkins_url"] = origin[1]
+            # Use origin passed from broker if available, otherwise find it
+            if "_broker_origin" in kwargs:
+                kwargs["_broker_origin"] = kwargs["_broker_origin"]
+                if "_jenkins_url" in kwargs:
+                    kwargs["_jenkins_url"] = kwargs["_jenkins_url"]
+            else:
+                origin = find_origin()
+                kwargs["_broker_origin"] = origin[0]
+                if origin[1]:
+                    kwargs["_jenkins_url"] = origin[1]
         else:
             raise exceptions.UserError(message="No workflow or job template specified")
         try:
