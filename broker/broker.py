@@ -99,6 +99,12 @@ class Broker:
         )
         method_obj = getattr(provider_inst, method)
         logger.debug(f"On {provider_inst=} executing {method_obj=} with params {self._kwargs=}.")
+        # Capture origin before threading since threads have separate call stacks
+        if "_broker_origin" not in self._kwargs:
+            origin = helpers.find_origin()
+            self._kwargs["_broker_origin"] = origin[0]
+            if origin[1]:
+                self._kwargs["_jenkins_url"] = origin[1]
         # Overkill for a single action, cleaner than splitting the logic
         max_workers = (
             min(count, int(self._settings.thread_limit)) if self._settings.thread_limit else None

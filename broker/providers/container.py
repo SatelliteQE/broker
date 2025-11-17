@@ -292,9 +292,13 @@ class Container(Provider):
         if isinstance(envars, str):
             envars = {var.split("=")[0]: var.split("=")[1] for var in envars.split(",")}
         # add some context information about the container's requester
-        origin = helpers.find_origin()
+        # Use origin passed from broker if available, otherwise find it
+        if "_broker_origin" in kwargs:
+            origin = (kwargs["_broker_origin"], kwargs.get("_jenkins_url"))
+        else:
+            origin = helpers.find_origin()
 
-        if "for" in origin:
+        if "for" in origin[0]:
             origin = origin.split()[-1]
         envars["BROKER_ORIGIN"] = origin[0]
         if origin[1]:
