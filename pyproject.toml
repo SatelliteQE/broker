@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.7.0"
+version = "0.7.1"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -39,15 +39,7 @@ Repository = "https://github.com/SatelliteQE/broker"
 ansible_pylibssh = ["ansible-pylibssh"]
 ansibletower = ["awxkit"]
 beaker = ["beaker-client"]
-dev = [
-    "bumpver",
-    "docker",
-    "pexpect",
-    "pre-commit",
-    "pytest",
-    "pytest-randomly",
-    "ruff",
-]
+dev = ["docker", "pexpect", "pre-commit", "pytest", "pytest-randomly", "ruff"]
 docker = ["docker", "paramiko"]
 hussh = ["hussh>=0.1.7"]
 openstack = ["openstacksdk"]
@@ -59,7 +51,6 @@ all = [
     "ansible-pylibssh",
     "awxkit",
     "beaker-client",
-    "bumpver",
     "docker",
     "hussh>=0.1.7",
     "openstacksdk",
@@ -89,21 +80,6 @@ paramiko = "broker.binds.paramiko:Session"
 ansible-pylibssh = "broker.binds.pylibssh:InteractiveShell"
 ssh2-python = "broker.binds.ssh2:InteractiveShell"
 paramiko = "broker.binds.paramiko:InteractiveShell"
-
-[tool.bumpver]
-current_version = "0.7.0"
-version_pattern = "MAJOR.MINOR.PATCH"
-commit_message = "bump version to {new_version}"
-tag_message = "{new_version}"
-tag_scope = "default"
-commit = true
-tag = true
-push = false
-
-[tool.bumpver.file_patterns]
-"pyproject.toml" = ['^version = "{version}"', '^current_version = "{version}"']
-"broker_settings.yaml.example" = ["^_version: {version}"]
-
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
