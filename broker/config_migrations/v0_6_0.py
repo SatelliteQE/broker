@@ -1,6 +1,8 @@
 """Config migrations for versions older than 0.6.0 to 0.6.0."""
 
-from logzero import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 TO_VERSION = "0.6.0"
 

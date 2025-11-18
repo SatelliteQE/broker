@@ -11,14 +11,15 @@ Note: You typically want to use a Host object instance to create sessions,
 
 from contextlib import contextmanager
 from importlib.metadata import entry_points
+import logging
 from pathlib import Path
 import tempfile
-
-from logzero import logger
 
 from broker import helpers
 from broker.exceptions import NotImplementedError
 from broker.settings import clone_global_settings
+
+logger = logging.getLogger(__name__)
 
 SSH_NOT_INSTALLED_MSG = (
     "{backend} is not installed.\n"

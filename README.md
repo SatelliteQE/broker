@@ -139,3 +139,30 @@ Clone the Broker repository and install locally with  `uv pip install "broker[de
 Copy the example settings file to `broker_settings.yaml` and edit it.
 
 To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
+
+
+# API Usage
+TODO: Flesh this out
+
+## Using Broker as a Library
+
+When using Broker as a library in your Python code, you control logging configuration:
+
+```python
+import logging
+
+# Configure logging for your application
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Optionally, control Broker's log level specifically
+logging.getLogger('broker').setLevel(logging.DEBUG)
+
+# Now import and use Broker
+from broker import Broker
+broker = Broker()
+```
+
+Broker uses the standard Python logging hierarchy under the `broker.*` namespace.

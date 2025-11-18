@@ -3,17 +3,19 @@
 import importlib
 from importlib.metadata import version
 import json
+import logging
 import os
 from pathlib import Path
 import pkgutil
 import sys
 
 import click
-from logzero import logger
 from packaging.version import Version
 from ruamel.yaml import YAML, YAMLError
 
 from broker import exceptions
+
+logger = logging.getLogger(__name__)
 
 yaml = YAML()
 yaml.default_flow_style = False
