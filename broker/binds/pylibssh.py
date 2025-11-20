@@ -94,7 +94,7 @@ class Session:
 
     @staticmethod
     def _set_destination(source, destination):
-        dest = destination or source
+        dest = str(destination or source)
         if dest.endswith("/"):
             dest = dest + Path(source).name
         return dest

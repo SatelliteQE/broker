@@ -71,7 +71,7 @@ class Session:
 
     @staticmethod
     def _set_destination(source, destination):
-        dest = destination or source
+        dest = str(destination or source)
         if dest.endswith("/"):
             dest = dest + Path(source).name
         return dest
@@ -102,14 +102,14 @@ class Session:
 
     def scp_read(self, source, destination=None, return_data=False):
         """SCP read a remote file into a local destination or return a bytes object if return_data is True."""
-        destination = self._set_destination(str(source), str(destination))
+        destination = self._set_destination(source, destination)
         if return_data:
             return self.session.scp_read(remote_path=str(source))
         self.session.scp_read(remote_path=str(source), local_path=str(destination))
 
     def scp_write(self, source, destination=None, ensure_dir=True):
         """SCP write a local file to a remote destination."""
-        destination = self._set_destination(str(source), str(destination))
+        destination = self._set_destination(source, destination)
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
         self.session.scp_write(str(source), str(destination))
@@ -119,7 +119,7 @@ class Session:
         if return_data:
             return self.session.sftp_read(remote_path=str(source)).encode("utf-8")
 
-        destination = self._set_destination(str(source), str(destination))
+        destination = self._set_destination(source, destination)
 
         # Create the destination path if it doesn't exist
         Path(destination).parent.mkdir(parents=True, exist_ok=True)
@@ -128,7 +128,7 @@ class Session:
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
         """Sftp write a local file to a remote destination."""
-        destination = self._set_destination(str(source), str(destination))
+        destination = self._set_destination(source, destination)
         if ensure_dir:
             self.run(f"mkdir -p {Path(destination).absolute().parent}")
         self.session.sftp_write(local_path=str(source), remote_path=str(destination))
