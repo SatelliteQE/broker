@@ -42,7 +42,7 @@ click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.COMMAND_GROUPS = {
     "broker": [
         {"name": "Core Actions", "commands": ["checkout", "checkin", "inventory"]},
-        {"name": "Extras", "commands": ["execute", "extend", "providers", "config", "shell"]},
+        {"name": "Extras", "commands": ["execute", "extend", "providers", "config", "scenarios", "shell"]},
     ]
 }
 
@@ -634,3 +634,120 @@ def shell_cmd():
     without needing to prefix each with 'broker'.
     """
     broker_shell(standalone_mode=False, args=[])
+# --- Scenarios CLI Group ---
+
+
+@cli.group()
+def scenarios():
+    """Manage and execute Broker scenarios.
+
+    Scenarios allow you to chain multiple Broker actions together in a YAML file.
+    """
+    pass
+
+
+@guarded_command(group=scenarios, name="list")
+def scenarios_list():
+    """List all available scenarios in the scenarios directory."""
+    from broker.scenarios import SCENARIOS_DIR, list_scenarios
+
+    scenario_names = list_scenarios()
+    if not scenario_names:
+        CONSOLE.print(f"No scenarios found in {SCENARIOS_DIR}")
+        return
+
+    table = Table(title="Available Scenarios")
+    table.add_column("Name", style="cyan")
+    table.add_column("Path", style="magenta")
+
+    for name in scenario_names:
+        table.add_row(name, str(SCENARIOS_DIR / f"{name}.yaml"))
+
+    CONSOLE.print(table)
+
+
+@guarded_command(
+    group=scenarios,
+    name="execute",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+@click.argument("scenario", type=str)
+@click.option("-b", "--background", is_flag=True, help="Run scenario in the background")
+@click.pass_context
+def scenarios_execute(ctx, scenario, background):
+    """Execute a scenario file.
+
+    SCENARIO can be a name (found in scenarios dir) or a path to a YAML file.
+
+    Additional arguments are passed as variable overrides:
+
+        broker scenarios execute my_scenario --MY_VAR value --ANOTHER_VAR value
+
+    Config overrides use dotted notation:
+
+        broker scenarios execute my_scenario --config.settings.ssh.backend paramiko
+    """
+    from broker.scenarios import ScenarioRunner, find_scenario
+
+    # Parse CLI args into variables and config overrides
+    cli_vars = {}
+    cli_config = {}
+    extra_args = helpers.kwargs_from_click_ctx(ctx)
+
+    for key, val in extra_args.items():
+        if key.startswith("config."):
+            cli_config[key] = val
+        else:
+            cli_vars[key] = val
+
+    if background:
+        helpers.fork_broker()
+
+    scenario_path = find_scenario(scenario)
+    runner = ScenarioRunner(
+        scenario_path=scenario_path,
+        cli_vars=cli_vars,
+        cli_config=cli_config,
+    )
+    runner.run()
+
+
+@guarded_command(group=scenarios)
+@click.argument("scenario", type=str)
+@click.option("--no-syntax", is_flag=True, help="Disable syntax highlighting")
+def info(scenario, no_syntax):
+    """Get information about a scenario.
+
+    Displays the scenario's config, variables, and step names.
+    """
+    from broker.scenarios import ScenarioRunner, find_scenario
+
+    scenario_path = find_scenario(scenario)
+    runner = ScenarioRunner(scenario_path=scenario_path)
+    info_data = runner.get_info()
+
+    output = helpers.yaml_format(info_data)
+    if no_syntax:
+        CONSOLE.print(output)
+    else:
+        CONSOLE.print(Syntax(output, "yaml", background_color="default"))
+
+
+@guarded_command(group=scenarios, name="validate")
+@click.argument("scenario", type=str)
+def scenarios_validate(scenario):
+    """Validate a scenario file against the schema.
+
+    Checks for syntax errors and schema violations.
+    """
+    from broker.scenarios import find_scenario, validate_scenario
+
+    scenario_path = find_scenario(scenario)
+    is_valid, error_msg = validate_scenario(scenario_path)
+
+    if is_valid:
+        logger.info(f"Scenario '{scenario}' is valid!")
+        if error_msg:  # Schema not found message
+            logger.warning(error_msg)
+    else:
+        logger.error(f"Scenario '{scenario}' is invalid: {error_msg}")

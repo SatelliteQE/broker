@@ -91,3 +91,9 @@ class ParamikoBindError(BrokerError):
     """Raised when a problem occurs at the Paramiko bind level."""
 
     error_code = 15
+
+
+class ScenarioError(BrokerError):
+    """Raised when a problem occurs during scenario execution."""
+
+    error_code = 16
