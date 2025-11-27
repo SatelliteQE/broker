@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scenario Schema",
+  "description": "A schema for validating scenario YAML files based on the defined specification.",
+  "type": "object",
+  "properties": {
+    "config": {
+      "type": "object",
+      "description": "Global configuration settings for the scenario execution.",
+      "properties": {
+        "inventory_path": {
+          "type": "string",
+          "description": "The file path to the scenario's dedicated inventory file."
+        },
+        "settings": {
+          "type": "object",
+          "description": "A nested map of provider-specific settings.",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "variables": {
+      "type": "object",
+      "description": "A key-value map of variables to be used within the steps.",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "array", "object"]
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "A list of step objects that define the scenario's actions.",
+      "items": {
+        "$ref": "#/definitions/step"
+      }
+    }
+  },
+  "required": [
+    "steps"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "step": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A human-readable name for the step."
+        },
+        "action": {
+          "type": "string",
+          "description": "The type of action to perform.",
+          "enum": [
+            "checkout",
+            "checkin",
+            "inventory",
+            "ssh",
+            "scp",
+            "sftp",
+            "execute",
+            "run_scenarios",
+            "exit"
+          ]
+        },
+        "arguments": {
+          "type": "object",
+          "description": "An optional key-value map of arguments specific to the chosen action."
+        },
+        "with": {
+          "type": "object",
+          "description": "Specifies the target hosts for the action.",
+          "properties": {
+            "hosts": {
+              "type": "string",
+              "description": "Can be 'scenario_inventory' or an inventory filter expression."
+            }
+          },
+          "required": ["hosts"],
+          "additionalProperties": false
+        },
+        "when": {
+          "type": "string",
+          "description": "A conditional expression that must evaluate to true for the step to run."
+        },
+        "loop": {
+          "type": "object",
+          "description": "Defines a loop to run the action multiple times.",
+          "properties": {
+            "iterable": {
+              "type": "string",
+              "description": "An inventory filter or a variable that resolves to a list."
+            },
+            "iter_var": {
+              "type": "string",
+              "description": "The name of the variable to hold the current item during each loop iteration."
+            },
+            "on_error": {
+              "type": "string",
+              "description": "Defines behavior on loop item failure.",
+              "enum": ["continue"]
+            }
+          },
+          "required": ["iterable", "iter_var"],
+          "additionalProperties": false
+        },
+        "capture": {
+          "type": "object",
+          "description": "Captures the output of the step into a variable.",
+          "properties": {
+            "as": {
+              "type": "string",
+              "description": "The name of the new variable to store the result in."
+            },
+            "transform": {
+              "type": "string",
+              "description": "A templating expression to transform the step.output before saving it."
+            }
+          },
+          "required": ["as"],
+          "additionalProperties": false
+        },
+        "on_error": {
+          "type": "array",
+          "description": "A list of nested steps to execute if the current step fails.",
+          "items": {
+            "$ref": "#/definitions/step"
+          }
+        },
+        "exit_on_error": {
+          "type": "boolean",
+          "description": "If False, the scenario will continue even if the step fails and no on_error block is defined.",
+          "default": true
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "If False, forces the action to run sequentially when targeting multiple hosts.",
+          "default": true
+        }
+      },
+      "required": [
+        "name",
+        "action"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
