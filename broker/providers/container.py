@@ -300,8 +300,6 @@ class Container(Provider):
         else:
             origin = helpers.find_origin()
 
-        if "for" in origin[0]:
-            origin = origin.split()[-1]
         envars["BROKER_ORIGIN"] = origin[0]
         if origin[1]:
             envars["JENKINS_URL"] = origin[1]
