@@ -11,6 +11,7 @@ from broker.logging import setup_logging
 
 setup_logging(console_level=logging.INFO)  # Basic setup until settings are loaded
 
+from click_shell import shell
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
@@ -40,7 +41,7 @@ click.rich_click.SHOW_ARGUMENTS = True
 click.rich_click.COMMAND_GROUPS = {
     "broker": [
         {"name": "Core Actions", "commands": ["checkout", "checkin", "inventory"]},
-        {"name": "Extras", "commands": ["execute", "extend", "providers", "config"]},
+        {"name": "Extras", "commands": ["execute", "extend", "providers", "config", "shell"]},
     ]
 }
 
@@ -564,3 +565,67 @@ def validate(chunk):
         logger.info("Validation passed!")
     except exceptions.BrokerError as err:
         logger.warning(f"Validation failed: {err}")
+
+
+def _make_shell_help_func(cmd, shell_instance):
+    """Create a help function that invokes the command with --help.
+
+    This works around a compatibility issue between click_shell and rich_click where
+    the shell's built-in help system uses a standard HelpFormatter that lacks
+    rich_click's config attribute.
+    """
+
+    def help_func():
+        # Invoke the command with --help which properly uses rich_click formatting
+        try:
+            cmd.main(["--help"], standalone_mode=False, parent=shell_instance.ctx)
+        except SystemExit:
+            pass
+
+    help_func.__name__ = f"help_{cmd.name}"
+    return help_func
+
+
+@shell(
+    prompt="broker > ",
+    intro="Welcome to Broker's interactive shell.\nType 'help' for commands, 'exit' or 'quit' to leave.",
+)
+def broker_shell():
+    """Start an interactive Broker shell session."""
+    pass
+
+
+# Register commands to the shell
+broker_shell.add_command(checkout)
+broker_shell.add_command(checkin)
+broker_shell.add_command(inventory)
+broker_shell.add_command(execute)
+broker_shell.add_command(providers)
+broker_shell.add_command(config)
+
+
+# Shell-only commands (not available as normal sub-commands)
+@broker_shell.command(name="reload_config")
+def reload_config_cmd():
+    """Reload Broker's configuration from disk.
+
+    This clears the cached settings, forcing them to be re-read
+    from the settings file on next access.
+    """
+    settings.settings._settings = None
+    CONSOLE.print("Configuration cache cleared. Settings will reload on next access.")
+
+
+# Patch help functions on the shell instance to work around click_shell/rich_click incompatibility
+for cmd_name, cmd in broker_shell.commands.items():
+    setattr(broker_shell.shell, f"help_{cmd_name}", _make_shell_help_func(cmd, broker_shell.shell))
+
+
+@cli.command(name="shell")
+def shell_cmd():
+    """Start an interactive Broker shell session.
+
+    This provides a REPL-like interface for running Broker commands
+    without needing to prefix each with 'broker'.
+    """
+    broker_shell(standalone_mode=False, args=[])
