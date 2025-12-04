@@ -30,6 +30,7 @@ dependencies = [
     "rich",
     "rich_click",
     "ruamel.yaml",
+    "click-shell",
 ]
 
 [project.urls]
