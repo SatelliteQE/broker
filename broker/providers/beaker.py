@@ -5,6 +5,7 @@ import logging
 
 import click
 from dynaconf import Validator
+from rich.progress import track
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,8 @@ class Beaker(Provider):
     def get_inventory(self, *args):
         """Get a list of hosts and their information from Beaker."""
         hosts = self.runtime.user_systems()
-        with click.progressbar(hosts, label="Compiling host information") as hosts_bar:
-            compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
+        compiled_host_info = [
+            self._compile_host_info(host)
+            for host in track(hosts, description="Compiling host information")
+        ]
         return compiled_host_info

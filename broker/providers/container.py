@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import click
 from dynaconf import Validator
+from rich.progress import track
 
 logger = logging.getLogger(__name__)
 
@@ -261,10 +262,10 @@ class Container(Provider):
     def get_inventory(self, name_prefix):
         """Get all containers that have a matching name prefix."""
         name_prefix = name_prefix or self._name_prefix
+        containers = [cont for cont in self.runtime.containers if cont.name.startswith(name_prefix)]
         return [
             container_info(cont)
-            for cont in self.runtime.containers
-            if cont.name.startswith(name_prefix)
+            for cont in track(containers, description="Compiling host information")
         ]
 
     def extend(self):
