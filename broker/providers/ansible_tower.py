@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 from packaging.version import InvalidVersion, Version
 from requests.exceptions import ConnectionError
 from rich.console import Console
+from rich.progress import track
 from rich.prompt import Prompt
 from ruamel.yaml import YAML, YAMLError
 
@@ -903,8 +904,10 @@ class AnsibleTower(Provider):
         for inv in invs:
             inv_hosts = inv.get_related("hosts", page_size=200).results
             hosts.extend(inv_hosts)
-        with click.progressbar(hosts, label="Compiling host information") as hosts_bar:
-            compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
+        compiled_host_info = [
+            self._compile_host_info(host)
+            for host in track(hosts, description="Compiling host information")
+        ]
         return compiled_host_info
 
     def extend(self, target_vm, new_expire_time=None, provider_labels=None):

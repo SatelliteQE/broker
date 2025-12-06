@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import click
 from dynaconf import Validator
+from rich.progress import track
 
 logger = logging.getLogger(__name__)
 
@@ -195,8 +196,10 @@ class Foreman(Provider):
     def get_inventory(self, *args, **kwargs):
         """Synchronize list of hosts on Foreman using set prefix."""
         all_hosts = self.runtime.hosts()
-        with click.progressbar(all_hosts, label="Compiling host information") as hosts_bar:
-            compiled_host_info = [self._compile_host_info(host) for host in hosts_bar]
+        compiled_host_info = [
+            self._compile_host_info(host)
+            for host in track(all_hosts, description="Compiling host information")
+        ]
         return compiled_host_info
 
     def _host_release(self):
