@@ -1,5 +1,6 @@
 """Defines the CLI commands for Broker."""
 
+import contextlib
 from functools import wraps
 import logging
 import signal
@@ -577,10 +578,8 @@ def _make_shell_help_func(cmd, shell_instance):
 
     def help_func():
         # Invoke the command with --help which properly uses rich_click formatting
-        try:
+        with contextlib.suppress(SystemExit):
             cmd.main(["--help"], standalone_mode=False, parent=shell_instance.ctx)
-        except SystemExit:
-            pass
 
     help_func.__name__ = f"help_{cmd.name}"
     return help_func
@@ -613,7 +612,13 @@ def reload_config_cmd():
     from the settings file on next access.
     """
     settings.settings._settings = None
-    CONSOLE.print("Configuration cache cleared. Settings will reload on next access.")
+    setup_logging(
+        console_level=settings.settings.logging.console_level,
+        file_level=settings.settings.logging.file_level,
+        log_path=settings.settings.logging.log_path,
+        structured=settings.settings.logging.structured,
+    )
+    CONSOLE.print("Configuration reloaded.")
 
 
 # Patch help functions on the shell instance to work around click_shell/rich_click incompatibility
