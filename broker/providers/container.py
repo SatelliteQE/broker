@@ -8,7 +8,9 @@ from uuid import uuid4
 
 import click
 from dynaconf import Validator
+from rich.console import Console
 from rich.progress import track
+from rich.syntax import Syntax
 
 logger = logging.getLogger(__name__)
 
@@ -231,15 +233,41 @@ class Container(Provider):
         return host_inst
 
     def provider_help(
-        self, container_hosts=False, container_host=None, container_apps=False, **kwargs
+        self,
+        container_hosts=False,
+        container_host=None,
+        container_apps=False,
+        container_app=None,
+        **kwargs,
     ):
         """Return useful information about container images."""
-        results_limit = kwargs.get("results_limit", self._settings.Container.results_limit)
-        if container_host:
-            logger.info(
-                f"Information for {container_host} container-host:\n"
-                f"{helpers.yaml_format(self.runtime.image_info(container_host))}"
+        rich_console = Console(no_color=self._settings.less_colors)
+        if container_host or container_app:
+            image_name = container_host or container_app
+            image_info = self.runtime.image_info(image_name)
+            if not image_info:
+                logger.warning(f"Image {image_name} not found!")
+                return
+            # Extract config separately for special formatting
+            config = image_info.pop("config", {})
+            # Display basic info in a table
+            info_table = helpers.dict_to_table(
+                image_info,
+                title=f"{image_name} Information",
             )
+            rich_console.print(info_table)
+            # Display config as syntax-highlighted YAML
+            if config:
+                config_yaml = helpers.yaml_format(config)
+                syntax = Syntax(
+                    config_yaml,
+                    "yaml",
+                    theme="monokai",
+                    line_numbers=False,
+                    background_color="default",
+                )
+                rich_console.print("\n[bold]Image Configuration[/bold]")
+                rich_console.print(syntax)
         elif container_hosts:
             images = [
                 img.tags[0]
@@ -249,15 +277,31 @@ class Container(Provider):
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.eval_filter(images, res_filter, "res")
                 images = images if isinstance(images, list) else [images]
-            images = "\n".join(images[:results_limit])
-            logger.info(f"Available host images:\n{images}")
+            if not images:
+                logger.warning("No host images found!")
+                return
+            image_table = helpers.dictlist_to_table(
+                [{"name": img} for img in images],
+                title="Available Host Images",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(image_table)
         elif container_apps:
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
                 images = helpers.eval_filter(images, res_filter, "res")
                 images = images if isinstance(images, list) else [images]
-            images = "\n".join(images[:results_limit])
-            logger.info(f"Available app images:\n{images}")
+            if not images:
+                logger.warning("No app images found!")
+                return
+            image_table = helpers.dictlist_to_table(
+                [{"name": img} for img in images],
+                title="Available App Images",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(image_table)
 
     def get_inventory(self, name_prefix):
         """Get all containers that have a matching name prefix."""
