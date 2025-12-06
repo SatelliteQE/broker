@@ -140,6 +140,15 @@ Copy the example settings file to `broker_settings.yaml` and edit it.
 
 To run Broker outside of its base directory, specify the directory with the `BROKER_DIRECTORY` environment variable.
 
+### Handling uv.lock conflicts
+
+This project treats `uv.lock` as a binary file to suppress large diffs. To automatically resolve conflicts in this file, you can configure a custom merge driver:
+
+```bash
+git config merge.uv-lock.name "Generate uv.lock"
+git config merge.uv-lock.driver "uv lock"
+```
+
 
 # API Usage
 TODO: Flesh this out
