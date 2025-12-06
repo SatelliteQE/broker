@@ -6,10 +6,12 @@ from uuid import uuid4
 
 import click
 from dynaconf import Validator
+from rich.console import Console
 from rich.progress import track
 
 logger = logging.getLogger(__name__)
 
+from broker import helpers
 from broker.binds import foreman
 from broker.helpers import Result
 from broker.providers import Provider
@@ -161,27 +163,50 @@ class Foreman(Provider):
         **kwargs,
     ):
         """Return useful information about Foreman provider."""
+        rich_console = Console(no_color=self._settings.less_colors)
         if hostgroups:
             all_hostgroups = self.runtime.hostgroups()
-            logger.info(f"On Foreman {self.instance} you have the following hostgroups:")
-            for hg in all_hostgroups["results"]:
-                logger.info(f"- {hg['title']}")
-        elif hostgroup:
-            logger.info(
-                f"On Foreman {self.instance} the hostgroup {hostgroup} has the following properties:"
+            if not all_hostgroups.get("results"):
+                logger.warning("No hostgroups found!")
+                return
+            hostgroup_names = [hg["title"] for hg in all_hostgroups["results"]]
+            if res_filter := kwargs.get("results_filter"):
+                hostgroup_names = helpers.eval_filter(hostgroup_names, res_filter, "res")
+                hostgroup_names = (
+                    hostgroup_names if isinstance(hostgroup_names, list) else [hostgroup_names]
+                )
+            if not hostgroup_names:
+                logger.warning("No hostgroups found!")
+                return
+            hostgroup_table = helpers.dictlist_to_table(
+                [{"name": hg} for hg in hostgroup_names],
+                title=f"Available Hostgroups on {self.instance}",
+                _id=False,
+                headers=False,
             )
+            rich_console.print(hostgroup_table)
+        elif hostgroup:
             data = self.runtime.hostgroup(name=hostgroup)
+            if not data:
+                logger.warning(f"Hostgroup {hostgroup} not found!")
+                return
             fields_of_interest = {
-                "description": "description",
-                "operating_system": "operatingsystem_name",
-                "domain": "domain_name",
-                "subnet": "subnet_name",
-                "subnet6": "subnet6_name",
+                "Description": "description",
+                "Operating System": "operatingsystem_name",
+                "Domain": "domain_name",
+                "Subnet": "subnet_name",
+                "Subnet6": "subnet6_name",
             }
-            for name, field in fields_of_interest.items():
-                value = data.get(field, False)
-                if value:
-                    logger.info(f"  {name}: {value}")
+            display_data = {
+                name: data.get(field, "N/A")
+                for name, field in fields_of_interest.items()
+                if data.get(field)
+            }
+            hostgroup_table = helpers.dict_to_table(
+                display_data,
+                title=f"{hostgroup} Information",
+            )
+            rich_console.print(hostgroup_table)
 
     def _compile_host_info(self, host):
         return {
