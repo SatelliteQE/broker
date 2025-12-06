@@ -5,7 +5,9 @@ import logging
 
 import click
 from dynaconf import Validator
+from rich.console import Console
 from rich.progress import track
+from rich.syntax import Syntax
 
 logger = logging.getLogger(__name__)
 
@@ -129,17 +131,28 @@ class Beaker(Provider):
 
     def provider_help(self, jobs=False, job=None, **kwargs):
         """Print useful information from the Beaker provider."""
-        results_limit = kwargs.get("results_limit", self._settings.container.results_limit)
+        rich_console = Console(no_color=self._settings.less_colors)
         if job:
             if not job.startswith("J:"):
                 job = f"J:{job}"
-            logger.info(self.runtime.job_clone(job, prettyxml=True, dryrun=True).stdout)
+            job_xml = self.runtime.job_clone(job, prettyxml=True, dryrun=True).stdout
+            syntax = Syntax(job_xml, "xml", theme="monokai", line_numbers=True)
+            rich_console.print(syntax)
         elif jobs:
             result = self.runtime.job_list(**kwargs).stdout.splitlines()
             if res_filter := kwargs.get("results_filter"):
                 result = helpers.eval_filter(result, res_filter, "res")
-            result = "\n".join(result[:results_limit])
-            logger.info(f"Available jobs:\n{result}")
+                result = result if isinstance(result, list) else [result]
+            if not result:
+                logger.warning("No jobs found!")
+                return
+            job_table = helpers.dictlist_to_table(
+                [{"name": j} for j in result],
+                title="Available Jobs",
+                _id=False,
+                headers=False,
+            )
+            rich_console.print(job_table)
 
     def release(self, host_name, job_id):
         """Release a hosts reserved from Beaker by cancelling the job."""
