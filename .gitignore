@@ -99,3 +99,4 @@ ENV/
 inventory.yaml
 *.bak
 /bin/*
+.venv
