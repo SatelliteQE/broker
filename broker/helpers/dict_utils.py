@@ -12,10 +12,12 @@ def clean_dict(in_dict):
 def merge_dicts(dict1, dict2):
     """Merge two nested dictionaries together.
 
+    Values from dict2 take precedence over dict1 for duplicate keys.
+
     :return: merged dictionary
     """
     if not isinstance(dict1, MutableMapping) or not isinstance(dict2, MutableMapping):
-        return dict1
+        return dict2
     dict1 = clean_dict(dict1)
     dict2 = clean_dict(dict2)
     merged = {}

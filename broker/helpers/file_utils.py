@@ -1,5 +1,6 @@
 """File handling utilities."""
 
+import contextlib
 from contextlib import contextmanager
 from io import BytesIO
 import json
@@ -30,6 +31,74 @@ def load_file(file, warn=True):
         return json.loads(file.read_text())
     elif file.suffix in (".yaml", ".yml"):
         return yaml.load(file)
+
+
+def save_file(file, data, mode="overwrite"):
+    """Save data to a file, using appropriate format based on file extension.
+
+    Args:
+        file: Path to the file (string or Path object)
+        data: The data to save. Can be dict, list, or string.
+        mode: Write mode - "overwrite" (default) or "append"
+
+    Returns:
+        Path object to the saved file
+
+    The format is determined by the file extension:
+    - .json: Save as JSON with indentation
+    - .yaml/.yml: Save as YAML
+    - Other: Save as plain text (string conversion if needed)
+    """
+    file = Path(file)
+    file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Determine format based on extension
+    suffix = file.suffix.lower()
+
+    if suffix == ".json":
+        # For JSON, try to parse string data as JSON first
+        if isinstance(data, str):
+            with contextlib.suppress(json.JSONDecodeError):
+                data = json.loads(data)
+        content = json.dumps(data, indent=2, default=str)
+    elif suffix in (".yaml", ".yml"):
+        # For YAML, try to parse string data as structured data first
+        if isinstance(data, str):
+            data = _try_parse_structured_string(data)
+        output = BytesIO()
+        yaml.dump(data, output)
+        content = output.getvalue().decode("utf-8")
+    # Plain text - convert to string if needed
+    elif isinstance(data, (dict, list)):
+        content = yaml_format(data)
+    else:
+        content = str(data)
+
+    # Write the content
+    if mode == "append":
+        with file.open("a") as f:
+            f.write(content)
+            if not content.endswith("\n"):
+                f.write("\n")
+    else:
+        file.write_text(content)
+        if not content.endswith("\n"):
+            with file.open("a") as f:
+                f.write("\n")
+
+    logger.debug(f"Saved data to file: {file.absolute()}")
+    return file
+
+
+def _try_parse_structured_string(data):
+    """Try to parse a string as JSON or YAML, returning original if parsing fails."""
+    # Try JSON first
+    with contextlib.suppress(json.JSONDecodeError):
+        return json.loads(data)
+    # Then try YAML
+    with contextlib.suppress(Exception):
+        return yaml.load(data)
+    return data
 
 
 def resolve_file_args(broker_args):

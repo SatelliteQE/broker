@@ -138,6 +138,7 @@ class Beaker(Provider):
             job_xml = self.runtime.job_clone(job, prettyxml=True, dryrun=True).stdout
             syntax = Syntax(job_xml, "xml", theme="monokai", line_numbers=True)
             rich_console.print(syntax)
+            return {"job_id": job, "xml": job_xml}
         elif jobs:
             result = self.runtime.job_list(**kwargs).stdout.splitlines()
             if res_filter := kwargs.get("results_filter"):
@@ -153,6 +154,7 @@ class Beaker(Provider):
                 headers=False,
             )
             rich_console.print(job_table)
+            return result
 
     def release(self, host_name, job_id):
         """Release a hosts reserved from Beaker by cancelling the job."""

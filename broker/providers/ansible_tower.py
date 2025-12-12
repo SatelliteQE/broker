@@ -967,6 +967,12 @@ class AnsibleTower(Provider):
                 headers=("Variable", "Default Value"),
             )
             rich_console.print(extras_table)
+            return {
+                "name": workflow,
+                "description": wfjt.description,
+                "inventory": default_inv["name"],
+                "extra_vars": json.loads(wfjt.extra_vars),
+            }
         elif workflows:
             workflows = [
                 workflow.name
@@ -986,6 +992,7 @@ class AnsibleTower(Provider):
                 headers=False,
             )
             rich_console.print(workflow_table)
+            return workflows[:results_limit]
         elif inventory:
             if inv := self._v2.inventory.get(name=inventory, kind="").results:
                 inv = inv.pop()
@@ -997,6 +1004,7 @@ class AnsibleTower(Provider):
                 title="Inventory Details",
             )
             rich_console.print(inv_table)
+            return {"id": inv.id, "name": inv.name, "description": inv.description}
         elif inventories:
             inv = [inv.name for inv in self._v2.inventory.get(kind="", page_size=1000).results]
             if not inv:
@@ -1012,6 +1020,7 @@ class AnsibleTower(Provider):
                 headers=False,
             )
             rich_console.print(inv_table)
+            return inv[:results_limit]
         elif job_template:
             if jt := self._v2.job_templates.get(name=job_template).results:
                 jt = jt.pop()
@@ -1030,6 +1039,12 @@ class AnsibleTower(Provider):
                 headers=("Variable", "Default Value"),
             )
             rich_console.print(extras_table)
+            return {
+                "name": job_template,
+                "description": jt.description,
+                "inventory": default_inv["name"],
+                "extra_vars": json.loads(jt.extra_vars),
+            }
         elif job_templates:
             job_templates = [
                 job_template.name
@@ -1051,6 +1066,7 @@ class AnsibleTower(Provider):
                 headers=False,
             )
             rich_console.print(job_template_table)
+            return job_templates[:results_limit]
         elif templates:
             templates = list(
                 set(
@@ -1073,6 +1089,7 @@ class AnsibleTower(Provider):
                 headers=False,
             )
             rich_console.print(template_table)
+            return templates[:results_limit]
         elif flavors:
             flavors = self.execute(workflow="list-flavors", artifacts="last")["data_out"][
                 "list_flavors"
@@ -1087,6 +1104,7 @@ class AnsibleTower(Provider):
                 flavors[:results_limit], title="Available Flavors", _id=False
             )
             rich_console.print(flavor_table)
+            return flavors[:results_limit]
 
     def release(self, name, broker_args=None):
         """Release the host back to the tower instance via the release workflow."""

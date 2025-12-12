@@ -268,6 +268,7 @@ class Container(Provider):
                 )
                 rich_console.print("\n[bold]Image Configuration[/bold]")
                 rich_console.print(syntax)
+            return {"name": image_name, **image_info, "config": config}
         elif container_hosts:
             images = [
                 img.tags[0]
@@ -287,6 +288,7 @@ class Container(Provider):
                 headers=False,
             )
             rich_console.print(image_table)
+            return images
         elif container_apps:
             images = [img.tags[0] for img in self.runtime.images if img.tags]
             if res_filter := kwargs.get("results_filter"):
@@ -302,6 +304,7 @@ class Container(Provider):
                 headers=False,
             )
             rich_console.print(image_table)
+            return images
 
     def get_inventory(self, name_prefix):
         """Get all containers that have a matching name prefix."""

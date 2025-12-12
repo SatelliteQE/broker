@@ -182,17 +182,26 @@ class OpenStack(Provider):
         """Display OpenStack provider information."""
         if images:
             logger.info("Available images:")
+            image_list = []
             for image in self.connection.image.images():
                 if image.status == "active":
                     logger.info(f"  - {image.name} ({image.id})")
+                    image_list.append({"name": image.name, "id": image.id})
+            return image_list
         elif flavors:
             logger.info("Available flavors:")
+            flavor_list = []
             for flavor in self.connection.compute.flavors():
                 logger.info(f"  - {flavor.name} ({flavor.id})")
+                flavor_list.append({"name": flavor.name, "id": flavor.id})
+            return flavor_list
         elif networks:
             logger.info("Available networks:")
+            network_list = []
             for network in self.connection.network.networks():
                 logger.info(f"  - {network.name} ({network.id})")
+                network_list.append({"name": network.name, "id": network.id})
+            return network_list
         elif templates:
             templates = self._settings.OPENSTACK.get("templates", {})
             if templates:
@@ -201,8 +210,10 @@ class OpenStack(Provider):
                     logger.info(f"  - {template_name}: {template_config}")
             else:
                 logger.info("No templates configured")
+            return templates
         else:
             logger.info("OpenStack provider configured and connected")
+            return None
 
     def construct_host(self, provider_params, host_classes, **kwargs):
         """Construct a host object from the provider_params and kwargs."""
