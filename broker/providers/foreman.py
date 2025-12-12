@@ -185,6 +185,7 @@ class Foreman(Provider):
                 headers=False,
             )
             rich_console.print(hostgroup_table)
+            return hostgroup_names
         elif hostgroup:
             data = self.runtime.hostgroup(name=hostgroup)
             if not data:
@@ -207,6 +208,7 @@ class Foreman(Provider):
                 title=f"{hostgroup} Information",
             )
             rich_console.print(hostgroup_table)
+            return {"name": hostgroup, **display_data}
 
     def _compile_host_info(self, host):
         return {
