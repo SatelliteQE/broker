@@ -71,7 +71,8 @@ def update_inventory(add=None, remove=None):
                             "name"
                         ) == new_host.get("name"):
                             # update missing data in the new_host with the old_host data
-                            new_host.update(merge_dicts(new_host, host))
+                            # new_host values take precedence over old host data
+                            new_host.update(merge_dicts(host, new_host))
                     inv_data.remove(host)
         if add:
             inv_data.extend(add)

@@ -17,6 +17,7 @@ from dynaconf.validator import ValidationError
 
 from broker.config_manager import ConfigManager
 from broker.exceptions import ConfigurationError
+from broker.helpers import merge_dicts
 
 INTERACTIVE_MODE = ConfigManager.interactive_mode
 BROKER_DIRECTORY = Path.home().joinpath(".broker")
@@ -101,10 +102,17 @@ def _create_and_configure_settings(file_path, file_exists, config_dict):
     # Remove vault loader if set somehow
     new_settings._loaders = [loader for loader in new_settings._loaders if "vault" not in loader]
 
-    # Add any configuration values passed in
+    # Add any configuration values passed in, merging nested dicts
     if config_dict:
         for key, value in config_dict.items():
-            new_settings[key] = value
+            # Normalize key to uppercase for settings lookup
+            upper_key = key.upper()
+            existing = new_settings.get(upper_key)
+            if existing is not None and isinstance(existing, dict) and isinstance(value, dict):
+                # Deep merge the nested dictionaries
+                new_settings[upper_key] = merge_dicts(existing, value)
+            else:
+                new_settings[upper_key] = value
 
     return new_settings
 

@@ -75,7 +75,8 @@ class Broker:
         # if a nick was specified, pull in the resolved arguments
         if "nick" in kwargs:
             nick = kwargs.pop("nick")
-            kwargs = helpers.merge_dicts(kwargs, helpers.resolve_nick(nick, self._settings))
+            # Merge nick resolution with kwargs; kwargs takes precedence over nick values
+            kwargs = helpers.merge_dicts(helpers.resolve_nick(nick, self._settings), kwargs)
             logger.debug(f"kwargs after nick resolution {kwargs=}")
         # Allow users to more simply pass a host class instead of a dict
         if "host_class" in kwargs:

@@ -9,9 +9,9 @@ Usage:
     runner.run()
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import jinja2
@@ -21,6 +21,7 @@ from ruamel.yaml import YAML
 from broker import helpers
 from broker.broker import Broker
 from broker.exceptions import ScenarioError
+from broker.providers import PROVIDERS
 from broker.settings import BROKER_DIRECTORY, create_settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,12 @@ logger = logging.getLogger(__name__)
 yaml = YAML()
 yaml.default_flow_style = False
 yaml.sort_keys = False
+
+# Mapping of user-friendly argument names to Broker's internal argument names
+# These are arguments that have a different name when passed to Broker directly
+ARGUMENT_NAME_MAP = {
+    "count": "_count",
+}
 
 # Directory where scenarios are stored by default
 SCENARIOS_DIR = BROKER_DIRECTORY / "scenarios"
@@ -95,11 +102,7 @@ def list_scenarios():
     if not SCENARIOS_DIR.exists():
         return []
 
-    scenarios = []
-    for file in SCENARIOS_DIR.iterdir():
-        if file.suffix in (".yaml", ".yml"):
-            scenarios.append(file.stem)
-    return sorted(scenarios)
+    return sorted(f.stem for f in SCENARIOS_DIR.iterdir() if f.suffix in (".yaml", ".yml"))
 
 
 def render_template(template_str, context):
@@ -129,6 +132,29 @@ def render_template(template_str, context):
     except jinja2.UndefinedError as e:
         logger.warning(f"Template rendering warning: {e}")
         raise ScenarioError(f"Undefined variable in template: {e}") from e
+
+
+def evaluate_expression(expression, context):
+    """Evaluate a Jinja2 expression and return the actual Python object.
+
+    Unlike render_template which always returns a string, this function
+    returns the actual Python object resulting from the expression evaluation.
+    This is useful for getting iterables, dicts, etc.
+
+    Args:
+        expression: A Jinja2 expression (without {{ }} delimiters)
+        context: Dictionary of variables for expression evaluation
+
+    Returns:
+        The Python object resulting from the expression evaluation
+    """
+    try:
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined)
+        compiled_expr = env.compile_expression(expression)
+        return compiled_expr(**context)
+    except jinja2.UndefinedError as e:
+        logger.warning(f"Expression evaluation warning: {e}")
+        raise ScenarioError(f"Undefined variable in expression: {e}") from e
 
 
 def evaluate_condition(expression, context):
@@ -182,13 +208,17 @@ def recursive_render(data, context):
         return data
 
 
-def resolve_hosts_reference(hosts_ref, scenario_inventory, context):
+def resolve_hosts_reference(hosts_ref, scenario_inventory, context, broker_inst=None):  # noqa: PLR0911
     """Resolve a hosts reference to a list of host objects.
 
     Args:
-        hosts_ref: Either 'scenario_inventory' or an inventory filter expression
+        hosts_ref: Either 'scenario_inventory', 'inventory', or an inventory filter expression.
+            Filter expressions can use:
+            - @inv: Filter against Broker's main inventory
+            - @scenario_inv: Filter against the scenario's inventory
         scenario_inventory: List of hosts checked out by this scenario
         context: Template context for rendering
+        broker_inst: Optional Broker instance for reconstructing hosts from inventory data
 
     Returns:
         List of host objects
@@ -196,10 +226,24 @@ def resolve_hosts_reference(hosts_ref, scenario_inventory, context):
     if hosts_ref == "scenario_inventory":
         return scenario_inventory.copy()
 
-    # Check if it's a filter expression (contains @inv)
+    # Check if it's the main Broker inventory
+    if hosts_ref == "inventory":
+        inv_data = helpers.load_inventory()
+        if broker_inst and inv_data:
+            return [broker_inst.reconstruct_host(h) for h in inv_data]
+        return inv_data
+
+    # Check if it's a filter expression for the scenario inventory
+    if "@scenario_inv" in hosts_ref:
+        return helpers.eval_filter(scenario_inventory, hosts_ref, filter_key="scenario_inv")
+
+    # Check if it's a filter expression for the main inventory
     if "@inv" in hosts_ref:
-        # Filter against the scenario inventory using Broker's filter
-        return helpers.eval_filter(scenario_inventory, hosts_ref, filter_key="inv")
+        inv_data = helpers.load_inventory()
+        filtered = helpers.eval_filter(inv_data, hosts_ref, filter_key="inv")
+        if broker_inst and filtered:
+            return [broker_inst.reconstruct_host(h) for h in filtered]
+        return filtered
 
     # Try to render as a template and see if it's a variable
     rendered = render_template(hosts_ref, context)
@@ -325,11 +369,10 @@ class ScenarioRunner:
         """
         for key, value in self.cli_config.items():
             # Remove 'config.' prefix if present
-            if key.startswith("config."):
-                key = key[7:]
+            config_key = key[7:] if key.startswith("config.") else key
 
             # Navigate the config dict and set the value
-            parts = key.split(".")
+            parts = config_key.split(".")
             target = self.config
             for part in parts[:-1]:
                 if part not in target:
@@ -348,11 +391,26 @@ class ScenarioRunner:
         return BROKER_DIRECTORY / f"scenario_{self.scenario_name}_inventory.yaml"
 
     def _setup_logging(self):
-        """Setup scenario-specific file logging."""
+        """Set up scenario-specific file logging."""
         log_dir = BROKER_DIRECTORY / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         # Note: Actual file handler setup would be done here
         # For now, we rely on the main broker logger
+
+    def _reconstruct_host_safe(self, host_data):
+        """Safely reconstruct a host from inventory data.
+
+        Args:
+            host_data: Dictionary of host data from inventory
+
+        Returns:
+            Host object or None if reconstruction fails
+        """
+        try:
+            return Broker(broker_settings=self._settings).reconstruct_host(host_data)
+        except (KeyError, ValueError, TypeError) as e:
+            logger.warning(f"Failed to reconstruct host from inventory: {e}")
+            return None
 
     def _load_scenario_inventory(self):
         """Load existing scenario inventory from disk if it exists."""
@@ -360,13 +418,15 @@ class ScenarioRunner:
             inv_data = helpers.load_file(self.inventory_path, warn=False)
             if inv_data:
                 # Reconstruct host objects from the inventory data
-                for host_data in inv_data:
-                    try:
-                        host = Broker(broker_settings=self._settings).reconstruct_host(host_data)
-                        if host:
-                            self.scenario_inventory.append(host)
-                    except Exception as e:
-                        logger.warning(f"Failed to reconstruct host from inventory: {e}")
+                hosts = [self._reconstruct_host_safe(h) for h in inv_data]
+                self.scenario_inventory.extend(h for h in hosts if h is not None)
+
+    def _clear_scenario_inventory(self):
+        """Clear scenario inventory for a fresh run."""
+        self.scenario_inventory.clear()
+        if self.inventory_path.exists():
+            self.inventory_path.unlink()
+            logger.debug(f"Cleared existing scenario inventory: {self.inventory_path}")
 
     def _save_scenario_inventory(self):
         """Save the current scenario inventory to disk."""
@@ -386,9 +446,7 @@ class ScenarioRunner:
             Dictionary context for template rendering
         """
         # Create a dict-like wrapper for steps that allows both attribute and dict access
-        steps_dict = {}
-        for name, mem in self.steps_memory.items():
-            steps_dict[name] = mem
+        steps_dict = dict(self.steps_memory.items())
 
         return {
             "step": self.steps_memory.get(current_step_name),
@@ -398,7 +456,7 @@ class ScenarioRunner:
             **self.variables,
         }
 
-    def _execute_step(self, step_data, previous_step_memory):
+    def _execute_step(self, step_data, previous_step_memory):  # noqa: PLR0912, PLR0915
         """Execute a single step.
 
         Args:
@@ -420,15 +478,16 @@ class ScenarioRunner:
         # Build context for template rendering
         context = self._build_context(step_name, previous_step_memory)
 
-        # Check 'when' condition
-        if "when" in step_data:
+        # Check 'when' condition only if there's no loop
+        # (for loops, the condition is evaluated per-iteration inside _execute_loop)
+        if "when" in step_data and "loop" not in step_data:
             try:
                 should_run = evaluate_condition(step_data["when"], context)
                 if not should_run:
                     logger.info(f"Skipping step '{step_name}' due to condition")
                     step_mem.status = "skipped"
                     return step_mem
-            except Exception as e:
+            except (jinja2.TemplateError, ScenarioError) as e:
                 logger.warning(f"Error evaluating 'when' condition for '{step_name}': {e}")
                 step_mem.status = "skipped"
                 return step_mem
@@ -436,19 +495,24 @@ class ScenarioRunner:
         logger.info(f"Executing step: {step_name} (action: {action})")
 
         try:
-            # Render arguments with template context
-            arguments = recursive_render(step_data.get("arguments", {}), context)
-
             # Resolve target hosts if 'with' is specified
             target_hosts = None
             if "with" in step_data:
                 hosts_ref = step_data["with"]["hosts"]
-                target_hosts = resolve_hosts_reference(hosts_ref, self.scenario_inventory, context)
+                broker_inst = Broker(broker_settings=self._settings)
+                target_hosts = resolve_hosts_reference(
+                    hosts_ref, self.scenario_inventory, context, broker_inst
+                )
 
             # Execute the action (loop or single)
             if "loop" in step_data:
-                result = self._execute_loop(step_data, arguments, target_hosts, context)
+                # For loops, pass raw arguments - they'll be rendered per-iteration
+                # with loop variables available in context
+                raw_arguments = step_data.get("arguments", {})
+                result = self._execute_loop(step_data, raw_arguments, target_hosts, context)
             else:
+                # Render arguments with template context
+                arguments = recursive_render(step_data.get("arguments", {}), context)
                 parallel = step_data.get("parallel", True)
                 result = self._dispatch_action(step_data, arguments, target_hosts, parallel)
 
@@ -466,11 +530,14 @@ class ScenarioRunner:
             step_mem._error = e
             step_mem.status = "failed"
 
-            # Handle on_error steps
-            if "on_error" in step_data:
+            # Handle on_error - can be "continue" string or list of recovery steps
+            on_error = step_data.get("on_error")
+            if on_error == "continue":
+                logger.warning(f"Step '{step_name}' failed but on_error=continue, continuing")
+            elif isinstance(on_error, list):
                 logger.info(f"Executing on_error handler for step '{step_name}'")
                 try:
-                    self._execute_steps(step_data["on_error"])
+                    self._execute_steps(on_error)
                 except Exception as handler_err:
                     logger.error(f"on_error handler also failed: {handler_err}")
                     raise handler_err from e
@@ -496,7 +563,7 @@ class ScenarioRunner:
             # Save inventory after each step in case of failure
             self._save_scenario_inventory()
 
-    def _execute_loop(self, step_data, base_arguments, target_hosts, context):
+    def _execute_loop(self, step_data, base_arguments, target_hosts, context):  # noqa: PLR0912, PLR0915
         """Execute a step in a loop over an iterable.
 
         Args:
@@ -514,42 +581,96 @@ class ScenarioRunner:
         on_error = loop_config.get("on_error")
 
         # Resolve the iterable
-        if "@inv" in iterable_expr:
-            # It's an inventory filter
+        if "@scenario_inv" in iterable_expr:
+            # Filter against scenario inventory
             resolved_iterable = helpers.eval_filter(
-                self.scenario_inventory, iterable_expr, filter_key="inv"
+                self.scenario_inventory, iterable_expr, filter_key="scenario_inv"
             )
+        elif "@inv" in iterable_expr:
+            # Filter against main broker inventory and reconstruct hosts
+            inv_data = helpers.load_inventory()
+            filtered = helpers.eval_filter(inv_data, iterable_expr, filter_key="inv")
+            broker_inst = Broker(broker_settings=self._settings)
+            resolved_iterable = [broker_inst.reconstruct_host(h) for h in filtered]
         else:
-            # Try to render as a template
-            resolved_iterable = recursive_render(iterable_expr, context)
+            # Evaluate as a Jinja2 expression to get the actual Python object
+            # Strip {{ }} if present, since evaluate_expression expects raw expression
+            expr = iterable_expr.strip()
+            if expr.startswith("{{") and expr.endswith("}}"):
+                expr = expr[2:-2].strip()
+            resolved_iterable = evaluate_expression(expr, context)
 
-        # Ensure it's a list
-        if not isinstance(resolved_iterable, (list, tuple)):
-            resolved_iterable = [resolved_iterable]
+        # Ensure it's iterable - handle dicts specially
+        if isinstance(resolved_iterable, dict):
+            # Convert dict to list of tuples for iteration
+            resolved_iterable = list(resolved_iterable.items())
+        elif not isinstance(resolved_iterable, (list, tuple)):
+            # Convert iterables like dict_items to a list
+            try:
+                resolved_iterable = list(resolved_iterable)
+            except TypeError:
+                resolved_iterable = [resolved_iterable]
+
+        # Parse iter_var - support "key, value" syntax for tuple unpacking
+        iter_var_names = [v.strip() for v in iter_var_name.split(",")]
+
+        # Check for capture.key to determine how to key the loop output
+        capture_config = step_data.get("capture", {})
+        capture_key_expr = capture_config.get("key")
 
         loop_output = {}
 
         for item in resolved_iterable:
             # Create a loop-specific context
             loop_context = context.copy()
-            loop_context[iter_var_name] = item
+
+            # Handle tuple unpacking for multiple iter_var names
+            if len(iter_var_names) > 1 and isinstance(item, (list, tuple)):
+                for var_name, value in zip(iter_var_names, item):
+                    loop_context[var_name] = value
+                default_loop_key = str(item[0]) if item else str(item)
+            else:
+                loop_context[iter_var_names[0]] = item
+                default_loop_key = str(item)
+
+            # Check 'when' condition for this iteration (if present)
+            when_condition = step_data.get("when")
+            if when_condition:
+                try:
+                    should_run = evaluate_condition(when_condition, loop_context)
+                    if not should_run:
+                        logger.debug(f"Skipping loop iteration for {item} due to condition")
+                        continue
+                except (jinja2.TemplateError, ScenarioError) as e:
+                    logger.warning(f"Error evaluating 'when' condition for iteration {item}: {e}")
+                    continue
 
             # Re-render arguments with the loop variable
             iter_args = recursive_render(base_arguments, loop_context)
 
             try:
                 result = self._dispatch_action(step_data, iter_args, target_hosts, parallel=False)
-                loop_output[str(item)] = result
+
+                # Determine the key for this iteration's result
+                if capture_key_expr:
+                    # Evaluate the key expression with loop context (including result)
+                    key_context = loop_context.copy()
+                    key_context["result"] = result
+                    loop_key = str(render_template(f"{{{{ {capture_key_expr} }}}}", key_context))
+                else:
+                    loop_key = default_loop_key
+
+                loop_output[loop_key] = result
             except Exception as e:
                 if on_error == "continue":
                     logger.warning(f"Loop iteration failed for {item}: {e}, continuing...")
-                    loop_output[str(item)] = {"error": str(e)}
+                    loop_output[default_loop_key] = {"error": str(e)}
                 else:
                     raise
 
         return loop_output
 
-    def _dispatch_action(self, step_data, arguments, hosts=None, parallel=True):
+    def _dispatch_action(self, step_data, arguments, hosts=None, parallel=True):  # noqa: PLR0911
         """Dispatch an action to the appropriate handler.
 
         Args:
@@ -582,12 +703,32 @@ class ScenarioRunner:
             return self._action_exit(arguments)
         elif action == "run_scenarios":
             return self._action_run_scenarios(arguments)
+        elif action == "output":
+            return self._action_output(arguments)
+        elif action == "provider_info":
+            return self._action_provider_info(step_name, arguments)
         else:
             raise ScenarioError(f"Unknown action: {action}")
 
+    def _map_argument_names(self, arguments):
+        """Map user-friendly argument names to Broker's internal names.
+
+        Args:
+            arguments: Dictionary of arguments from the scenario
+
+        Returns:
+            Dictionary with argument names mapped to Broker's expected names
+        """
+        mapped = {}
+        for key, value in arguments.items():
+            mapped_key = ARGUMENT_NAME_MAP.get(key, key)
+            mapped[mapped_key] = value
+        return mapped
+
     def _action_checkout(self, step_name, arguments):
         """Handle checkout action."""
-        broker_inst = Broker(broker_settings=self._settings, **arguments)
+        mapped_args = self._map_argument_names(arguments)
+        broker_inst = Broker(broker_settings=self._settings, **mapped_args)
         self.steps_memory[step_name]._broker_inst = broker_inst
 
         hosts = broker_inst.checkout()
@@ -626,7 +767,12 @@ class ScenarioRunner:
         return helpers.load_inventory(filter=arguments.get("filter"))
 
     def _action_ssh(self, arguments, hosts, parallel):
-        """Handle ssh (execute command) action."""
+        """Handle ssh (execute command) action.
+
+        Returns:
+            A single Result object if there's only one host,
+            otherwise a dict mapping hostname to Result objects.
+        """
         if not hosts:
             raise ScenarioError("SSH action requires target hosts")
 
@@ -637,20 +783,31 @@ class ScenarioRunner:
         timeout = arguments.get("timeout")
 
         def run_on_host(host):
-            return host.execute(command, timeout=timeout)
+            return (host.hostname, host.execute(command, timeout=timeout))
 
-        if parallel and len(hosts) > 1:
-            results = []
+        if len(hosts) == 1:
+            # Return single result directly for easier template access
+            return hosts[0].execute(command, timeout=timeout)
+
+        # Multiple hosts: return dict mapping hostname to result
+        if parallel:
+            results = {}
             with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
-                futures = {executor.submit(run_on_host, h): h for h in hosts}
+                futures = [executor.submit(run_on_host, h) for h in hosts]
                 for future in as_completed(futures):
-                    results.append(future.result())
+                    hostname, result = future.result()
+                    results[hostname] = result
             return results
         else:
-            return [run_on_host(h) for h in hosts]
+            return {h.hostname: h.execute(command, timeout=timeout) for h in hosts}
 
     def _action_scp(self, arguments, hosts, parallel):
-        """Handle scp action."""
+        """Handle scp action.
+
+        Returns:
+            A single Result object if there's only one host,
+            otherwise a dict mapping hostname to Result objects.
+        """
         if not hosts:
             raise ScenarioError("SCP action requires target hosts")
 
@@ -662,20 +819,35 @@ class ScenarioRunner:
         def scp_to_host(host):
             # Use sftp_write for uploading files
             host.session.sftp_write(source, destination)
+            return (
+                host.hostname,
+                helpers.Result(stdout=f"Copied {source} to {destination}", stderr="", status=0),
+            )
+
+        if len(hosts) == 1:
+            # Return single result directly for easier template access
+            hosts[0].session.sftp_write(source, destination)
             return helpers.Result(stdout=f"Copied {source} to {destination}", stderr="", status=0)
 
-        if parallel and len(hosts) > 1:
-            results = []
+        # Multiple hosts: return dict mapping hostname to result
+        if parallel:
+            results = {}
             with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
-                futures = {executor.submit(scp_to_host, h): h for h in hosts}
+                futures = [executor.submit(scp_to_host, h) for h in hosts]
                 for future in as_completed(futures):
-                    results.append(future.result())
+                    hostname, result = future.result()
+                    results[hostname] = result
             return results
         else:
-            return [scp_to_host(h) for h in hosts]
+            return {h.hostname: scp_to_host(h)[1] for h in hosts}
 
     def _action_sftp(self, arguments, hosts, parallel):
-        """Handle sftp action."""
+        """Handle sftp action.
+
+        Returns:
+            A single Result object if there's only one host,
+            otherwise a dict mapping hostname to Result objects.
+        """
         if not hosts:
             raise ScenarioError("SFTP action requires target hosts")
 
@@ -684,6 +856,19 @@ class ScenarioRunner:
         direction = arguments.get("direction", "upload")
 
         def sftp_on_host(host):
+            if direction == "upload":
+                host.session.sftp_write(source, destination)
+                result = helpers.Result(
+                    stdout=f"Uploaded {source} to {destination}", stderr="", status=0
+                )
+            else:
+                host.session.sftp_read(source, destination)
+                result = helpers.Result(
+                    stdout=f"Downloaded {source} to {destination}", stderr="", status=0
+                )
+            return (host.hostname, result)
+
+        def sftp_single(host):
             if direction == "upload":
                 host.session.sftp_write(source, destination)
                 return helpers.Result(
@@ -695,15 +880,21 @@ class ScenarioRunner:
                     stdout=f"Downloaded {source} to {destination}", stderr="", status=0
                 )
 
-        if parallel and len(hosts) > 1:
-            results = []
+        if len(hosts) == 1:
+            # Return single result directly for easier template access
+            return sftp_single(hosts[0])
+
+        # Multiple hosts: return dict mapping hostname to result
+        if parallel:
+            results = {}
             with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
-                futures = {executor.submit(sftp_on_host, h): h for h in hosts}
+                futures = [executor.submit(sftp_on_host, h) for h in hosts]
                 for future in as_completed(futures):
-                    results.append(future.result())
+                    hostname, result = future.result()
+                    results[hostname] = result
             return results
         else:
-            return [sftp_on_host(h) for h in hosts]
+            return {h.hostname: sftp_on_host(h)[1] for h in hosts}
 
     def _action_execute(self, step_name, arguments):
         """Handle execute action (provider action)."""
@@ -738,6 +929,128 @@ class ScenarioRunner:
             results.append({"path": path, "success": True})
 
         return results
+
+    def _action_output(self, arguments):
+        """Handle output action - write content to stdout, stderr, or a file.
+
+        Args:
+            arguments: Dictionary containing:
+                - content: The content to output (required). Can be a template string,
+                    a variable name, or raw data.
+                - destination: Where to write the output. Options:
+                    - "stdout" (default): Write to standard output
+                    - "stderr": Write to standard error
+                    - A file path: Write/append to the specified file
+                      (.json and .yaml/.yml files will be formatted appropriately)
+                - mode: For file destinations only:
+                    - "overwrite" (default): Overwrite existing file or create new
+                    - "append": Append to existing file or create new
+
+        Returns:
+            The content that was written
+        """
+        import sys
+
+        content = arguments.get("content")
+        if content is None:
+            raise ScenarioError("Output action requires 'content' argument")
+
+        # Check if content is a variable name (string that matches a captured variable)
+        if isinstance(content, str) and content in self.variables:
+            content = self.variables[content]
+
+        destination = arguments.get("destination", "stdout")
+        mode = arguments.get("mode", "overwrite")
+
+        if destination == "stdout":
+            # Convert content to string for stdout
+            if not isinstance(content, str):
+                content = helpers.yaml_format(content)
+            sys.stdout.write(content)
+            if not content.endswith("\n"):
+                sys.stdout.write("\n")
+            sys.stdout.flush()
+        elif destination == "stderr":
+            # Convert content to string for stderr
+            if not isinstance(content, str):
+                content = helpers.yaml_format(content)
+            sys.stderr.write(content)
+            if not content.endswith("\n"):
+                sys.stderr.write("\n")
+            sys.stderr.flush()
+        else:
+            # Treat as file path - use save_file helper for format-aware saving
+            helpers.save_file(destination, content, mode=mode)
+            logger.debug(f"Wrote output to file: {destination}")
+
+        return content
+
+    def _action_provider_info(self, step_name, arguments):
+        """Handle provider_info action - query provider for available resources.
+
+        Args:
+            step_name: Name of the current step
+            arguments: Dictionary containing:
+                - provider: The provider name (required), e.g., "AnsibleTower", "Container"
+                - query: What to query. Can be:
+                    - A string for flag-style queries: "workflows", "inventories", etc.
+                    - A dict for value-style queries: {"workflow": "my-workflow"}
+                - Additional provider-specific arguments (e.g., tower_inventory)
+
+        Returns:
+            The data returned by the provider's provider_help method
+
+        Example YAML:
+            - name: List workflows
+              action: provider_info
+              arguments:
+                provider: AnsibleTower
+                query: workflows
+                tower_inventory: my-inventory
+
+            - name: Get workflow details
+              action: provider_info
+              arguments:
+                provider: AnsibleTower
+                query:
+                  workflow: my-workflow-name
+        """
+        provider_name = arguments.get("provider")
+        if not provider_name:
+            raise ScenarioError("provider_info action requires 'provider' argument")
+
+        query = arguments.get("query")
+        if not query:
+            raise ScenarioError("provider_info action requires 'query' argument")
+
+        # Get the provider class
+        provider_cls = PROVIDERS.get(provider_name)
+        if not provider_cls:
+            available = ", ".join(PROVIDERS.keys())
+            raise ScenarioError(f"Unknown provider: {provider_name}. Available: {available}")
+
+        # Build kwargs for provider_help
+        # Start with all arguments except 'provider' and 'query'
+        help_kwargs = {k: v for k, v in arguments.items() if k not in ("provider", "query")}
+
+        # Process the query argument
+        if isinstance(query, str):
+            # Flag-style query: query: "workflows" -> workflows=True
+            help_kwargs[query] = True
+        elif isinstance(query, dict):
+            # Value-style query: query: {workflow: "name"} -> workflow="name"
+            help_kwargs.update(query)
+        else:
+            raise ScenarioError(f"Invalid query type: {type(query)}. Expected str or dict.")
+
+        # Instantiate the provider and call provider_help
+        try:
+            provider_inst = provider_cls(broker_settings=self._settings)
+            self.steps_memory[step_name]._broker_inst = provider_inst
+            result = provider_inst.provider_help(**help_kwargs)
+            return result
+        except Exception as e:
+            raise ScenarioError(f"provider_info failed for {provider_name}: {e}") from e
 
     def _capture_output(self, capture_config, result, context):
         """Capture step output into a variable.
@@ -776,8 +1089,8 @@ class ScenarioRunner:
         """
         logger.info(f"Starting scenario: {self.scenario_name}")
 
-        # Load any existing scenario inventory
-        self._load_scenario_inventory()
+        # Clear any existing scenario inventory for a fresh run
+        self._clear_scenario_inventory()
 
         try:
             self._execute_steps(self.data.get("steps", []))
@@ -825,7 +1138,7 @@ def validate_scenario(scenario_path):
     try:
         with path.open() as f:
             data = yaml.load(f)
-    except Exception as e:
+    except (OSError, yaml.YAMLError) as e:
         return False, f"Failed to parse YAML: {e}"
 
     schema = get_schema()

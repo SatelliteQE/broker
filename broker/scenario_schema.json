@@ -61,7 +61,9 @@
             "sftp",
             "execute",
             "run_scenarios",
-            "exit"
+            "exit",
+            "output",
+            "provider_info"
           ]
         },
         "arguments": {
@@ -90,11 +92,11 @@
           "properties": {
             "iterable": {
               "type": "string",
-              "description": "An inventory filter or a variable that resolves to a list."
+              "description": "An inventory filter, variable name, or expression that resolves to an iterable. Supports dict methods like 'my_dict.items()' for key-value iteration."
             },
             "iter_var": {
               "type": "string",
-              "description": "The name of the variable to hold the current item during each loop iteration."
+              "description": "The name(s) of the variable(s) to hold the current item. Supports tuple unpacking with comma-separated names (e.g., 'key, value' for dict items)."
             },
             "on_error": {
               "type": "string",
@@ -116,17 +118,31 @@
             "transform": {
               "type": "string",
               "description": "A templating expression to transform the step.output before saving it."
+            },
+            "key": {
+              "type": "string",
+              "description": "For loops only: A templating expression to derive the dictionary key for each iteration. Has access to loop variables and 'result'. If not specified, defaults to the iter_var value."
             }
           },
           "required": ["as"],
           "additionalProperties": false
         },
         "on_error": {
-          "type": "array",
-          "description": "A list of nested steps to execute if the current step fails.",
-          "items": {
-            "$ref": "#/definitions/step"
-          }
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Simple error handling: 'continue' to proceed despite errors.",
+              "enum": ["continue"]
+            },
+            {
+              "type": "array",
+              "description": "A list of nested steps to execute if the current step fails.",
+              "items": {
+                "$ref": "#/definitions/step"
+              }
+            }
+          ],
+          "description": "Error handling behavior. Can be 'continue' to proceed despite errors, or an array of recovery steps to execute on failure."
         },
         "exit_on_error": {
           "type": "boolean",
