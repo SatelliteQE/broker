@@ -22,11 +22,18 @@ from broker.providers import Provider
 def container_info(container_inst):
     """Return a dict of container information."""
     attr_dict = {"container_host": "Image", "_broker_origin": "Labels/broker.origin"}
+    # Config may not be present in list output, only in inspect output
+    # Fall back to container name or Id if hostname is not available
+    config = container_inst.attrs.get("Config", {})
+    hostname = config.get("Hostname") if config else None
+    if not hostname:
+        # Use the container name or short id as fallback
+        hostname = container_inst.name or container_inst.attrs.get("Id", "")[:12]
     info = {
         "_broker_provider": "Container",
         "_broker_args": helpers.dict_from_paths(container_inst.attrs, attr_dict),
         "name": container_inst.name,
-        "hostname": container_inst.attrs["Config"].get("Hostname"),
+        "hostname": hostname,
         "image": container_inst.image.tags,
         "ports": container_inst.ports,
     }

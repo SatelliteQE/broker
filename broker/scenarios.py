@@ -21,6 +21,7 @@ from ruamel.yaml import YAML
 from broker import helpers
 from broker.broker import Broker
 from broker.exceptions import ScenarioError
+from broker.logging import setup_logging
 from broker.providers import PROVIDERS
 from broker.settings import BROKER_DIRECTORY, create_settings
 
@@ -111,12 +112,16 @@ def render_template(template_str, context):
     If the input is not a string or doesn't contain template syntax,
     it is returned as-is.
 
+    For simple variable references like "{{ variable }}", this function
+    preserves the original Python type (int, bool, list, dict, etc.).
+    For complex templates with text or multiple expressions, it returns a string.
+
     Args:
         template_str: String that may contain Jinja2 template syntax
         context: Dictionary of variables for template rendering
 
     Returns:
-        Rendered string or original value if not a template
+        Rendered value (preserving type for simple refs) or string for complex templates
     """
     if not isinstance(template_str, str):
         return template_str
@@ -124,6 +129,23 @@ def render_template(template_str, context):
     # Check if it looks like a template
     if "{{" not in template_str and "{%" not in template_str:
         return template_str
+
+    # Check if this is a simple variable reference like "{{ var }}" or "{{ obj.attr }}"
+    # If so, use evaluate_expression to preserve the Python type
+    stripped = template_str.strip()
+    if (
+        stripped.startswith("{{")
+        and stripped.endswith("}}")
+        and stripped.count("{{") == 1
+        and "{%" not in stripped
+    ):
+        # Extract the expression inside {{ }}
+        expr = stripped[2:-2].strip()
+        try:
+            return evaluate_expression(expr, context)
+        except ScenarioError:
+            # Fall through to standard rendering if expression evaluation fails
+            pass
 
     try:
         env = jinja2.Environment(undefined=jinja2.StrictUndefined)
@@ -331,7 +353,7 @@ class ScenarioRunner:
         # Setup scenario-specific file logging
         self._setup_logging()
 
-        logger.info(f"Initialized scenario: {self.scenario_name}")
+        logger.debug(f"Initialized scenario: {self.scenario_name}")
 
     def _load_and_validate(self):
         """Load the scenario YAML file and validate against the schema.
@@ -391,11 +413,36 @@ class ScenarioRunner:
         return BROKER_DIRECTORY / f"scenario_{self.scenario_name}_inventory.yaml"
 
     def _setup_logging(self):
-        """Set up scenario-specific file logging."""
-        log_dir = BROKER_DIRECTORY / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        # Note: Actual file handler setup would be done here
-        # For now, we rely on the main broker logger
+        """Set up scenario-specific file logging.
+
+        Path resolution rules for log_path config:
+        - If not specified: Use the default broker.log file (no reconfiguration)
+        - If filename only (no /): Use BROKER_DIRECTORY/logs/{filename}
+        - If absolute path with filename: Use as-is
+        - If absolute directory path: Use {path}/{scenario_name}.log
+        """
+        log_path_config = self.config.get("log_path")
+        if not log_path_config:
+            # Use default broker.log - no reconfiguration needed
+            return
+
+        log_path = Path(log_path_config)
+
+        if not log_path.is_absolute():
+            # Filename only - place in BROKER_DIRECTORY/logs/
+            resolved_path = BROKER_DIRECTORY / "logs" / log_path
+        elif log_path.suffix:
+            # Absolute path with filename extension - use as-is
+            resolved_path = log_path
+        else:
+            # Absolute directory path - use {path}/{scenario_name}.log
+            resolved_path = log_path / f"{self.scenario_name}.log"
+
+        # Ensure the parent directory exists
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Reconfigure logging to use the custom log file
+        setup_logging(log_path=resolved_path)
 
     def _reconstruct_host_safe(self, host_data):
         """Safely reconstruct a host from inventory data.
