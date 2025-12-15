@@ -1,0 +1,8 @@
+# Invalid scenario - missing required 'steps' field
+config:
+  inventory_path: /tmp/test.yaml
+
+variables:
+  foo: bar
+
+# 'steps' is missing - should fail schema validation

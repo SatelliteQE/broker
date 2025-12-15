@@ -25,3 +25,6 @@ def test_deploy_details_scenario():
     assert scenario is not None
     assert scenario.scenario_name == "deploy_details"
     scenario.run()
+    assert "workflow_list" in scenario.variables
+    assert "workflow_details" in scenario.variables
+    assert scenario.steps_memory["List workflows"].status == "completed"

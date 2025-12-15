@@ -1,0 +1,27 @@
+# Scenario for testing conditional execution
+variables:
+  run_this: true
+  skip_this: false
+  value: 42
+
+steps:
+  - name: should_run
+    action: output
+    arguments:
+      content: "This step should run"
+      destination: stdout
+    when: run_this == true
+
+  - name: should_skip
+    action: output
+    arguments:
+      content: "This step should be skipped"
+      destination: stdout
+    when: skip_this == true
+
+  - name: conditional_value
+    action: output
+    arguments:
+      content: "Value is greater than 40"
+      destination: stdout
+    when: value > 40

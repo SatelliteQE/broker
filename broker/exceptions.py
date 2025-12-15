@@ -97,3 +97,28 @@ class ScenarioError(BrokerError):
     """Raised when a problem occurs during scenario execution."""
 
     error_code = 16
+
+    def __init__(self, message="Scenario execution failed", step_name=None, scenario_name=None):
+        """Initialize ScenarioError with optional context.
+
+        Args:
+            message: The error message
+            step_name: Name of the step where the error occurred (optional)
+            scenario_name: Name of the scenario being executed (optional)
+        """
+        self.step_name = step_name
+        self.scenario_name = scenario_name
+
+        # Build a contextual message
+        parts = []
+        if scenario_name:
+            parts.append(f"Scenario '{scenario_name}'")
+        if step_name:
+            parts.append(f"step '{step_name}'")
+
+        if parts:
+            self.message = f"{' '.join(parts)}: {message}"
+        else:
+            self.message = message
+
+        super().__init__(message=self.message)

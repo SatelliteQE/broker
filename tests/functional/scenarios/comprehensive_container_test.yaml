@@ -175,7 +175,7 @@ steps:
     with:
       hosts: "@scenario_inv[0]"
 
-  - name: Use SSH to copy file between containers (simulating SCP workflow)
+  - name: Use SSH to create files on containers
     action: ssh
     arguments:
       command: "echo 'SCP simulation - file created via SSH' > /tmp/scp_test_file.txt"
