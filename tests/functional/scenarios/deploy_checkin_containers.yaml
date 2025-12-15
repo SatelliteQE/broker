@@ -1,0 +1,19 @@
+steps:
+  - name: Discover container hosts
+    action: provider_info
+    arguments:
+      provider: Container
+      query: container_hosts
+    capture:
+      as: container_hosts
+  - name: Deploy each container host
+    action: checkout
+    arguments:
+      container_host: "{{ c_host }}"
+    loop:
+      iterable: container_hosts
+      iter_var: c_host
+  - name: Checkin all deployed containers
+    action: checkin
+    with:
+      hosts: scenario_inventory

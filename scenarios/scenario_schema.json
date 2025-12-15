@@ -12,10 +12,6 @@
           "type": "string",
           "description": "The file path to the scenario's dedicated inventory file."
         },
-        "log_path": {
-          "type": "string",
-          "description": "Custom log file path. If a filename only, logs to BROKER_DIRECTORY/logs/. If an absolute path with filename, uses as-is. If an absolute directory path, uses {path}/{scenario_name}.log. If not specified, uses the main broker.log file."
-        },
         "settings": {
           "type": "object",
           "description": "A nested map of provider-specific settings.",
@@ -132,21 +128,11 @@
           "additionalProperties": false
         },
         "on_error": {
-          "oneOf": [
-            {
-              "type": "string",
-              "description": "Simple error handling: 'continue' to proceed despite errors.",
-              "enum": ["continue"]
-            },
-            {
-              "type": "array",
-              "description": "A list of nested steps to execute if the current step fails.",
-              "items": {
-                "$ref": "#/definitions/step"
-              }
-            }
-          ],
-          "description": "Error handling behavior. Can be 'continue' to proceed despite errors, or an array of recovery steps to execute on failure."
+          "type": "array",
+          "description": "A list of nested steps to execute if the current step fails.",
+          "items": {
+            "$ref": "#/definitions/step"
+          }
         },
         "exit_on_error": {
           "type": "boolean",

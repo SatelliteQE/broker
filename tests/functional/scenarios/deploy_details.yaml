@@ -1,0 +1,29 @@
+steps:
+  - name: List workflows
+    action: provider_info
+    arguments:
+      provider: AnsibleTower
+      query: workflows
+    capture:
+      as: workflow_list
+
+  # Value-style query
+  - name: Get workflow details
+    action: provider_info
+    arguments:
+      provider: AnsibleTower
+      query:
+        workflow: "{{ workflow_name }}"
+    when: "'deploy' in workflow_name"
+    loop:
+      iterable: workflow_list
+      iter_var: workflow_name
+    capture:
+      as: workflow_details
+      key: workflow_name
+
+  - name: Output results per workflow
+    action: output
+    arguments:
+      content: workflow_details
+      destination: deploy_workflows.json
