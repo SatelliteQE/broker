@@ -1,0 +1,21 @@
+# A valid minimal scenario for testing ScenarioRunner initialization
+config:
+  inventory_path: /tmp/test_inventory.yaml
+  log_path: test_scenario.log
+  settings:
+    Container:
+      runtime: podman
+
+variables:
+  my_var: test_value
+  my_list:
+    - item1
+    - item2
+  my_count: 2
+  enabled: true
+
+steps:
+  - name: test_step
+    action: checkout
+    arguments:
+      nick: test_nick

@@ -1,0 +1,18 @@
+# Scenario for testing capture functionality
+variables:
+  initial_value: start
+
+steps:
+  - name: capture_step
+    action: output
+    arguments:
+      content: "captured_output"
+      destination: stdout
+    capture:
+      as: captured_var
+
+  - name: use_captured
+    action: output
+    arguments:
+      content: "Using captured: {{ captured_var }}"
+      destination: stdout

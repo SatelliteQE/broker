@@ -225,6 +225,7 @@ commands = [
         "-v",
         "{tox_root}/tests/test_broker.py",
         "{tox_root}/tests/test_helpers.py",
+        "{tox_root}/tests/test_scenarios.py",
         "{posargs}",
     ],
 ]
