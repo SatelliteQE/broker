@@ -105,14 +105,13 @@ def _create_and_configure_settings(file_path, file_exists, config_dict):
     # Add any configuration values passed in, merging nested dicts
     if config_dict:
         for key, value in config_dict.items():
-            # Normalize key to uppercase for settings lookup
-            upper_key = key.upper()
-            existing = new_settings.get(upper_key)
+            # Use the original key for settings lookup and assignment
+            existing = new_settings.get(key)
             if existing is not None and isinstance(existing, dict) and isinstance(value, dict):
                 # Deep merge the nested dictionaries
-                new_settings[upper_key] = merge_dicts(existing, value)
+                new_settings[key] = merge_dicts(existing, value)
             else:
-                new_settings[upper_key] = value
+                new_settings[key] = value
 
     return new_settings
 

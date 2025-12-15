@@ -17,7 +17,7 @@ def merge_dicts(dict1, dict2):
     :return: merged dictionary
     """
     if not isinstance(dict1, MutableMapping) or not isinstance(dict2, MutableMapping):
-        return dict2
+        return dict2 if dict2 is not None else dict1
     dict1 = clean_dict(dict1)
     dict2 = clean_dict(dict2)
     merged = {}

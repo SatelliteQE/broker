@@ -213,7 +213,7 @@ def data_to_tempfile(data, path=None, as_tar=False):
 @contextmanager
 def temporary_tar(paths):
     """Create a temporary tar file and return the path."""
-    temp_tar = Path(f"{uuid4().hex[-10]}.tar")
+    temp_tar = Path(f"{uuid4().hex[-10:]}.tar")
     with tarfile.open(temp_tar, mode="w") as tar:
         for path in paths:
             logger.debug(f"Adding {path.absolute()} to {temp_tar.absolute()}")

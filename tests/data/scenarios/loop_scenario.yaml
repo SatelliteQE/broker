@@ -1,0 +1,28 @@
+# Scenario for testing loop functionality
+variables:
+  test_items:
+    - alpha
+    - beta
+    - gamma
+  test_dict:
+    key1: value1
+    key2: value2
+
+steps:
+  - name: loop_step
+    action: output
+    arguments:
+      content: "Processing {{ item }}"
+      destination: stdout
+    loop:
+      iterable: test_items
+      iter_var: item
+
+  - name: dict_loop_step
+    action: output
+    arguments:
+      content: "Key: {{ k }}, Value: {{ v }}"
+      destination: stdout
+    loop:
+      iterable: test_dict.items()
+      iter_var: k, v

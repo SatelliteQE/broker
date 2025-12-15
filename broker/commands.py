@@ -69,11 +69,17 @@ def guarded_command(group=None, *cli_args, **cli_kwargs):
                 helpers.emit(return_code=0)
                 return retval
             except Exception as err:  # noqa: BLE001 -- we want to catch all exceptions
-                if not isinstance(err, exceptions.BrokerError):
+                if isinstance(err, exceptions.ScenarioError):
+                    # Show full message for scenario errors since context is important
+                    logger.error(f"Scenario failed: {err.message}")
+                    CONSOLE.print(f"[red]Scenario failed:[/red] {err.message}")
+                elif not isinstance(err, exceptions.BrokerError):
                     err = exceptions.BrokerError(err)
                     logger.error(f"Command failed: {err.message}")
+                    CONSOLE.print(f"[red]Command failed:[/red] {err.message}")
                 else:  # BrokerError children already log their messages
                     logger.error(f"Command failed due to: {type(err).__name__}")
+                    CONSOLE.print(f"[red]Command failed due to:[/red] {type(err).__name__}")
                 helpers.emit(return_code=err.error_code, error_message=str(err.message))
                 sys.exit(err.error_code)
 
@@ -220,6 +226,7 @@ def cli(version):
         table.add_column("Location", justify="left", style="magenta")
 
         table.add_row("Broker Directory", str(settings.BROKER_DIRECTORY.absolute()))
+        table.add_row("Scenarios Directory", f"{settings.BROKER_DIRECTORY.absolute()}/scenarios")
         table.add_row("Settings File", str(settings.settings_path.absolute()))
         table.add_row("Inventory File", f"{settings.BROKER_DIRECTORY.absolute()}/inventory.yaml")
         table.add_row("Log File", f"{settings.BROKER_DIRECTORY.absolute()}/logs/broker.log")
@@ -315,7 +322,13 @@ def checkin(hosts, background, all_, sequential, filter):
             unmatched.discard(host.get("name"))
 
     if unmatched:
-        logger.warning(f"The following hosts were not found in inventory: {', '.join(unmatched)}")
+        logger.warning(
+            "The following hosts were not found in inventory: %s",
+            ", ".join(unmatched),
+        )
+        CONSOLE.print(
+            f"[yellow]Warning:[/yellow] The following hosts were not found in inventory: {', '.join(unmatched)}"
+        )
     if to_remove:
         Broker(hosts=to_remove).checkin(sequential=sequential)
 
@@ -455,6 +468,7 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, provider
         click.echo(result)
     elif output_format == "log":
         logger.info(result)
+        CONSOLE.print(result)
     elif output_format == "yaml":
         click.echo(helpers.yaml_format(result))
 
@@ -567,8 +581,10 @@ def validate(chunk):
     try:
         ConfigManager(settings.settings_path).validate(chunk, PROVIDERS)
         logger.info("Validation passed!")
+        CONSOLE.print("[green]Validation passed![/green]")
     except exceptions.BrokerError as err:
         logger.warning(f"Validation failed: {err}")
+        CONSOLE.print(f"[yellow]Validation failed:[/yellow] {err}")
 
 
 # --- Scenarios CLI Group ---
@@ -595,10 +611,9 @@ def scenarios_list():
 
     table = Table(title="Available Scenarios")
     table.add_column("Name", style="cyan")
-    table.add_column("Path", style="magenta")
 
     for name in scenario_names:
-        table.add_row(name, str(SCENARIOS_DIR / f"{name}.yaml"))
+        table.add_row(name)
 
     CONSOLE.print(table)
 
@@ -646,7 +661,25 @@ def scenarios_execute(ctx, scenario, background):
         cli_vars=cli_vars,
         cli_config=cli_config,
     )
-    runner.run()
+    try:
+        runner.run()
+    finally:
+        # Display scenario inventory if any hosts remain
+        if runner.scenario_inventory:
+            inv_data = [host.to_dict() for host in runner.scenario_inventory]
+            curated_host_info = [
+                helpers.inventory_fields_to_dict(
+                    inventory_fields=settings.settings.inventory_fields,
+                    host_dict=host,
+                    provider_actions=PROVIDER_ACTIONS,
+                )
+                for host in inv_data
+            ]
+            table = helpers.dictlist_to_table(
+                curated_host_info, "Scenario Inventory (hosts still checked out)", _id=True
+            )
+            CONSOLE.print(table)
+            CONSOLE.print(f"[dim]Inventory file: {runner.inventory_path}[/dim]")
 
 
 @guarded_command(group=scenarios)
@@ -683,11 +716,11 @@ def scenarios_validate(scenario):
     is_valid, error_msg = validate_scenario(scenario_path)
 
     if is_valid:
-        logger.info(f"Scenario '{scenario}' is valid!")
+        CONSOLE.print(f"[green]Scenario '{scenario}' is valid![/green]")
         if error_msg:  # Schema not found message
-            logger.warning(error_msg)
+            CONSOLE.print(f"[yellow]Warning:[/yellow] {error_msg}")
     else:
-        logger.error(f"Scenario '{scenario}' is invalid: {error_msg}")
+        CONSOLE.print(f"[red]Scenario '{scenario}' is invalid:[/red] {error_msg}")
 
 
 def _make_shell_help_func(cmd, shell_instance):

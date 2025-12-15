@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import logging
 from pathlib import Path
+import sys
 
 import jinja2
 import jsonschema
@@ -339,7 +340,8 @@ class ScenarioRunner:
 
         # Initialize variables (scenario vars, then CLI overrides on top)
         self.variables = self.data.get("variables", {}).copy()
-        self.variables.update(self.cli_vars)
+        # Apply CLI variable overrides with type conversion
+        self._apply_cli_var_overrides()
 
         # Steps memory: mapping step name -> StepMemory
         self.steps_memory = {}
@@ -402,6 +404,76 @@ class ScenarioRunner:
                 target = target[part]
             target[parts[-1]] = value
 
+    def _convert_cli_value(self, cli_value, original_value, var_name):
+        """Convert a CLI string value to match the type of the original value.
+
+        Args:
+            cli_value: String value from CLI
+            original_value: Original value from scenario YAML
+            var_name: Name of the variable (for logging)
+
+        Returns:
+            Converted value, or original cli_value if conversion fails
+        """
+        original_type = type(original_value)
+
+        # If original is None or already the right type, keep as-is
+        if original_value is None or isinstance(cli_value, original_type):
+            return cli_value
+
+        try:
+            if original_type is bool:
+                lower_val = str(cli_value).lower()
+                bool_map = {
+                    "true": True,
+                    "1": True,
+                    "yes": True,
+                    "on": True,
+                    "false": False,
+                    "0": False,
+                    "no": False,
+                    "off": False,
+                }
+                if lower_val in bool_map:
+                    return bool_map[lower_val]
+                logger.warning(
+                    f"Could not convert CLI value '{cli_value}' to bool for '{var_name}', "
+                    f"keeping as string"
+                )
+            elif original_type is int:
+                return int(cli_value)
+            elif original_type is float:
+                return float(cli_value)
+            elif original_type in (list, dict):
+                # For collections, try to parse as JSON if it looks like JSON
+                if isinstance(cli_value, str) and cli_value and cli_value[0] in ("{", "["):
+                    return json.loads(cli_value)
+                logger.warning(
+                    f"CLI value for '{var_name}' doesn't appear to be valid {original_type.__name__} JSON, "
+                    f"keeping as string"
+                )
+        except (ValueError, TypeError, IndexError) as e:
+            logger.warning(
+                f"Failed to convert CLI value '{cli_value}' to {original_type.__name__} for '{var_name}': {e}. "
+                f"Keeping as string."
+            )
+        return cli_value
+
+    def _apply_cli_var_overrides(self):
+        """Apply CLI variable overrides with type conversion.
+
+        CLI variables are passed as strings. This method attempts to convert them
+        to match the type of the original scenario variable. If the original variable
+        doesn't exist or conversion fails, the string value is kept with a warning.
+        """
+        for key, cli_value in self.cli_vars.items():
+            if key not in self.variables:
+                # New variable from CLI - keep as string
+                self.variables[key] = cli_value
+            else:
+                # Convert to match original type
+                self.variables[key] = self._convert_cli_value(cli_value, self.variables[key], key)
+
     def _get_inventory_path(self):
         """Get the path for the scenario-specific inventory file.
 
@@ -409,7 +481,7 @@ class ScenarioRunner:
             Path object for the inventory file
         """
         if inv_path := self.config.get("inventory_path"):
-            return Path(inv_path)
+            return Path(inv_path).expanduser()
         return BROKER_DIRECTORY / f"scenario_{self.scenario_name}_inventory.yaml"
 
     def _setup_logging(self):
@@ -585,11 +657,19 @@ class ScenarioRunner:
                 logger.info(f"Executing on_error handler for step '{step_name}'")
                 try:
                     self._execute_steps(on_error)
+                except SystemExit:
+                    # Let SystemExit pass through (from exit action in error handler)
+                    raise
                 except Exception as handler_err:
-                    logger.error(f"on_error handler also failed: {handler_err}")
+                    # If the error handler itself failed, this is a secondary failure
+                    # Re-raise it so it terminates the scenario
                     raise handler_err from e
             elif step_data.get("exit_on_error", True):
-                raise ScenarioError(f"Step '{step_name}' failed and exit_on_error is True") from e
+                raise ScenarioError(
+                    f"Step failed: {e}",
+                    step_name=step_name,
+                    scenario_name=self.scenario_name,
+                ) from e
             else:
                 logger.warning(f"Step '{step_name}' failed but exit_on_error=False, continuing")
 
@@ -652,8 +732,9 @@ class ScenarioRunner:
             # Convert dict to list of tuples for iteration
             resolved_iterable = list(resolved_iterable.items())
         elif not isinstance(resolved_iterable, (list, tuple)):
-            # Convert iterables like dict_items to a list
+            # Convert other iterables to a list, avoiding double-conversion of dict.items()
             try:
+                # Convert to list once - dict_items, dict_keys, etc will be converted
                 resolved_iterable = list(resolved_iterable)
             except TypeError:
                 resolved_iterable = [resolved_iterable]
@@ -672,10 +753,17 @@ class ScenarioRunner:
             loop_context = context.copy()
 
             # Handle tuple unpacking for multiple iter_var names
-            if len(iter_var_names) > 1 and isinstance(item, (list, tuple)):
-                for var_name, value in zip(iter_var_names, item):
-                    loop_context[var_name] = value
-                default_loop_key = str(item[0]) if item else str(item)
+            if len(iter_var_names) > 1:
+                if isinstance(item, (list, tuple)) and len(item) >= len(iter_var_names):
+                    for var_name, value in zip(iter_var_names, item):
+                        loop_context[var_name] = value
+                    default_loop_key = str(item[0]) if item else str(item)
+                else:
+                    raise ScenarioError(
+                        f"Loop item cannot be unpacked: expected {len(iter_var_names)} "
+                        f"values but got {item}. Ensure the iterable contains "
+                        f"tuples/lists with {len(iter_var_names)} elements."
+                    )
             else:
                 loop_context[iter_var_names[0]] = item
                 default_loop_key = str(item)
@@ -821,7 +909,12 @@ class ScenarioRunner:
             otherwise a dict mapping hostname to Result objects.
         """
         if not hosts:
-            raise ScenarioError("SSH action requires target hosts")
+            raise ScenarioError(
+                "SSH action requires target hosts. Specify hosts for this step via "
+                "the 'with' clause (e.g. 'with: { hosts: [...] }') or ensure that "
+                "the scenario inventory contains hosts from a previous checkout or "
+                "inventory action."
+            )
 
         command = arguments.get("command")
         if not command:
@@ -839,7 +932,7 @@ class ScenarioRunner:
         # Multiple hosts: return dict mapping hostname to result
         if parallel:
             results = {}
-            with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(hosts), 10)) as executor:
                 futures = [executor.submit(run_on_host, h) for h in hosts]
                 for future in as_completed(futures):
                     hostname, result = future.result()
@@ -879,14 +972,14 @@ class ScenarioRunner:
         # Multiple hosts: return dict mapping hostname to result
         if parallel:
             results = {}
-            with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(hosts), 10)) as executor:
                 futures = [executor.submit(scp_to_host, h) for h in hosts]
                 for future in as_completed(futures):
                     hostname, result = future.result()
                     results[hostname] = result
             return results
         else:
-            return {h.hostname: scp_to_host(h)[1] for h in hosts}
+            return dict(scp_to_host(h) for h in hosts)
 
     def _action_sftp(self, arguments, hosts, parallel):
         """Handle sftp action.
@@ -934,14 +1027,14 @@ class ScenarioRunner:
         # Multiple hosts: return dict mapping hostname to result
         if parallel:
             results = {}
-            with ThreadPoolExecutor(max_workers=len(hosts)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(hosts), 10)) as executor:
                 futures = [executor.submit(sftp_on_host, h) for h in hosts]
                 for future in as_completed(futures):
                     hostname, result = future.result()
                     results[hostname] = result
             return results
         else:
-            return {h.hostname: sftp_on_host(h)[1] for h in hosts}
+            return dict(sftp_on_host(h) for h in hosts)
 
     def _action_execute(self, step_name, arguments):
         """Handle execute action (provider action)."""
@@ -996,8 +1089,6 @@ class ScenarioRunner:
         Returns:
             The content that was written
         """
-        import sys
-
         content = arguments.get("content")
         if content is None:
             raise ScenarioError("Output action requires 'content' argument")
@@ -1146,11 +1237,14 @@ class ScenarioRunner:
             # Normal exit from exit action
             logger.info(f"Scenario '{self.scenario_name}' exited with code {e.code}")
             if e.code != 0:
-                raise ScenarioError(f"Scenario exited with non-zero code: {e.code}")
+                raise ScenarioError(
+                    f"Exited with non-zero code: {e.code}",
+                    scenario_name=self.scenario_name,
+                )
         except ScenarioError:
             raise
         except Exception as e:
-            raise ScenarioError(f"Scenario failed: {e}") from e
+            raise ScenarioError(f"Unexpected error: {e}", scenario_name=self.scenario_name) from e
 
     def get_info(self):
         """Get summary information about the scenario.
