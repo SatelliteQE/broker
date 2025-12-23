@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.8.0"
+version = "0.7.3"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,6 +33,7 @@ dependencies = [
     "rich_click",
     "ruamel.yaml",
     "click-shell",
+    "typing-extensions",      # temporary until Python 3.12+ only
 ]
 
 [project.urls]
