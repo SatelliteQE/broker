@@ -22,7 +22,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Fetch all history for proper tagging
           token: ${{ secrets.CHERRYPICK_PAT }}
