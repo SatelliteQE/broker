@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "broker"
-version = "0.7.3"
+version = "0.8.0"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
