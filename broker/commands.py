@@ -176,7 +176,10 @@ def populate_providers(click_group):
         )(provider_cmd)
 
 
-@click.group(invoke_without_command=True)
+@click.group(
+    invoke_without_command=True,
+    no_args_is_help=True,
+)
 @click.option(
     "--log-level",
     type=click.Choice(["info", "warning", "error", "debug", "trace", "silent"]),
