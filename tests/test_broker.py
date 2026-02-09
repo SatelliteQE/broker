@@ -146,5 +146,54 @@ def test_origin_captured_before_threading(broker_settings):
     broker_inst.checkin()
 
 
+def test_logging_not_reconfigured_on_broker_init(broker_settings):
+    """Test that instantiating Broker with LOGGING overrides does not mutate global logging.
+
+    This is a regression test to ensure that additional Broker instances,
+    particularly in multi_manager contexts, do not reconfigure global logging settings.
+    """
+    import logging
+    from broker.logging import setup_logging
+
+    # Configure logging once at startup (simulating CLI initialization)
+    setup_logging(
+        console_level="warning",
+        file_level="info",
+        log_path="logs/test_broker.log",
+        structured=False,
+    )
+
+    # Capture the initial root logger configuration
+    root_logger = logging.getLogger()
+    initial_handlers = root_logger.handlers.copy()
+    initial_level = root_logger.level
+    initial_handler_count = len(initial_handlers)
+    initial_handler_levels = [h.level for h in initial_handlers]
+
+    # Create a settings object with different LOGGING configuration
+    test_config = broker_settings.to_dict()
+    test_config["LOGGING"] = {
+        "console_level": "debug",
+        "file_level": "trace",
+        "log_path": "logs/different.log",
+        "structured": True,
+    }
+    from broker.settings import create_settings
+    custom_settings = create_settings(config_dict=test_config)
+
+    # Instantiate Broker with custom settings that include LOGGING overrides
+    broker_inst = Broker(broker_settings=custom_settings, nick="test_nick")
+
+    # Assert that root logger configuration remains unchanged
+    assert len(root_logger.handlers) == initial_handler_count, \
+        f"Handler count changed from {initial_handler_count} to {len(root_logger.handlers)}"
+    assert root_logger.level == initial_level, \
+        f"Root logger level changed from {initial_level} to {root_logger.level}"
+    assert [h.level for h in root_logger.handlers] == initial_handler_levels, \
+        "Handler levels changed after Broker instantiation"
+    assert root_logger.handlers == initial_handlers, \
+        "Root logger handlers were modified after Broker instantiation"
+
+
 class SomeException(Exception):
     pass
