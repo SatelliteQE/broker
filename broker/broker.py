@@ -23,7 +23,6 @@ import logging
 
 from broker import exceptions, helpers
 from broker.hosts import Host
-from broker.logging import setup_logging
 from broker.providers import PROVIDER_ACTIONS, PROVIDERS, _provider_imports
 from broker.settings import clone_global_settings
 
@@ -59,13 +58,6 @@ class Broker:
         self._settings = broker_settings or clone_global_settings()
         if broker_settings:
             logger.debug(f"Using local settings object: {self._settings.to_dict()}")
-            if "logging" in broker_settings:
-                setup_logging(
-                    console_level=broker_settings.logging.console_level,
-                    file_level=broker_settings.logging.file_level,
-                    log_path=broker_settings.logging.log_path,
-                    structured=broker_settings.logging.structured,
-                )
         else:
             logger.debug("Using global settings.")
         kwargs = helpers.resolve_file_args(kwargs)
