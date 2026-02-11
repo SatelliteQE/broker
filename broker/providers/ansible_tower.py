@@ -430,7 +430,7 @@ class AnsibleTower(Provider):
                 message=f"Ambiguous AnsibleTower inventory {inventory} passed from {caller_context}",
             )
 
-    def _merge_artifacts(self, at_object, strategy="last", artifacts=None):
+    def _merge_artifacts(self, at_object, strategy=None, artifacts=None):
         """Gather and merge all artifacts associated with an object and its children.
 
         :param at_object: object you want to merge
@@ -445,6 +445,8 @@ class AnsibleTower(Provider):
         :return: dictionary of merged artifact, used for constructing host
         """
         logger.debug(f"Attempting to merge: {at_object.name}")
+        if strategy is None:
+            strategy = "last"
 
         if artifacts is None:
             artifacts = {}
