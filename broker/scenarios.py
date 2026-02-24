@@ -42,6 +42,74 @@ ARGUMENT_NAME_MAP = {
 SCENARIOS_DIR = BROKER_DIRECTORY / "scenarios"
 SCENARIOS_DIR.mkdir(parents=True, exist_ok=True)
 
+# Import tracking
+IMPORTS_FILE = SCENARIOS_DIR / ".broker-imports.yaml"
+CURRENT_SCHEMA_VERSION = 1
+
+
+def load_imports_manifest():
+    """Load the imports manifest file."""
+    if not IMPORTS_FILE.exists():
+        return {"schema_version": CURRENT_SCHEMA_VERSION, "imports": []}
+
+    data = helpers.load_file(IMPORTS_FILE, warn=False) or {}
+
+    # Handle version mismatch
+    if data.get("schema_version", 0) > CURRENT_SCHEMA_VERSION:
+        logger.warning(
+            f"Import tracking file version {data.get('schema_version')} is newer "
+            f"than supported ({CURRENT_SCHEMA_VERSION}). Some features may not work."
+        )
+
+    return data
+
+
+def save_imports_manifest(data):
+    """Save the imports manifest file."""
+    helpers.save_file(IMPORTS_FILE, data)
+
+
+def find_import_entry(manifest, source, ref="master"):
+    """Find an import entry in the manifest."""
+    for entry in manifest.get("imports", []):
+        if entry.get("source") == source and entry.get("ref_requested") == ref:
+            return entry
+    return None
+
+
+def upsert_import_entry(manifest, source, ref, resolved_commit, files):
+    """Update or insert an import entry in the manifest."""
+    from datetime import datetime, timezone
+
+    entry = find_import_entry(manifest, source, ref)
+    now = datetime.now(timezone.utc).isoformat()
+
+    if entry:
+        entry["imported_at"] = now
+        entry["resolved_commit"] = resolved_commit
+        entry["files"] = files
+    else:
+        if "imports" not in manifest:
+            manifest["imports"] = []
+        manifest["imports"].append(
+            {
+                "source": source,
+                "ref_requested": ref,
+                "imported_at": now,
+                "resolved_commit": resolved_commit,
+                "files": files,
+            }
+        )
+    return manifest
+
+
+def compute_sha256(content_bytes):
+    """Compute SHA256 hash of bytes content."""
+    import hashlib
+
+    return hashlib.sha256(content_bytes).hexdigest()
+
+
 # Load the schema from the package
 SCHEMA_PATH = Path(__file__).parent / "scenario_schema.json"
 
@@ -57,54 +125,80 @@ def get_schema():
 def find_scenario(name_or_path):
     """Find a scenario file by name or path.
 
+    Accepts either a plain stem name (e.g. "rhel-vm"), a relative slash-delimited
+    path inside the scenarios directory (e.g. "ansibletower/provisioning/rhel-vm"),
+    or a full filesystem path.
+
     Args:
-        name_or_path: Either a scenario name (without extension) or a full path
+        name_or_path: A scenario name, relative path, or full path
 
     Returns:
         Path object to the scenario file
 
     Raises:
-        ScenarioError: If the scenario cannot be found
+        ScenarioError: If the scenario cannot be found or the name is ambiguous
     """
-    # First, check if it's a direct path
+    # First, check if it's a direct path to an existing file
     path = Path(name_or_path)
     if path.exists() and path.is_file():
         return path
 
-    # Add .yaml extension if not present
+    # Add .yaml extension if not present and check as a direct path
     if not path.suffix:
         path = path.with_suffix(".yaml")
         if path.exists():
             return path
 
-    # Check in the scenarios directory
-    scenario_path = SCENARIOS_DIR / path.name
-    if scenario_path.exists():
-        return scenario_path
+    # Check as a relative path inside the scenarios directory (slash-delimited)
+    for ext in (".yaml", ".yml", ""):
+        candidate = SCENARIOS_DIR / f"{name_or_path}{ext}"
+        if candidate.exists() and candidate.is_file():
+            return candidate
 
-    # Check with .yaml extension
-    scenario_path = SCENARIOS_DIR / f"{name_or_path}.yaml"
-    if scenario_path.exists():
-        return scenario_path
+    # Recursive search: collect all matches by stem or relative path
+    stem = Path(name_or_path).stem
+    rel_no_ext = (
+        str(Path(name_or_path).with_suffix("")) if Path(name_or_path).suffix else name_or_path
+    )
+    matches = []
+    for candidate in sorted(SCENARIOS_DIR.rglob("*.yaml")) + sorted(SCENARIOS_DIR.rglob("*.yml")):
+        rel = str(candidate.relative_to(SCENARIOS_DIR).with_suffix(""))
+        if candidate.stem == stem or rel == rel_no_ext:
+            if candidate not in matches:
+                matches.append(candidate)
 
-    # Check with .yml extension
-    scenario_path = SCENARIOS_DIR / f"{name_or_path}.yml"
-    if scenario_path.exists():
-        return scenario_path
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        paths = ", ".join(str(m.relative_to(SCENARIOS_DIR).with_suffix("")) for m in matches)
+        raise ScenarioError(
+            f"Ambiguous scenario name '{name_or_path}'. "
+            f"Multiple matches found: {paths}. "
+            f"Pass the full relative path (e.g. 'ansibletower/provisioning/{stem}') to disambiguate."
+        )
 
     raise ScenarioError(f"Scenario not found: {name_or_path}")
 
 
 def list_scenarios():
-    """List all scenarios in the scenarios directory.
+    """List all scenarios in the scenarios directory, including nested subdirectories.
 
     Returns:
-        List of scenario names (without extensions)
+        Sorted list of relative path stems (e.g. 'my-scenario',
+        'ansibletower/provisioning/rhel-vm') without file extensions.
     """
     if not SCENARIOS_DIR.exists():
         return []
 
-    return sorted(f.stem for f in SCENARIOS_DIR.iterdir() if f.suffix in (".yaml", ".yml"))
+    seen = set()
+    results = []
+    for f in sorted(SCENARIOS_DIR.rglob("*")):
+        if f.is_file() and f.suffix in (".yaml", ".yml") and not f.name.startswith("."):
+            rel = str(f.relative_to(SCENARIOS_DIR).with_suffix(""))
+            if rel not in seen:
+                seen.add(rel)
+                results.append(rel)
+    return results
 
 
 def render_template(template_str, context):

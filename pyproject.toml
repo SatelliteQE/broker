@@ -204,9 +204,13 @@ known-first-party = ["broker"]
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-"broker/commands.py" = ["E402"]    # Intentional: logging setup before imports
+"broker/commands.py" = [
+    "E402",    # Intentional: logging setup before imports
+    "PLR0911", # CLI commands may have multiple return paths for different modes
+    "PLR0912", # CLI commands may have multiple branches for options/modes
+]
 "broker/providers/*.py" = ["E402"] # logger defined before other imports
-"broker/binds/*.py" = ["E402"]     # logger defined before other imports
+"broker/binds/*.py" = ["E402"] # logger defined before other imports
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25

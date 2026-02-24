@@ -29,6 +29,14 @@ from broker.helpers.file_utils import (
     yaml_format,
 )
 
+# Git utilities
+from broker.helpers.git import (
+    GitHubAdapter,
+    GitLabAdapter,
+    RawHTTPAdapter,
+    parse_source,
+)
+
 # Inventory utilities
 from broker.helpers.inventory import (
     INVENTORY_LOCK,
@@ -71,7 +79,10 @@ __all__ = [
     "Emitter",
     "FileLock",
     "FilterTest",
+    "GitHubAdapter",
+    "GitLabAdapter",
     "MockStub",
+    "RawHTTPAdapter",
     "Result",
     "clean_dict",
     "data_to_tempfile",
@@ -91,6 +102,7 @@ __all__ = [
     "load_file",
     "load_inventory",
     "merge_dicts",
+    "parse_source",
     "resolve_file_args",
     "resolve_nick",
     "save_file",

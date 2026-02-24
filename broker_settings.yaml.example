@@ -85,6 +85,14 @@ Foreman:
 Beaker:
     hub_url:
     max_job_wait: 24h
+SCENARIO_IMPORT:
+    git_hosts:
+        - url: "https://github.com"
+          token: ""
+          type: "github"
+        - url: "https://gitlab.com"
+          token: ""
+          type: "gitlab"
 # You can set a nickname as a shortcut for arguments
 nicks:
     rhel9:

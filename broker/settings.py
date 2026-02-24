@@ -61,6 +61,8 @@ BASE_VALIDATORS = [
     Validator("INVENTORY_FIELDS", is_type_of=dict),
     Validator("INVENTORY_LIST_VARS", is_type_of=str, default="hostname | name"),
     Validator("LESS_COLORS", default=False),
+    Validator("SCENARIO_IMPORT", default={}),
+    Validator("SCENARIO_IMPORT.GIT_HOSTS", default=[]),
 ]
 
 
