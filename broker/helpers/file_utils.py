@@ -191,23 +191,31 @@ class FileLock:
 
 
 @contextmanager
-def data_to_tempfile(data, path=None, as_tar=False):
+def data_to_tempfile(data, path=None, as_tar=False, suffix=""):
     """Write data to a temporary file and return the path."""
-    path = Path(path or uuid4().hex[-10])
+    if path:
+        path = Path(path)
+    else:
+        path = Path(f"{uuid4().hex[-10]}{suffix}")
+
     logger.debug(f"Creating temporary file {path.absolute()}")
-    if isinstance(data, bytes):
-        path.write_bytes(data)
-    elif isinstance(data, str):
-        path.write_text(data)
-    else:
-        raise TypeError(f"data must be bytes or str, not {type(data)}")
-    if as_tar:
-        tar = tarfile.open(path)
-        yield tarfile.open(path)
-        tar.close()
-    else:
-        yield path
-    path.unlink()
+    try:
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        elif isinstance(data, str):
+            path.write_text(data)
+        else:
+            raise TypeError(f"data must be bytes or str, not {type(data)}")
+
+        if as_tar:
+            tar = tarfile.open(path)
+            yield tar
+            tar.close()
+        else:
+            yield path
+    finally:
+        if path.exists():
+            path.unlink()
 
 
 @contextmanager

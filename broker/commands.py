@@ -3,6 +3,7 @@
 import contextlib
 from functools import wraps
 import logging
+from pathlib import Path
 import signal
 import sys
 
@@ -13,6 +14,7 @@ from broker.logging import setup_logging
 setup_logging(console_level=logging.INFO)  # Basic setup until settings are loaded
 
 from click_shell import shell
+import requests
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.table import Table
@@ -606,17 +608,23 @@ def scenarios():
 def scenarios_list():
     """List all available scenarios in the scenarios directory."""
     from broker.scenarios import SCENARIOS_DIR, list_scenarios
+    from broker.settings import BROKER_DIRECTORY
 
-    scenario_names = list_scenarios()
-    if not scenario_names:
+    scenario_paths = list_scenarios()
+    if not scenario_paths:
         CONSOLE.print(f"No scenarios found in {SCENARIOS_DIR}")
         return
 
     table = Table(title="Available Scenarios")
     table.add_column("Name", style="cyan")
+    table.add_column("Path", style="dim")
 
-    for name in scenario_names:
-        table.add_row(name)
+    for rel_path in scenario_paths:
+        p = Path(rel_path)
+        name = p.name
+        parent_dir = SCENARIOS_DIR / p.parent
+        display_path = str(parent_dir.relative_to(BROKER_DIRECTORY))
+        table.add_row(name, display_path)
 
     CONSOLE.print(table)
 
@@ -724,6 +732,463 @@ def scenarios_validate(scenario):
             CONSOLE.print(f"[yellow]Warning:[/yellow] {error_msg}")
     else:
         CONSOLE.print(f"[red]Scenario '{scenario}' is invalid:[/red] {error_msg}")
+
+
+def _display_imported_scenarios(manifest):
+    """Display a table of imported scenarios."""
+    if not manifest.get("imports"):
+        CONSOLE.print("No imported scenarios found.")
+        return
+
+    table = Table(title="Imported Scenarios")
+    table.add_column("Name", style="cyan")
+    table.add_column("Source", style="blue", no_wrap=True)
+    table.add_column("Imported", style="dim")
+    table.add_column("Commit", style="dim")
+
+    # Flatten the import entries to show individual scenarios
+    for entry in manifest["imports"]:
+        source_txt = entry.get("source", "")
+        imported_at = entry.get("imported_at", "")
+        commit_hash = (entry.get("resolved_commit") or "")[:7]
+
+        # Format timestamp to be more human-readable (e.g., "2026-02-23" -> "Feb 23, 2026")
+        formatted_date = imported_at
+        if imported_at:
+            try:
+                from datetime import datetime
+
+                # Parse ISO format and format it nicely
+                dt = datetime.fromisoformat(imported_at.replace("Z", "+00:00"))
+                formatted_date = dt.strftime("%b %d, %Y")
+            except (ValueError, AttributeError):
+                # Fallback to just the date part if parsing fails
+                with contextlib.suppress(AttributeError):
+                    formatted_date = imported_at.split("T")[0]
+
+        # Add a row for each imported file
+        for file_entry in entry.get("files", []):
+            scenario_path = file_entry.get("path", "")
+            # Extract scenario name from path (remove .yaml/.yml extension)
+            scenario_name = Path(scenario_path).stem
+
+            table.add_row(
+                scenario_name,
+                source_txt,
+                formatted_date,
+                commit_hash,
+            )
+
+    CONSOLE.print(table)
+
+
+def _display_remote_scenarios(scenarios, source):
+    """Display a table of remote scenarios."""
+    table = Table(title=f"Remote Scenarios ({source})")
+    table.add_column("Name", style="cyan")
+    table.add_column("Categories", style="blue")
+    table.add_column("Description", style="dim", max_width=60, overflow="fold")
+
+    for s in scenarios:
+        scenario_name = s.get("name", Path(s["path"]).stem)
+        categories = ", ".join(s.get("categories", [])) if s.get("categories") else ""
+        description = s.get("description", "")
+        table.add_row(scenario_name, categories, description)
+
+    CONSOLE.print(table)
+
+
+def _check_local_modifications(dest_path, remote_path, tracked_files, force):
+    """Check if a local file has been modified.
+
+    Returns True if the import should proceed, False if it should be skipped.
+    """
+    from broker.scenarios import compute_sha256
+
+    if not dest_path.exists():
+        return True
+
+    old_tracked_sha = tracked_files.get(remote_path)
+    current_local_sha = compute_sha256(dest_path.read_bytes())
+
+    # If we tracked a SHA and the current file differs -> local modification
+    if old_tracked_sha and old_tracked_sha != current_local_sha:
+        if not force:
+            if ConfigManager.interactive_mode:
+                CONSOLE.print(f"[yellow]Local file {remote_path} has been modified.[/yellow]")
+                if not click.confirm("Overwrite with remote version?"):
+                    CONSOLE.print(f"Skipping {remote_path}")
+                    return False
+            else:
+                CONSOLE.print(
+                    f"[yellow]Skipping modified file {remote_path} (use --force to overwrite)[/yellow]"
+                )
+                return False
+    return True
+
+
+def _download_and_validate_scenario(adapter, remote_path, ref, dest_path, status):
+    """Download and validate a scenario file.
+
+    Returns (content_bytes, sha256) on success, (None, None) on failure.
+    """
+    from broker.scenarios import compute_sha256, validate_scenario
+
+    status.update(f"Downloading {remote_path}...")
+
+    try:
+        content_bytes = adapter.get_file_content(remote_path, ref)
+        new_sha = compute_sha256(content_bytes)
+    except (OSError, RuntimeError, exceptions.BrokerError, requests.RequestException) as e:
+        CONSOLE.print(f"[red]Failed to download {remote_path}:[/red] {e}")
+        logger.error(f"Failed to download {remote_path}: {e}")
+        return None, None
+
+    # Validate (Soft Gate)
+    with helpers.data_to_tempfile(content_bytes, suffix=".yaml") as tmp:
+        status.update(f"Validating {remote_path}...")
+        is_valid, err = validate_scenario(tmp)
+
+        if not is_valid:
+            msg = f"Validation failed for {remote_path}: {err}"
+            if ConfigManager.interactive_mode:
+                CONSOLE.print(f"[yellow]{msg}[/yellow]")
+                if not click.confirm("Import invalid scenario anyway?"):
+                    return None, None
+            else:
+                logger.warning(msg)
+                CONSOLE.print(
+                    f"[yellow]Warning: Imported scenario {remote_path} failed validation.[/yellow]"
+                )
+
+    return content_bytes, new_sha
+
+
+def _filter_scenarios(remote_files, allowed_files, category, name):
+    """Apply filters to the remote scenarios list.
+
+    Returns a list of filtered scenario dictionaries.
+    """
+    filtered_scenarios = []
+    for scenario in remote_files:
+        path = scenario["path"]
+
+        # Check against update allow-list
+        if allowed_files is not None and path not in allowed_files:
+            continue
+
+        # Category filter (metadata list OR directory prefix)
+        if category:
+            in_list = category in scenario.get("categories", [])
+            in_path = path.startswith(f"{category}/")
+            if not (in_list or in_path):
+                continue
+
+        # Name filter (metadata name OR file stem)
+        if name:
+            name_match = scenario.get("name") == name
+            stem_match = Path(path).stem == name
+            if not (name_match or stem_match):
+                continue
+
+        filtered_scenarios.append(scenario)
+
+    return filtered_scenarios
+
+
+def _handle_ambiguous_names(filtered_scenarios, name, category, import_all):
+    """Handle ambiguous name matches interactively.
+
+    Returns (filtered_scenarios, filtered_paths, should_continue).
+    should_continue is False if user cancelled or error occurred.
+    """
+    filtered_paths = [s["path"] for s in filtered_scenarios]
+
+    if not (name and not category and len(filtered_scenarios) > 1):
+        return filtered_scenarios, filtered_paths, True
+
+    if ConfigManager.interactive_mode and not import_all:
+        CONSOLE.print(f"[yellow]Ambiguous name '{name}' matches multiple files:[/yellow]")
+        for idx, s in enumerate(filtered_scenarios, 1):
+            CONSOLE.print(f" {idx}. {s['path']}")
+
+        choice = click.prompt(
+            "Enter the number of the scenario to import (or 0 to cancel)", type=int, default=0
+        )
+        if choice == 0:
+            return filtered_scenarios, filtered_paths, False
+        if 1 <= choice <= len(filtered_scenarios):
+            filtered_scenarios = [filtered_scenarios[choice - 1]]
+            filtered_paths = [filtered_scenarios[0]["path"]]
+            return filtered_scenarios, filtered_paths, True
+
+        CONSOLE.print("[red]Invalid selection.[/red]")
+        return filtered_scenarios, filtered_paths, False
+    elif not import_all:
+        CONSOLE.print(
+            f"[red]Ambiguous name '{name}' matches multiple files: {', '.join(filtered_paths)}[/red]"
+        )
+        CONSOLE.print("Use --category to disambiguate or --all to import all.")
+        return filtered_scenarios, filtered_paths, False
+
+    return filtered_scenarios, filtered_paths, True
+
+
+def _execute_import(adapter, filtered_paths, ref, tracked_files, force):
+    """Execute the actual import of scenario files.
+
+    Returns (imported_files, resolved_commit) where imported_files is a list of {path, sha256}.
+    """
+    from broker.scenarios import SCENARIOS_DIR
+
+    imported_files = []
+    resolved_commit = adapter.resolve_commit(ref)
+
+    with Console().status("[bold green]Importing scenarios...") as status:
+        for remote_path in filtered_paths:
+            dest_path = SCENARIOS_DIR / remote_path
+
+            # Check for local modifications
+            if not _check_local_modifications(dest_path, remote_path, tracked_files, force):
+                continue
+
+            # Download and validate
+            content_bytes, new_sha = _download_and_validate_scenario(
+                adapter, remote_path, ref, dest_path, status
+            )
+            if content_bytes is None:
+                continue
+
+            # Write file
+            if isinstance(dest_path, str):
+                dest_path = Path(dest_path)
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path.write_bytes(content_bytes)
+            imported_files.append({"path": remote_path, "sha256": new_sha})
+
+    return imported_files, resolved_commit
+
+
+def _update_import_manifest(manifest, entry, source, ref, resolved_commit, imported_files):
+    """Update the import manifest with newly imported files."""
+    from broker.scenarios import save_imports_manifest, upsert_import_entry
+
+    if not imported_files:
+        CONSOLE.print("No scenarios were imported.")
+        return
+
+    # Merge imported_files with existing ones for this source if we did partial update
+    if entry:
+        # Map existing files by path
+        final_files_map = {f["path"]: f for f in entry["files"]}
+        # Update with new imports
+        for f in imported_files:
+            final_files_map[f["path"]] = f
+        final_files_list = list(final_files_map.values())
+    else:
+        final_files_list = imported_files
+
+    upsert_import_entry(manifest, source, ref, resolved_commit, final_files_list)
+    save_imports_manifest(manifest)
+
+    CONSOLE.print(f"[green]Successfully imported {len(imported_files)} scenario(s).[/green]")
+
+
+def _remove_imported_scenario(path_or_name):
+    """Remove an imported scenario file and clean up the manifest entry.
+
+    Accepts either a relative path (e.g. 'category/name.yaml') or a bare
+    stem name (e.g. 'name').  Matches are resolved inside SCENARIOS_DIR.
+    """
+    from broker.scenarios import SCENARIOS_DIR, load_imports_manifest, save_imports_manifest
+
+    # 1. Locate the file on-disk
+    candidate = path_or_name.lstrip("/")
+    if not candidate.endswith((".yaml", ".yml")):
+        candidate_suffixes = [candidate + ".yaml", candidate + ".yml"]
+    else:
+        candidate_suffixes = [candidate]
+
+    matched_file = None
+    matched_rel = None
+
+    for suffix in candidate_suffixes:
+        exact = SCENARIOS_DIR / suffix
+        if exact.exists():
+            matched_file = exact
+            matched_rel = suffix
+            break
+
+    # Fallback: glob by stem name across all subdirectories
+    if matched_file is None:
+        stem = Path(candidate).stem
+        hits = list(SCENARIOS_DIR.rglob(f"{stem}.yaml")) + list(SCENARIOS_DIR.rglob(f"{stem}.yml"))
+        if len(hits) > 1:
+            CONSOLE.print(f"[yellow]Ambiguous name '{stem}' matches multiple files:[/yellow]")
+            for h in hits:
+                CONSOLE.print(f"  {h.relative_to(SCENARIOS_DIR)}")
+            CONSOLE.print("Re-run with the full relative path to disambiguate.")
+            return
+        if hits:
+            matched_file = hits[0]
+            matched_rel = str(matched_file.relative_to(SCENARIOS_DIR))
+
+    if matched_file is None or not matched_file.exists():
+        CONSOLE.print(f"[red]Scenario file not found:[/red] {path_or_name}")
+        return
+
+    # 2. Delete the local file
+    matched_file.unlink()
+    CONSOLE.print(f"[green]Deleted[/green] {matched_rel}")
+
+    # Clean up now-empty parent directories (but never remove SCENARIOS_DIR itself)
+    parent = matched_file.parent
+    while parent != SCENARIOS_DIR and parent.exists() and not any(parent.iterdir()):
+        parent.rmdir()
+        parent = parent.parent
+
+    # 3. Remove from the manifest
+    norm_rel = matched_rel.replace("\\", "/")
+
+    manifest = load_imports_manifest()
+    changed = False
+    surviving_imports = []
+    for entry in manifest.get("imports", []):
+        original_files = entry.get("files", [])
+        kept = [f for f in original_files if f.get("path", "").replace("\\", "/") != norm_rel]
+        if len(kept) != len(original_files):
+            changed = True
+            if kept:
+                entry["files"] = kept
+                surviving_imports.append(entry)
+            # else: drop the whole import entry — no files remain
+        else:
+            surviving_imports.append(entry)
+
+    if changed:
+        manifest["imports"] = surviving_imports
+        save_imports_manifest(manifest)
+    else:
+        CONSOLE.print(
+            f"[yellow]No manifest entry found for[/yellow] {norm_rel} (file was still deleted)"
+        )
+
+
+@guarded_command(group=scenarios, name="import")
+@click.argument("source", type=str, default="SatelliteQE/broker-scenarios", required=False)
+@click.option(
+    "--list", "-l", "list_mode", is_flag=True, help="List remote scenarios without downloading."
+)
+@click.option("--list-imported", is_flag=True, help="List previously imported scenarios.")
+@click.option("--category", type=str, help="Filter by top-level category.")
+@click.option("--name", type=str, help="Filter by scenario name.")
+@click.option("--update", is_flag=True, help="Update existing scenarios.")
+@click.option("--force", is_flag=True, help="Force overwrite modified files.")
+@click.option("--all", "import_all", is_flag=True, help="Import all matches without prompting.")
+@click.option(
+    "--remove",
+    "remove_name",
+    type=str,
+    default=None,
+    help="Delete a local scenario file and remove it from the import manifest.",
+)
+def scenarios_import(
+    source, list_mode, list_imported, category, name, update, force, import_all, remove_name
+):
+    """Import scenarios from a remote source.
+
+    SOURCE default is SatelliteQE/broker-scenarios, but can be:
+    - owner/repo (GitHub)
+    - gitlab.com/owner/repo
+    - A raw HTTP URL to a file or manifest
+    """
+    from broker.scenarios import (
+        find_import_entry,
+        load_imports_manifest,
+    )
+
+    # 1. Handle --remove: no SOURCE required
+    if remove_name:
+        _remove_imported_scenario(remove_name)
+        return
+
+    # 1b. Handle --list-imported
+    if list_imported:
+        manifest = load_imports_manifest()
+        _display_imported_scenarios(manifest)
+        return
+
+    if not source:
+        raise click.UsageError("SOURCE argument is required unless using --list-imported.")
+
+    # 2. Parse Source
+    try:
+        adapter, rel_path, ref = helpers.parse_source(source)
+    except (exceptions.BrokerError, click.ClickException) as e:
+        CONSOLE.print(f"[red]Error parsing source:[/red] {e}")
+        return
+
+    # 3. Handle --update: restrict file list to what we tracked previously
+    allowed_files = None
+    if update:
+        manifest = load_imports_manifest()
+        if entry := find_import_entry(manifest, source, ref):
+            allowed_files = {f["path"] for f in entry.get("files", [])}
+            CONSOLE.print(
+                f"[cyan]Updating {len(allowed_files)} tracked files from {source}...[/cyan]"
+            )
+        else:
+            CONSOLE.print(
+                f"[yellow]No existing import found for {source} @ {ref}. Performing fresh import.[/yellow]"
+            )
+
+    # 4. Resolve Remote Files
+    try:
+        if list_mode:
+            CONSOLE.print(f"[cyan]Fetching file list from {source}...[/cyan]")
+
+        remote_files = adapter.list_remote_scenarios(path=rel_path, ref=ref)
+    except (OSError, RuntimeError, exceptions.BrokerError, requests.RequestException) as e:
+        CONSOLE.print(f"[red]Failed to list remote scenarios:[/red] {e}")
+        logger.error(f"Failed to list remote scenarios: {e}")
+        return
+
+    # 5. Apply Filters
+    filtered_scenarios = _filter_scenarios(remote_files, allowed_files, category, name)
+
+    if not filtered_scenarios:
+        CONSOLE.print("[yellow]No scenarios found matching criteria.[/yellow]")
+        return
+
+    # Handle ambiguous name matches (if category wasn't specified)
+    filtered_scenarios, filtered_paths, should_continue = _handle_ambiguous_names(
+        filtered_scenarios, name, category, import_all
+    )
+    if not should_continue:
+        return
+
+    # 6. List Mode Output
+    if list_mode:
+        _display_remote_scenarios(filtered_scenarios, source)
+        return
+
+    # 7. Confirmation (Interactive only)
+    if ConfigManager.interactive_mode and not import_all:
+        if len(filtered_paths) > 1:
+            if not click.confirm(f"Import {len(filtered_paths)} scenarios from {source}?"):
+                return
+
+    # 8. Import Execution
+    manifest = load_imports_manifest()  # Refresh manifest
+    entry = find_import_entry(manifest, source, ref)
+    tracked_files = {f["path"]: f["sha256"] for f in entry["files"]} if entry else {}
+
+    imported_files, resolved_commit = _execute_import(
+        adapter, filtered_paths, ref, tracked_files, force
+    )
+
+    # 9. Update Manifest
+    _update_import_manifest(manifest, entry, source, ref, resolved_commit, imported_files)
 
 
 def _make_shell_help_func(cmd, shell_instance):
