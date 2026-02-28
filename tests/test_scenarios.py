@@ -395,3 +395,187 @@ def test_dispatch_action_unknown():
     with pytest.raises(ScenarioError) as exc_info:
         runner._dispatch_action({"name": "test", "action": "nonexistent"}, {}, None)
     assert "Unknown action" in str(exc_info.value)
+
+
+# --- Import manifest function tests ---
+
+
+def test_compute_sha256():
+    """SHA256 returns a deterministic 64-character hex string."""
+    from broker import scenarios as scenarios_mod
+
+    result = scenarios_mod.compute_sha256(b"hello world")
+    assert isinstance(result, str)
+    assert len(result) == 64
+    assert result == scenarios_mod.compute_sha256(b"hello world")  # deterministic
+    assert result != scenarios_mod.compute_sha256(b"different content")  # sensitive to input
+
+
+def test_load_imports_manifest_fresh(tmp_path, monkeypatch):
+    """Loading a non-existent manifest returns a valid empty structure."""
+    from broker import scenarios as scenarios_mod
+
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", tmp_path / ".broker-imports.yaml")
+
+    manifest = scenarios_mod.load_imports_manifest()
+    assert manifest["schema_version"] == 1
+    assert manifest["imports"] == []
+
+
+def test_load_imports_manifest_version_warning(tmp_path, monkeypatch, caplog):
+    """A manifest with a future schema_version triggers a warning."""
+    import logging
+
+    from broker import scenarios as scenarios_mod
+    from broker.helpers import save_file
+
+    manifest_file = tmp_path / ".broker-imports.yaml"
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", manifest_file)
+    save_file(manifest_file, {"schema_version": 99, "imports": []})
+
+    with caplog.at_level(logging.WARNING, logger="broker.scenarios"):
+        scenarios_mod.load_imports_manifest()
+
+    assert "newer than supported" in caplog.text
+
+
+def test_save_and_reload_imports_manifest(tmp_path, monkeypatch):
+    """Saving a manifest and re-loading it returns identical data."""
+    from broker import scenarios as scenarios_mod
+
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", tmp_path / ".broker-imports.yaml")
+
+    data = {
+        "schema_version": 1,
+        "imports": [
+            {
+                "source": "owner/repo",
+                "ref_requested": "master",
+                "imported_at": "2026-01-01T00:00:00+00:00",
+                "resolved_commit": "abc123",
+                "files": [{"path": "foo/bar.yaml", "sha256": "deadbeef"}],
+            }
+        ],
+    }
+    scenarios_mod.save_imports_manifest(data)
+    reloaded = scenarios_mod.load_imports_manifest()
+
+    assert reloaded["schema_version"] == 1
+    assert len(reloaded["imports"]) == 1
+    assert reloaded["imports"][0]["source"] == "owner/repo"
+    assert reloaded["imports"][0]["files"][0]["path"] == "foo/bar.yaml"
+
+
+def test_find_import_entry(tmp_path, monkeypatch):
+    """find_import_entry locates an entry by source+ref and returns None on misses."""
+    from broker import scenarios as scenarios_mod
+
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", tmp_path / ".broker-imports.yaml")
+
+    manifest = {
+        "schema_version": 1,
+        "imports": [
+            {"source": "owner/repo", "ref_requested": "master", "files": []},
+            {"source": "other/repo", "ref_requested": "v1.0", "files": []},
+        ],
+    }
+
+    found = scenarios_mod.find_import_entry(manifest, "owner/repo", "master")
+    assert found is not None
+    assert found["source"] == "owner/repo"
+
+    # Wrong ref returns None
+    assert scenarios_mod.find_import_entry(manifest, "owner/repo", "v1.0") is None
+    # Wrong source returns None
+    assert scenarios_mod.find_import_entry(manifest, "missing/repo", "master") is None
+
+
+def test_upsert_import_entry_insert(tmp_path, monkeypatch):
+    """upsert_import_entry inserts a new entry into an empty manifest."""
+    from broker import scenarios as scenarios_mod
+
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", tmp_path / ".broker-imports.yaml")
+
+    manifest = {"schema_version": 1, "imports": []}
+    files = [{"path": "cat/scenario.yaml", "sha256": "aabbcc"}]
+
+    scenarios_mod.upsert_import_entry(manifest, "owner/repo", "master", "sha123abc", files)
+
+    assert len(manifest["imports"]) == 1
+    entry = manifest["imports"][0]
+    assert entry["source"] == "owner/repo"
+    assert entry["ref_requested"] == "master"
+    assert entry["resolved_commit"] == "sha123abc"
+    assert entry["files"] == files
+    assert "imported_at" in entry
+
+
+def test_upsert_import_entry_update(tmp_path, monkeypatch):
+    """upsert_import_entry updates an existing entry in place."""
+    from broker import scenarios as scenarios_mod
+
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", tmp_path / ".broker-imports.yaml")
+
+    manifest = {
+        "schema_version": 1,
+        "imports": [
+            {
+                "source": "owner/repo",
+                "ref_requested": "master",
+                "imported_at": "2025-01-01T00:00:00+00:00",
+                "resolved_commit": "old_sha",
+                "files": [{"path": "old.yaml", "sha256": "oldhash"}],
+            }
+        ],
+    }
+
+    new_files = [{"path": "new.yaml", "sha256": "newhash"}]
+    scenarios_mod.upsert_import_entry(manifest, "owner/repo", "master", "new_sha", new_files)
+
+    assert len(manifest["imports"]) == 1  # still only one entry
+    entry = manifest["imports"][0]
+    assert entry["resolved_commit"] == "new_sha"
+    assert entry["files"] == new_files
+    assert entry["imported_at"] != "2025-01-01T00:00:00+00:00"  # timestamp was refreshed
+
+
+def test_remove_imported_scenario(tmp_path, monkeypatch):
+    """_remove_imported_scenario deletes the file and removes its manifest entry."""
+    from broker import scenarios as scenarios_mod
+    from broker.commands import _remove_imported_scenario
+
+    scenarios_dir = tmp_path / "scenarios"
+    scenarios_dir.mkdir()
+    manifest_file = scenarios_dir / ".broker-imports.yaml"
+    monkeypatch.setattr(scenarios_mod, "SCENARIOS_DIR", scenarios_dir)
+    monkeypatch.setattr(scenarios_mod, "IMPORTS_FILE", manifest_file)
+
+    # Create a real scenario file inside a subdirectory
+    (scenarios_dir / "cat").mkdir()
+    scenario_file = scenarios_dir / "cat" / "my-scenario.yaml"
+    scenario_file.write_text("steps: []\n")
+
+    # Write a manifest that tracks this file
+    manifest = {
+        "schema_version": 1,
+        "imports": [
+            {
+                "source": "owner/repo",
+                "ref_requested": "master",
+                "imported_at": "2026-01-01T00:00:00+00:00",
+                "resolved_commit": "abc123",
+                "files": [{"path": "cat/my-scenario.yaml", "sha256": "deadbeef"}],
+            }
+        ],
+    }
+    scenarios_mod.save_imports_manifest(manifest)
+
+    _remove_imported_scenario("cat/my-scenario.yaml")
+
+    # File should be gone
+    assert not scenario_file.exists()
+    # Now-empty parent directory should also be removed
+    assert not (scenarios_dir / "cat").exists()
+    # Import entry should be cleaned out of the manifest
+    updated = scenarios_mod.load_imports_manifest()
+    assert updated["imports"] == []

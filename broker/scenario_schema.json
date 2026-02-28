@@ -4,6 +4,10 @@
   "description": "A schema for validating scenario YAML files based on the defined specification.",
   "type": "object",
   "properties": {
+    "description": {
+      "type": "string",
+      "description": "A brief description of the scenario's purpose and actions."
+    },
     "config": {
       "type": "object",
       "description": "Global configuration settings for the scenario execution.",
@@ -30,7 +34,14 @@
       "type": "object",
       "description": "A key-value map of variables to be used within the steps.",
       "additionalProperties": {
-        "type": ["string", "number", "boolean", "array", "object"]
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "array",
+          "object",
+          "null"
+        ]
       }
     },
     "steps": {
@@ -83,7 +94,9 @@
               "description": "Can be 'scenario_inventory' or an inventory filter expression."
             }
           },
-          "required": ["hosts"],
+          "required": [
+            "hosts"
+          ],
           "additionalProperties": false
         },
         "when": {
@@ -105,10 +118,15 @@
             "on_error": {
               "type": "string",
               "description": "Defines behavior on loop item failure.",
-              "enum": ["continue"]
+              "enum": [
+                "continue"
+              ]
             }
           },
-          "required": ["iterable", "iter_var"],
+          "required": [
+            "iterable",
+            "iter_var"
+          ],
           "additionalProperties": false
         },
         "capture": {
@@ -128,7 +146,9 @@
               "description": "For loops only: A templating expression to derive the dictionary key for each iteration. Has access to loop variables and 'result'. If not specified, defaults to the iter_var value."
             }
           },
-          "required": ["as"],
+          "required": [
+            "as"
+          ],
           "additionalProperties": false
         },
         "on_error": {
@@ -136,7 +156,9 @@
             {
               "type": "string",
               "description": "Simple error handling: 'continue' to proceed despite errors.",
-              "enum": ["continue"]
+              "enum": [
+                "continue"
+              ]
             },
             {
               "type": "array",

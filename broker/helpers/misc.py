@@ -195,7 +195,7 @@ def simple_retry(
             f"\nTrying again in {_cur_timeout} seconds."
         )
         time.sleep(_cur_timeout)
-        simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait, terminal_exceptions)
+        return simple_retry(cmd, cmd_args, cmd_kwargs, max_timeout, new_wait, terminal_exceptions)
 
 
 def find_origin():
