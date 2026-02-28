@@ -69,9 +69,9 @@ def test_parse_source(mock_settings):
     assert adapter.project_path == "group/project"
     assert path == "file.yaml"
 
-    # @ref syntax (stripped with warning)
+    # @ref syntax is now passed through rather than stripped
     adapter, path, ref = git.parse_source("owner/repo@v1.0")
-    assert ref == "master"  # Enforced
+    assert ref == "v1.0"
 
 
 def test_uppercase_git_hosts_config(monkeypatch):

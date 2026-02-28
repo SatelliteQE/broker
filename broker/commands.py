@@ -942,9 +942,13 @@ def _execute_import(adapter, filtered_paths, ref, tracked_files, force):
     from broker.scenarios import SCENARIOS_DIR
 
     imported_files = []
-    resolved_commit = adapter.resolve_commit(ref)
+    try:
+        resolved_commit = adapter.resolve_commit(ref)
+    except (OSError, RuntimeError, exceptions.BrokerError, requests.RequestException) as e:
+        logger.error(f"Failed to resolve commit for ref '{ref}': {e}")
+        return [], None
 
-    with Console().status("[bold green]Importing scenarios...") as status:
+    with CONSOLE.status("[bold green]Importing scenarios...") as status:
         for remote_path in filtered_paths:
             dest_path = SCENARIOS_DIR / remote_path
 
@@ -1079,7 +1083,7 @@ def _remove_imported_scenario(path_or_name):
 @click.option(
     "--list", "-l", "list_mode", is_flag=True, help="List remote scenarios without downloading."
 )
-@click.option("--list-imported", is_flag=True, help="List previously imported scenarios.")
+@click.option("--list-imported", "-L", is_flag=True, help="List previously imported scenarios.")
 @click.option("--category", type=str, help="Filter by top-level category.")
 @click.option("--name", type=str, help="Filter by scenario name.")
 @click.option("--update", is_flag=True, help="Update existing scenarios.")
@@ -1117,9 +1121,6 @@ def scenarios_import(
         manifest = load_imports_manifest()
         _display_imported_scenarios(manifest)
         return
-
-    if not source:
-        raise click.UsageError("SOURCE argument is required unless using --list-imported.")
 
     # 2. Parse Source
     try:
