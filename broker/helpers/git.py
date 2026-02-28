@@ -25,6 +25,7 @@ MIN_REPO_PARTS = 2
 MIN_GITLAB_PARTS = 3
 # Minimum parts required for web UI paths (blob/tree + ref + at least one path component)
 MIN_WEB_UI_PARTS = 2  # or 3 for GitLab with the "-" separator
+GITLAB_PAGE_SIZE = 100  # GitLab tree API max results per page
 
 
 def _get_git_hosts():
@@ -188,9 +189,9 @@ class GitHubAdapter(BaseAdapter):
         # GitHub API doesn't support recursive=1 for contents, only for trees
         # Use the Tree API for recursive listing - much more efficient
         try:
-            # First need the tree SHA for the ref
-            commit_sha = self.resolve_commit(ref)
-            commit_obj = self._request("GET", f"/commits/{commit_sha}").json()
+            # A single /commits/{ref} response contains both the commit SHA and the tree SHA
+            commit_obj = self._request("GET", f"/commits/{ref}").json()
+            commit_sha = commit_obj["sha"]
             tree_sha = commit_obj.get("commit", {}).get("tree", {}).get("sha")
             if not tree_sha:
                 raise exceptions.BrokerError(
@@ -286,12 +287,25 @@ class GitLabAdapter(BaseAdapter):
 
     def resolve_commit(self, ref="master"):
         """Resolve a ref to a commit SHA."""
-        # Can use branches API or commits API
+        # First try the commits endpoint (works for full SHAs and some short refs)
         try:
             data = self._request("GET", f"/repository/commits/{ref}").json()
             return data["id"]
         except exceptions.BrokerError:
-            # Try as a branch/tag if commit fetch fails (ambiguous ref)
+            pass
+        # Fallback: try as a branch name
+        try:
+            encoded_ref = urllib.parse.quote(ref, safe="")
+            data = self._request("GET", f"/repository/branches/{encoded_ref}").json()
+            return data["commit"]["id"]
+        except exceptions.BrokerError:
+            pass
+        # Fallback: try as a tag name
+        try:
+            encoded_ref = urllib.parse.quote(ref, safe="")
+            data = self._request("GET", f"/repository/tags/{encoded_ref}").json()
+            return data["commit"]["id"]
+        except exceptions.BrokerError:
             pass
         raise exceptions.BrokerError(f"Could not resolve ref '{ref}' on GitLab.")
 
@@ -310,7 +324,13 @@ class GitLabAdapter(BaseAdapter):
         scenarios = []
         page = 1
         while True:
-            params = {"path": path, "ref": ref, "recursive": True, "per_page": 100, "page": page}
+            params = {
+                "path": path,
+                "ref": ref,
+                "recursive": True,
+                "per_page": GITLAB_PAGE_SIZE,
+                "page": page,
+            }
             data = self._request("GET", "/repository/tree", params=params).json()
             if not data:
                 break
@@ -330,7 +350,7 @@ class GitLabAdapter(BaseAdapter):
                     )
 
             page += 1
-            if "next" not in self._request("HEAD", "/repository/tree", params=params).links:
+            if len(data) < GITLAB_PAGE_SIZE:
                 break
 
         return sorted(scenarios, key=lambda x: x["path"])
@@ -516,16 +536,14 @@ def parse_source(source_string):
     Returns:
         Tuple of (adapter_instance, relative_path_string, ref_string)
     """
-    # Handle @ref syntax (warn and strip)
+    # Handle @ref syntax — extract and preserve the requested ref
+    ref_override = "master"
     if "@" in source_string:
-        base, requested_ref = source_string.split("@", 1)
-        if requested_ref and requested_ref != "master":
-            logger.warning(
-                f"Ignoring requested ref '{requested_ref}' - 'master' is the only supported branch."
-            )
-        source_string = base
+        source_string, ref_override = source_string.split("@", 1)
+        if not ref_override:
+            ref_override = "master"
 
-    # 1. Raw HTTP / HTTPS URL
+    # 1. Raw HTTP / HTTPS URL (ref embedded in URL path; @ref not meaningful here)
     if source_string.startswith(("http://", "https://")):
         return _parse_http_source(source_string)
 
@@ -537,13 +555,13 @@ def parse_source(source_string):
         return (
             GitLabAdapter("https://gitlab.com", f"{parts[1]}/{parts[2]}"),
             "/".join(parts[3:]),
-            "master",
+            ref_override,
         )
 
     # 3. GitHub shortcut: owner/repo[/path]
     # Simplest case, assumes it's not a URL and doesn't start with a domain-like prefix
     parts = source_string.split("/")
     if len(parts) >= MIN_REPO_PARTS:
-        return GitHubAdapter(parts[0], parts[1]), "/".join(parts[2:]), "master"
+        return GitHubAdapter(parts[0], parts[1]), "/".join(parts[2:]), ref_override
 
     raise UsageError(f"Invalid source format: {source_string}")
