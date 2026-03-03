@@ -912,7 +912,7 @@ class AnsibleTower(Provider):
         ]
         return compiled_host_info
 
-    def extend(self, target_vm, new_expire_time=None, provider_labels=None):
+    def extend(self, target_vm, new_expire_time=None, provider_labels=None, **trash):
         """Run the extend workflow with defaults args.
 
         :param target_vm: This should be a host object
