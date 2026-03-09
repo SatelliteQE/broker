@@ -174,9 +174,7 @@ class ContainerSession:
             arcnames = None
 
         with helpers.temporary_tar(source, arcnames=arcnames) as tar:
-            logger.debug(
-                f"{self._cont_inst.hostname} adding file(s) {source} to {destination}"
-            )
+            logger.debug(f"{self._cont_inst.hostname} adding file(s) {source} to {destination}")
             if ensure_dir:
                 self.run(f"mkdir -m 666 -p {extract_to}")
             self._cont_inst._cont_inst.put_archive(extract_to, tar.read_bytes())
