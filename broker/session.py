@@ -151,26 +151,33 @@ class ContainerSession:
         res.__dict__.update(result.__dict__)
 
     def sftp_write(self, source, destination=None, ensure_dir=True):
-        """Add one of more files to the container."""
-        # ensure source is a list of Path objects
+        """Add one or more files to the container."""
         if not isinstance(source, list):
             source = [Path(source)]
         else:
             source = [Path(src) for src in source]
-        # validate each source's existenence
         for src in source:
             if not Path(src).exists():
                 raise FileNotFoundError(src)
         destination = destination or f"{source[0].parent}/"
-        # Files need to be added to a tarfile
-        with helpers.temporary_tar(source) as tar:
+
+        # When destination is a file path (no trailing slash) and there is a
+        # single source, rename the tar entry to the destination filename and
+        # extract into the parent directory.  This matches the behavior of
+        # SSH-based sessions (hussh, paramiko, etc.).
+        if not destination.endswith("/") and len(source) == 1:
+            dest_path = Path(destination)
+            extract_to = str(dest_path.parent)
+            arcnames = [dest_path.name]
+        else:
+            extract_to = str(destination)
+            arcnames = None
+
+        with helpers.temporary_tar(source, arcnames=arcnames) as tar:
             logger.debug(f"{self._cont_inst.hostname} adding file(s) {source} to {destination}")
             if ensure_dir:
-                if destination.endswith("/"):
-                    self.run(f"mkdir -m 666 -p {destination}")
-                else:
-                    self.run(f"mkdir -m 666 -p {Path(destination).parent}")
-            self._cont_inst._cont_inst.put_archive(str(destination), tar.read_bytes())
+                self.run(f"mkdir -m 666 -p {extract_to}")
+            self._cont_inst._cont_inst.put_archive(extract_to, tar.read_bytes())
 
     def sftp_read(self, source, destination=None, return_data=False):
         """Get a file or directory from the container."""
