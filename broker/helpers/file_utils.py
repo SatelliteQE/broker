@@ -211,12 +211,21 @@ def data_to_tempfile(data, path=None, as_tar=False):
 
 
 @contextmanager
-def temporary_tar(paths):
-    """Create a temporary tar file and return the path."""
+def temporary_tar(paths, arcnames=None):
+    """Create a temporary tar file and return the path.
+
+    :param paths: list of Path objects to add to the tar
+    :param arcnames: optional list of archive entry names (one per path).
+        When provided, ``arcnames[i]`` overrides the default ``path.name``
+        for the *i*-th entry.  This is used by ``ContainerSession.sftp_write``
+        to rename a file inside the archive so that ``put_archive`` extracts it
+        under the desired filename.
+    """
     temp_tar = Path(f"{uuid4().hex[-10:]}.tar")
     with tarfile.open(temp_tar, mode="w") as tar:
-        for path in paths:
+        for i, path in enumerate(paths):
+            name = arcnames[i] if arcnames else path.name
             logger.debug(f"Adding {path.absolute()} to {temp_tar.absolute()}")
-            tar.add(path, arcname=path.name)
+            tar.add(path, arcname=name)
     yield temp_tar.absolute()
     temp_tar.unlink()
