@@ -482,6 +482,7 @@ class AnsibleTower(Provider):
                     child_obj = self._v2.jobs.get(id=child_id).results
                     if child_obj:
                         child_obj = child_obj.pop()
+                        child_obj = child_obj.get()  # Hydrate job object with artifacts
                         artifacts = (
                             self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
                         )
@@ -511,6 +512,7 @@ class AnsibleTower(Provider):
                     child_obj = self._v2.jobs.get(id=child_id).results
                     if child_obj:
                         child_obj = child_obj.pop()
+                        child_obj = child_obj.get()  # Hydrate job with full error details
                         if child_obj.status == "error":
                             failure_messages.append(
                                 {
@@ -559,7 +561,8 @@ class AnsibleTower(Provider):
             ):  # skip jobs with no summary fields and failed jobs
                 continue
             if jobs := self._v2.jobs.get(id=job_fields["id"]).results:
-                if vm_name := jobs[0].artifacts.get("vm_name"):
+                job = jobs[0].get()  # Hydrate job with artifacts
+                if vm_name := job.artifacts.get("vm_name"):
                     hosts.append(vm_name)
         return list(set(hosts))
 
