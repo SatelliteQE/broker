@@ -12,5 +12,12 @@
     "url": "/api/v2/workflow_job_templates/35/",
     "name": "remove-vm",
     "extra_vars": "{\"source_vm\": \"\", \"host_type\": \"host\"}"
+  },
+  {
+    "id": 245,
+    "type": "workflow_job_template",
+    "url": "/api/v2/workflow_job_templates/245/",
+    "name": "deploy-satellite",
+    "extra_vars": "{\"deploy_sat_version\": \"\", \"host_type\": \"satellite\"}"
   }
 ]

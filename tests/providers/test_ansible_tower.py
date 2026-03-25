@@ -1,5 +1,6 @@
 import json
 import pytest
+from unittest.mock import patch, MagicMock
 from broker.broker import Broker
 from broker.providers.ansible_tower import AnsibleTower
 from broker.helpers import MockStub
@@ -50,6 +51,9 @@ class AwxkitApiStub(MockStub):
     def get_related(self, related=None):
         with open("tests/data/ansible_tower/fake_children.json") as child_file:
             child_data = json.load(child_file)
+        # Filter children to only those belonging to this workflow job
+        if hasattr(self, "id"):
+            child_data = [child for child in child_data if child.get("workflow_job_id") == self.id]
         return MockStub({"results": [MockStub(child) for child in child_data]})
 
     def get(self, *args, **kwargs):
@@ -62,7 +66,19 @@ class AwxkitApiStub(MockStub):
         return self
 
     def launch(self, payload={}):
-        return AwxkitApiStub(job_id=343, **payload)
+        # Find the executed workflow job by matching workflow template name to job name
+        with open("tests/data/ansible_tower/fake_jobs.json") as f:
+            jobs = json.load(f)
+
+        # Look for a workflow_job with matching name
+        for job in jobs:
+            if job.get("name") == self.name and job.get("type") == "workflow_job":
+                return AwxkitApiStub(job_id=job["id"], **payload)
+
+        raise ValueError(
+            f"No executed job found for workflow '{self.name}'. "
+            f"Add a matching workflow_job entry to fake_jobs.json"
+        )
 
     def pop(self, item=None):
         """awxkit uses pop() on objects, this allows for that and normal use"""
@@ -70,6 +86,10 @@ class AwxkitApiStub(MockStub):
             return self
         else:
             return super().pop(item)
+
+    def wait_until_completed(self, **kwargs):
+        """Simulate waiting for job completion - stub jobs are already completed"""
+        return self
 
 
 @pytest.fixture
@@ -98,7 +118,26 @@ def config_stub():
 
 
 @pytest.fixture
-def tower_stub(api_stub, config_stub):  # config_stub is now injected
+def awxkit_job_mock():
+    """Mock awxkit.api.pages.jobs.Job to support endpoint-based job loading in tests."""
+    def mock_job_class(connection, endpoint):
+        """Return a mock job object that fetches the right job when .get() is called."""
+        mock_job_instance = MagicMock()
+
+        # Extract job ID from endpoint using rsplit for efficiency
+        # e.g., "/api/v2/jobs/3863963/" -> "3863963"
+        job_id = int(endpoint.rstrip("/").rsplit("/", 1)[-1])
+
+        # Return the job stub loaded from fake_jobs.json
+        mock_job_instance.get.return_value = AwxkitApiStub(job_id=job_id)
+        return mock_job_instance
+
+    with patch("awxkit.api.pages.jobs.Job", side_effect=mock_job_class):
+        yield
+
+
+@pytest.fixture
+def tower_stub(api_stub, config_stub, awxkit_job_mock):  # stubs injected
     return AnsibleTower(root=api_stub, config=config_stub)
 
 
@@ -229,3 +268,29 @@ def test_parse_string_value_with_non_string():
     assert AnsibleTower._parse_string_value(True) is True
     assert AnsibleTower._parse_string_value(None) is None
     assert AnsibleTower._parse_string_value({"key": "value"}) == {"key": "value"}
+
+
+def test_host_creation_with_lazy_loaded_artifacts(tower_stub):
+    """Test that host construction works correctly using efficient endpoint-based job loading.
+
+    This test verifies that the deploy-satellite workflow correctly fetches job artifacts
+    using the optimized endpoint-based approach (single API call) instead of the inefficient
+    ID-based search approach (two API calls).
+
+    Regression test for UnboundLocalError bug fixed in commit 4a91543.
+    """
+    bx = Broker()
+
+    # Execute deploy-satellite workflow (job 3863902)
+    # This workflow has a child job 3863963 that contains the host artifacts
+    job = tower_stub.execute(workflow="deploy-satellite")
+
+    # Construct host - uses endpoint-based job loading for efficiency
+    # Without proper job loading, this would raise UnboundLocalError
+    host = tower_stub.construct_host(job, bx.host_classes)
+
+    # Verify host created successfully with correct attributes from job artifacts
+    assert isinstance(host, bx.host_classes["host"])
+    assert host.hostname == "test-satellite-host.example.com"
+    assert host.name == "test-satellite-stream-172-rhel9.7"
+    assert host.host_type == "satellite"
