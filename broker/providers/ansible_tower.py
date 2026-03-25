@@ -478,18 +478,12 @@ class AnsibleTower(Provider):
             for child in children:
                 if child.type == "workflow_job_node":
                     logger.debug(child)
-                    child_id = child.summary_fields.job.id
-                    child_obj = self._v2.jobs.get(id=child_id).results
-                    if child_obj:
-                        child_obj = child_obj.pop()
-                        child_obj = child_obj.get()  # Hydrate job object with artifacts
-                        artifacts = (
-                            self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
-                        )
-                    else:
-                        logger.warning(
-                            f"Unable to pull information from child job with id {child_id}."
-                        )
+                    # Use job endpoint directly for efficient single API call
+                    job_endpoint = child.related.job
+                    child_obj = awxkit.api.pages.jobs.Job(
+                        self._v2.connection, endpoint=job_endpoint
+                    ).get()
+                    artifacts = self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
         return artifacts
 
     def _get_failure_messages(self, workflow):
@@ -508,41 +502,40 @@ class AnsibleTower(Provider):
             for child in children[::-1]:
                 if child.type == "workflow_job_node":
                     logger.debug(child)
-                    child_id = child.summary_fields.job.id
-                    child_obj = self._v2.jobs.get(id=child_id).results
-                    if child_obj:
-                        child_obj = child_obj.pop()
-                        child_obj = child_obj.get()  # Hydrate job with full error details
-                        if child_obj.status == "error":
-                            failure_messages.append(
+                    job_endpoint = child.related.job
+                    child_obj = awxkit.api.pages.jobs.Job(
+                        self._v2.connection, endpoint=job_endpoint
+                    ).get()
+                    if child_obj.status == "error":
+                        failure_messages.append(
+                            {
+                                "job": child_obj.name,
+                                "reason": getattr(
+                                    child_obj,
+                                    "result_traceback",
+                                    child_obj.job_explanation,
+                                ),
+                            }
+                        )
+                    else:
+                        # get all failed job_events for each job (filter failed=true)
+                        failed_events = [
+                            ev
+                            for ev in child_obj.get_related("job_events", page_size=200).results
+                            if ev.failed
+                        ]
+                        # find the one(s) with event_data['res']['msg']
+                        failure_messages.extend(
+                            [
                                 {
                                     "job": child_obj.name,
-                                    "reason": getattr(
-                                        child_obj,
-                                        "result_traceback",
-                                        child_obj.job_explanation,
-                                    ),
+                                    "task": ev.event_data["play"],
+                                    "reason": ev.event_data["res"]["msg"],
                                 }
-                            )
-                        else:
-                            # get all failed job_events for each job (filter failed=true)
-                            failed_events = [
-                                ev
-                                for ev in child_obj.get_related("job_events", page_size=200).results
-                                if ev.failed
+                                for ev in failed_events
+                                if ev.event_data.get("res", {}).get("msg")
                             ]
-                            # find the one(s) with event_data['res']['msg']
-                            failure_messages.extend(
-                                [
-                                    {
-                                        "job": child_obj.name,
-                                        "task": ev.event_data["play"],
-                                        "reason": ev.event_data["res"]["msg"],
-                                    }
-                                    for ev in failed_events
-                                    if ev.event_data.get("res", {}).get("msg")
-                                ]
-                            )
+                        )
         if not failure_messages:
             return {
                 "reason": f"Unable to determine failure cause for {workflow.name} ar {workflow.url}"
@@ -560,10 +553,10 @@ class AnsibleTower(Provider):
                 "failed"
             ):  # skip jobs with no summary fields and failed jobs
                 continue
-            if jobs := self._v2.jobs.get(id=job_fields["id"]).results:
-                job = jobs[0].get()  # Hydrate job with artifacts
-                if vm_name := job.artifacts.get("vm_name"):
-                    hosts.append(vm_name)
+            job_endpoint = node.related.job
+            job = awxkit.api.pages.jobs.Job(self._v2.connection, endpoint=job_endpoint).get()
+            if vm_name := job.artifacts.get("vm_name"):
+                hosts.append(vm_name)
         return list(set(hosts))
 
     def handle_dangling_hosts(self, job, reason=None):

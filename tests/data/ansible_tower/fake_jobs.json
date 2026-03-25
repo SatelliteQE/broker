@@ -13,8 +13,7 @@
     {
         "id": 1337,
         "type": "job",
-        "related": {
-        },
+        "related": {},
         "name": "deploy-baserhel-from-rhvm",
         "artifacts": {
             "vm_fqdn": [
@@ -28,8 +27,7 @@
     {
         "id": 1338,
         "type": "job",
-        "related": {
-        },
+        "related": {},
         "name": "deploy-set-stats-for-jenkins",
         "artifacts": {
             "provider": "rhv",
@@ -52,5 +50,53 @@
                 "template": ""
             }
         }
+    },
+    {
+        "id": 3863902,
+        "type": "workflow_job",
+        "related": {
+            "workflow_nodes": "/api/v2/workflow_jobs/3863902/workflow_nodes/"
+        },
+        "name": "deploy-satellite",
+        "status": "successful",
+        "extra_vars": "{\"deploy_sat_version\": \"stream\"}"
+    },
+    {
+        "id": 3863963,
+        "type": "job",
+        "related": {},
+        "name": "satlab-tower-deploy-set-stats",
+        "status": "successful",
+        "url": "/api/v2/jobs/3863963/",
+        "artifacts": {
+            "host_type": "satellite",
+            "fqdn": "test-satellite-host.example.com",
+            "name": "test-satellite-stream-172-rhel9.7",
+            "_broker_args": {
+                "host_type": "satellite"
+            },
+            "_broker_facts": {
+                "fqdn": "test-satellite-host.example.com",
+                "name": "test-satellite-stream-172-rhel9.7"
+            }
+        }
+    },
+    {
+        "id": 3871944,
+        "type": "workflow_job",
+        "related": {
+            "workflow_nodes": "/api/controller/v2/workflow_jobs/3871944/workflow_nodes/"
+        },
+        "name": "remove-vm",
+        "status": "successful",
+        "extra_vars": "{\"host_type\": \"host\", \"source_vm\": \"test-vm-to-remove\"}"
+    },
+    {
+        "id": 3871945,
+        "type": "job",
+        "related": {},
+        "name": "satlab-tower-remove-vm",
+        "status": "successful",
+        "artifacts": {}
     }
 ]

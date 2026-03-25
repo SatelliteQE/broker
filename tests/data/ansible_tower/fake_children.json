@@ -2,6 +2,10 @@
     {
         "id": 274,
         "type": "workflow_job_node",
+        "workflow_job_id": 343,
+        "related": {
+            "job": "/api/v2/jobs/1337/"
+        },
         "summary_fields": {
             "job": {
                 "id": 1337,
@@ -15,6 +19,10 @@
     {
         "id": 275,
         "type": "workflow_job_node",
+        "workflow_job_id": 343,
+        "related": {
+            "job": "/api/v2/jobs/1338/"
+        },
         "summary_fields": {
             "job": {
                 "id": 1338,
@@ -24,5 +32,39 @@
                 "type": "job"
             }
         }
+    },
+    {
+        "id": 2528150,
+        "type": "workflow_job_node",
+        "workflow_job_id": 3863902,
+        "related": {
+            "job": "/api/v2/jobs/3863963/"
+        },
+        "summary_fields": {
+            "job": {
+                "id": 3863963,
+                "name": "satlab-tower-deploy-set-stats",
+                "status": "successful",
+                "failed": false,
+                "type": "job"
+            }
+        }
+    },
+    {
+        "id": 2533287,
+        "type": "workflow_job_node",
+        "workflow_job_id": 3871944,
+        "related": {
+            "job": "/api/controller/v2/jobs/3871945/"
+        },
+        "summary_fields": {
+            "job": {
+                "id": 3871945,
+                "name": "satlab-tower-remove-vm",
+                "status": "successful",
+                "failed": false,
+                "type": "job"
+            }
+        }
     }
- ]
+]
