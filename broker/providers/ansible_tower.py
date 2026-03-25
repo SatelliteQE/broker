@@ -430,6 +430,14 @@ class AnsibleTower(Provider):
                 message=f"Ambiguous AnsibleTower inventory {inventory} passed from {caller_context}",
             )
 
+    def _load_job_from_endpoint(self, endpoint):
+        """Load a job object from its endpoint URL.
+
+        :param endpoint: Job endpoint URL (e.g., "/api/v2/jobs/12345/")
+        :return: Job object with artifacts loaded
+        """
+        return awxkit.api.pages.jobs.Job(self._v2.connection, endpoint=endpoint).get()
+
     def _merge_artifacts(self, at_object, strategy=None, artifacts=None):
         """Gather and merge all artifacts associated with an object and its children.
 
@@ -480,9 +488,7 @@ class AnsibleTower(Provider):
                     logger.debug(child)
                     # Use job endpoint directly for efficient single API call
                     job_endpoint = child.related.job
-                    child_obj = awxkit.api.pages.jobs.Job(
-                        self._v2.connection, endpoint=job_endpoint
-                    ).get()
+                    child_obj = self._load_job_from_endpoint(job_endpoint)
                     artifacts = self._merge_artifacts(child_obj, strategy, artifacts) or artifacts
         return artifacts
 
@@ -503,9 +509,7 @@ class AnsibleTower(Provider):
                 if child.type == "workflow_job_node":
                     logger.debug(child)
                     job_endpoint = child.related.job
-                    child_obj = awxkit.api.pages.jobs.Job(
-                        self._v2.connection, endpoint=job_endpoint
-                    ).get()
+                    child_obj = self._load_job_from_endpoint(job_endpoint)
                     if child_obj.status == "error":
                         failure_messages.append(
                             {
@@ -538,7 +542,7 @@ class AnsibleTower(Provider):
                         )
         if not failure_messages:
             return {
-                "reason": f"Unable to determine failure cause for {workflow.name} ar {workflow.url}"
+                "reason": f"Unable to determine failure cause for {workflow.name} at {workflow.url}"
             }
         if self._settings.ANSIBLETOWER.error_scope == "last":
             return failure_messages[0]
@@ -554,7 +558,7 @@ class AnsibleTower(Provider):
             ):  # skip jobs with no summary fields and failed jobs
                 continue
             job_endpoint = node.related.job
-            job = awxkit.api.pages.jobs.Job(self._v2.connection, endpoint=job_endpoint).get()
+            job = self._load_job_from_endpoint(job_endpoint)
             if vm_name := job.artifacts.get("vm_name"):
                 hosts.append(vm_name)
         return list(set(hosts))

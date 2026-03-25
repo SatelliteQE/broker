@@ -1,6 +1,5 @@
 import json
 import pytest
-from unittest.mock import patch, MagicMock
 from broker.broker import Broker
 from broker.providers.ansible_tower import AnsibleTower
 from broker.helpers import MockStub
@@ -91,6 +90,20 @@ class AwxkitApiStub(MockStub):
         """Simulate waiting for job completion - stub jobs are already completed"""
         return self
 
+    def _load_job_from_endpoint(self, endpoint):
+        """Load a job object from its endpoint URL.
+
+        Stub implementation that parses the endpoint to extract job ID
+        and loads corresponding test data from fake_jobs.json.
+
+        :param endpoint: Job endpoint URL (e.g., "/api/v2/jobs/3863963/")
+        :return: AwxkitApiStub instance with job data
+        """
+        # Extract job ID from endpoint using rsplit for efficiency
+        # e.g., "/api/v2/jobs/3863963/" -> "3863963"
+        job_id = int(endpoint.rstrip("/").rsplit("/", 1)[-1])
+        return AwxkitApiStub(job_id=job_id)
+
 
 @pytest.fixture
 def api_stub():
@@ -118,27 +131,12 @@ def config_stub():
 
 
 @pytest.fixture
-def awxkit_job_mock():
-    """Mock awxkit.api.pages.jobs.Job to support endpoint-based job loading in tests."""
-    def mock_job_class(connection, endpoint):
-        """Return a mock job object that fetches the right job when .get() is called."""
-        mock_job_instance = MagicMock()
-
-        # Extract job ID from endpoint using rsplit for efficiency
-        # e.g., "/api/v2/jobs/3863963/" -> "3863963"
-        job_id = int(endpoint.rstrip("/").rsplit("/", 1)[-1])
-
-        # Return the job stub loaded from fake_jobs.json
-        mock_job_instance.get.return_value = AwxkitApiStub(job_id=job_id)
-        return mock_job_instance
-
-    with patch("awxkit.api.pages.jobs.Job", side_effect=mock_job_class):
-        yield
-
-
-@pytest.fixture
-def tower_stub(api_stub, config_stub, awxkit_job_mock):  # stubs injected
-    return AnsibleTower(root=api_stub, config=config_stub)
+def tower_stub(api_stub, config_stub):  # stubs injected
+    tower = AnsibleTower(root=api_stub, config=config_stub)
+    # Replace the production _load_job_from_endpoint with the stub version
+    # to avoid using real awxkit module in tests
+    tower._load_job_from_endpoint = api_stub._load_job_from_endpoint
+    return tower
 
 
 def test_execute(tower_stub):
