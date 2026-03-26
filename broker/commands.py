@@ -1289,20 +1289,30 @@ def shell_cmd(ipython):
     if ipython:
         try:
             from IPython import start_ipython
+            from traitlets.config import Config
         except ImportError:
             raise click.ClickException(f"IPython is not installed. {_SHELL_INSTALL_HINT}")
-        start_ipython(
-            argv=[],
-            user_ns={
-                "Broker": Broker,
-                "ConfigManager": ConfigManager,
-                "exceptions": exceptions,
-                "helpers": helpers,
-                "providers": PROVIDERS,
-                "settings": settings.settings,
-            },
-            display_banner=True,
+        _inventory = helpers.load_inventory()
+        _user_ns = {
+            "Broker": Broker,
+            "ConfigManager": ConfigManager,
+            "exceptions": exceptions,
+            "helpers": helpers,
+            "hosts": (Broker().reconstruct_host(host) for host in _inventory),
+            "inventory": _inventory,
+            "providers": PROVIDERS,
+            "settings": settings.settings,
+        }
+        _banner = (
+            "Welcome to Broker's IPython shell.\n"
+            "The following objects and modules are available:\n"
+            + "\n".join(f"  {name}" for name in sorted(_user_ns))
+            + "\nType 'exit' or press Ctrl-D to leave.\n"
         )
+        _cfg = Config()
+        _cfg.TerminalInteractiveShell.banner1 = _banner
+        _cfg.TerminalInteractiveShell.banner2 = ""
+        start_ipython(argv=[], user_ns=_user_ns, config=_cfg)
     else:
         if not _CLICK_SHELL_AVAILABLE:
             raise click.ClickException(f"click-shell is not installed. {_SHELL_INSTALL_HINT}")
