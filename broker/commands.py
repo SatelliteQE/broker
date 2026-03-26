@@ -1290,9 +1290,7 @@ def shell_cmd(ipython):
         try:
             from IPython import start_ipython
         except ImportError:
-            raise click.ClickException(
-                f"IPython is not installed. {_SHELL_INSTALL_HINT}"
-            )
+            raise click.ClickException(f"IPython is not installed. {_SHELL_INSTALL_HINT}")
         start_ipython(
             argv=[],
             user_ns={
@@ -1307,7 +1305,5 @@ def shell_cmd(ipython):
         )
     else:
         if not _CLICK_SHELL_AVAILABLE:
-            raise click.ClickException(
-                f"click-shell is not installed. {_SHELL_INSTALL_HINT}"
-            )
+            raise click.ClickException(f"click-shell is not installed. {_SHELL_INSTALL_HINT}")
         broker_shell(standalone_mode=False, args=[])
