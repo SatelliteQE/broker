@@ -13,7 +13,14 @@ from broker.logging import setup_logging
 
 setup_logging(console_level=logging.INFO)  # Basic setup until settings are loaded
 
-from click_shell import shell
+# click-shell is optional (broker[shell]); guard its import so the CLI still loads without it
+try:
+    from click_shell import shell as _click_shell_factory
+
+    _CLICK_SHELL_AVAILABLE = True
+except ImportError:
+    _CLICK_SHELL_AVAILABLE = False
+
 import requests
 from rich.console import Console
 from rich.syntax import Syntax
@@ -1211,46 +1218,49 @@ def _make_shell_help_func(cmd, shell_instance):
     return help_func
 
 
-@shell(
-    prompt="broker > ",
-    intro="Welcome to Broker's interactive shell.\nType 'help' for commands, 'exit' or 'quit' to leave.",
-)
-def broker_shell():
-    """Start an interactive Broker shell session."""
-    pass
+if _CLICK_SHELL_AVAILABLE:
 
-
-# Register commands to the shell
-broker_shell.add_command(checkout)
-broker_shell.add_command(checkin)
-broker_shell.add_command(inventory)
-broker_shell.add_command(execute)
-broker_shell.add_command(providers)
-broker_shell.add_command(config)
-broker_shell.add_command(scenarios)
-
-
-# Shell-only commands (not available as normal sub-commands)
-@broker_shell.command(name="reload_config")
-def reload_config_cmd():
-    """Reload Broker's configuration from disk.
-
-    This clears the cached settings, forcing them to be re-read
-    from the settings file on next access.
-    """
-    settings.settings._settings = None
-    setup_logging(
-        console_level=settings.settings.logging.console_level,
-        file_level=settings.settings.logging.file_level,
-        log_path=settings.settings.logging.log_path,
-        structured=settings.settings.logging.structured,
+    @_click_shell_factory(
+        prompt="broker > ",
+        intro="Welcome to Broker's interactive shell.\nType 'help' for commands, 'exit' or 'quit' to leave.",
     )
-    CONSOLE.print("Configuration reloaded.")
+    def broker_shell():
+        """Start an interactive Broker shell session."""
+        pass
 
+    # Register commands to the shell
+    broker_shell.add_command(checkout)
+    broker_shell.add_command(checkin)
+    broker_shell.add_command(inventory)
+    broker_shell.add_command(execute)
+    broker_shell.add_command(providers)
+    broker_shell.add_command(config)
+    broker_shell.add_command(scenarios)
 
-# Patch help functions on the shell instance to work around click_shell/rich_click incompatibility
-for cmd_name, cmd in broker_shell.commands.items():
-    setattr(broker_shell.shell, f"help_{cmd_name}", _make_shell_help_func(cmd, broker_shell.shell))
+    # Shell-only commands (not available as normal sub-commands)
+    @broker_shell.command(name="reload_config")
+    def reload_config_cmd():
+        """Reload Broker's configuration from disk.
+
+        This clears the cached settings, forcing them to be re-read
+        from the settings file on next access.
+        """
+        settings.settings._settings = None
+        setup_logging(
+            console_level=settings.settings.logging.console_level,
+            file_level=settings.settings.logging.file_level,
+            log_path=settings.settings.logging.log_path,
+            structured=settings.settings.logging.structured,
+        )
+        CONSOLE.print("Configuration reloaded.")
+
+    # Patch help functions on the shell instance to work around click_shell/rich_click incompatibility
+    for cmd_name, cmd in broker_shell.commands.items():
+        setattr(
+            broker_shell.shell,
+            f"help_{cmd_name}",
+            _make_shell_help_func(cmd, broker_shell.shell),
+        )
 
 
 @cli.command(name="shell")
@@ -1274,19 +1284,23 @@ def shell_cmd(ipython):
             from IPython import start_ipython
         except ImportError:
             raise click.ClickException(
-                "IPython is not installed. Install it with: uv pip install 'broker[ipython]'"
+                "IPython is not installed. Install it with: uv pip install 'broker[shell]'"
             )
-        from broker.providers import PROVIDERS
-
         start_ipython(
             argv=[],
             user_ns={
                 "Broker": Broker,
-                "settings": settings.settings,
-                "providers": PROVIDERS,
+                "ConfigManager": ConfigManager,
+                "exceptions": exceptions,
                 "helpers": helpers,
+                "providers": PROVIDERS,
+                "settings": settings.settings,
             },
             display_banner=True,
         )
     else:
+        if not _CLICK_SHELL_AVAILABLE:
+            raise click.ClickException(
+                "click-shell is not installed. Install it with: uv pip install 'broker[shell]'"
+            )
         broker_shell(standalone_mode=False, args=[])

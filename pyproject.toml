@@ -32,7 +32,6 @@ dependencies = [
     "rich",
     "rich_click",
     "ruamel.yaml",
-    "click-shell",
     "typing-extensions",      # temporary until Python 3.12+ only
 ]
 
@@ -55,18 +54,20 @@ dev = [
 ]
 docker = ["docker", "paramiko"]
 hussh = ["hussh>=0.1.7"]
-ipython = ["ipython"]
 openstack = ["openstacksdk"]
 paramiko = ["paramiko"]
 podman = ["podman>=5.2"]
+shell = ["click-shell", "ipython"]
 ssh2_python = ["ssh2-python"]
 satlab = ["awxkit", "podman>=5.2", "hussh>=0.1.7"]
 all = [
     "ansible-pylibssh",
     "awxkit",
     "beaker-client",
+    "click-shell",
     "docker",
     "hussh>=0.1.7",
+    "ipython",
     "openstacksdk",
     "paramiko",
     "pexpect",
