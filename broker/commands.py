@@ -44,6 +44,13 @@ setup_logging(
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
+_SHELL_INSTALL_HINT = (
+    "Install broker's shell dependencies with:\n"
+    "  uv tool install 'broker[shell]'\n"
+    "  uv pip install 'broker[shell]'\n"
+    "  pip install 'broker[shell]'"
+)
+
 signal.signal(signal.SIGINT, helpers.handle_keyboardinterrupt)
 CONSOLE = Console(no_color=settings.settings.less_colors)  # rich console for pretty printing
 
@@ -1284,7 +1291,7 @@ def shell_cmd(ipython):
             from IPython import start_ipython
         except ImportError:
             raise click.ClickException(
-                "IPython is not installed. Install it with: uv pip install 'broker[shell]'"
+                f"IPython is not installed. {_SHELL_INSTALL_HINT}"
             )
         start_ipython(
             argv=[],
@@ -1301,6 +1308,6 @@ def shell_cmd(ipython):
     else:
         if not _CLICK_SHELL_AVAILABLE:
             raise click.ClickException(
-                "click-shell is not installed. Install it with: uv pip install 'broker[shell]'"
+                f"click-shell is not installed. {_SHELL_INSTALL_HINT}"
             )
         broker_shell(standalone_mode=False, args=[])
