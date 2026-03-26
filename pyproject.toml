@@ -55,6 +55,7 @@ dev = [
 ]
 docker = ["docker", "paramiko"]
 hussh = ["hussh>=0.1.7"]
+ipython = ["ipython"]
 openstack = ["openstacksdk"]
 paramiko = ["paramiko"]
 podman = ["podman>=5.2"]

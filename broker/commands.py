@@ -1254,10 +1254,39 @@ for cmd_name, cmd in broker_shell.commands.items():
 
 
 @cli.command(name="shell")
-def shell_cmd():
+@click.option(
+    "--ipython",
+    is_flag=True,
+    default=False,
+    help="Launch an IPython REPL with Broker objects pre-loaded (requires ipython).",
+)
+def shell_cmd(ipython):
     """Start an interactive Broker shell session.
 
     This provides a REPL-like interface for running Broker commands
     without needing to prefix each with 'broker'.
+
+    Use --ipython to launch a full Python REPL with Broker objects available,
+    giving you more state management and programmatic interactions.
     """
-    broker_shell(standalone_mode=False, args=[])
+    if ipython:
+        try:
+            from IPython import start_ipython
+        except ImportError:
+            raise click.ClickException(
+                "IPython is not installed. Install it with: uv pip install 'broker[ipython]'"
+            )
+        from broker.providers import PROVIDERS
+
+        start_ipython(
+            argv=[],
+            user_ns={
+                "Broker": Broker,
+                "settings": settings.settings,
+                "providers": PROVIDERS,
+                "helpers": helpers,
+            },
+            display_banner=True,
+        )
+    else:
+        broker_shell(standalone_mode=False, args=[])
