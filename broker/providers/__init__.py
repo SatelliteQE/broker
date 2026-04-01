@@ -151,11 +151,12 @@ class Provider(metaclass=ProviderMeta):
                         instance_name, instance_values = name, values
                         break
             self.instance = instance_name  # store the instance name on the provider
-            fresh_settings.update(instance_values)
-            self._settings[section_name] = fresh_settings
-            if not instance_values.get("override_envars"):
-                # if a provider instance doesn't want to override envars, load them
-                self._settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
+            if instance_values is not None:
+                fresh_settings.update(instance_values)
+                self._settings[section_name] = fresh_settings
+                if not instance_values.get("override_envars"):
+                    # if a provider instance doesn't want to override envars, load them
+                    self._settings.execute_loaders(loaders=[dynaconf.loaders.env_loader])
         # add our validators
         self._settings.validators.extend(self._validators)
         # use selective validation to only validate the instance settings
