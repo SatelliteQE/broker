@@ -4,7 +4,6 @@
 
 version: 2
 updates:
-
   # Maintain dependencies for our GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -19,3 +18,12 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 0
+    # Add this to explicitly ignore the uv ecosystem detection
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          [
+            "version-update:semver-major",
+            "version-update:semver-minor",
+            "version-update:semver-patch",
+          ]
