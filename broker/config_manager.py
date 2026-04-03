@@ -63,18 +63,27 @@ class ConfigManager:
     def _interactive_edit(self, chunk):
         """Write the chunk data to a temporary file and open it in an editor."""
         temp_file = Path("temp_settings.yaml")
+        # Attempt to fix corrupted YAML by re-parsing it
+        if isinstance(chunk, str):
+            try:
+                parsed = yaml.load(chunk)
+                if parsed is not None and not isinstance(parsed, str):
+                    chunk = parsed
+            except YAMLError:
+                pass
         yaml.dump(chunk, temp_file)
         click.edit(filename=str(temp_file))
-        new_data = temp_file.read_text()
-        temp_file.unlink()
-        # first try to load it as yaml
+        # Load directly from the Path to avoid ruamel corruption issues
         try:
-            return yaml.load(new_data)
-        except YAMLError:  # then try json
+            result = yaml.load(temp_file)
+        except YAMLError:
+            new_data = temp_file.read_text()
             try:
-                return json.loads(new_data)
-            except json.JSONDecodeError:  # finally, just return the raw data
-                return new_data
+                result = json.loads(new_data)
+            except json.JSONDecodeError:
+                result = new_data
+        temp_file.unlink()
+        return result
 
     def _import_config(self, source, is_url=False):
         """Initialize the broker settings file from a source."""

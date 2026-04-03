@@ -1,5 +1,6 @@
 """Ansible Tower provider implementation."""
 
+import atexit
 from functools import cache, cached_property
 import inspect
 import json
@@ -165,6 +166,19 @@ class ATInventoryError(exceptions.ProviderError):
         )
 
 
+def _cleanup_temp_token(v2_api, desc):
+    """Cleanup temporary token created by Broker."""
+    try:
+        # Find and delete the temporary token
+        tokens = v2_api.tokens.get(description=desc).results
+        if tokens:
+            for token in tokens:
+                token.delete()
+            logger.debug(f"Deleted temporary token: {desc}")
+    except Exception as err:  # noqa: BLE001
+        logger.debug(f"Failed to delete temporary token {desc}: {err}")
+
+
 @cache
 def get_awxkit_and_uname(
     awxkit_config=None,
@@ -210,6 +224,21 @@ def get_awxkit_and_uname(
                 logger.info(
                     f"Successfully created a temporary token with description: {temp_token_desc}."
                 )
+
+                # Save the token to settings so subsequent provider instantiations within
+                # the same execution (like scenario steps) can reuse the token
+                if broker_settings:
+                    try:
+                        # Use .set() with a dotted path to update only the token key,
+                        # leaving the rest of the ANSIBLETOWER config intact
+                        broker_settings.set("ANSIBLETOWER.token", token)
+                        logger.debug("Saved temporary token to broker_settings for reuse.")
+                    except Exception as err:  # noqa: BLE001
+                        logger.debug(f"Could not update broker_settings with token: {err}")
+
+                # Register an atexit handler to automatically clean up the transient token
+                atexit.register(_cleanup_temp_token, versions.v2.get(), temp_token_desc)
+
         except Exception as err:  # noqa: BLE001 - Don't currently know the specific exception
             logger.debug(f"Error creating temporary token: {err}")
             logger.warning(
@@ -338,20 +367,6 @@ class AnsibleTower(Provider):
         self.username = uname or self._v2.me.get().results[0].username
         # Check to see if we're running AAP (ver 4.0+)
         self._is_aap = self._v2.ping.get().version[0] != "3"
-
-    def __del__(self):
-        """Clean up any temporary tokens we created."""
-        if getattr(self, "_temp_token_desc", None) and hasattr(self, "_v2"):
-            try:
-                # Find and delete the temporary token
-                tokens = self._v2.tokens.get(description=self._temp_token_desc).results
-                if tokens:
-                    for token in tokens:
-                        token.delete()
-                    logger.debug(f"Deleted temporary token: {self._temp_token_desc}")
-            except Exception as err:  # noqa: BLE001 - Not currently known
-                # Just log the error since we're in __del__
-                logger.debug(f"Failed to delete temporary token: {err}")
 
     @staticmethod
     def _pull_params(kwargs):
