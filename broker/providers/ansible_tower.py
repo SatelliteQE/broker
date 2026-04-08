@@ -978,17 +978,21 @@ class AnsibleTower(Provider):
                 title=f"{workflow} information",
             )
             rich_console.print(top_table)
-            extras_table = helpers.dict_to_table(
-                json.loads(wfjt.extra_vars),
-                title="Workflow Variables",
-                headers=("Variable", "Default Value"),
-            )
-            rich_console.print(extras_table)
+            extra_vars = json.loads(wfjt.extra_vars) if wfjt.extra_vars else None
+            if extra_vars:
+                extras_table = helpers.dict_to_table(
+                    extra_vars,
+                    title="Workflow Variables",
+                    headers=("Variable", "Default Value"),
+                )
+                rich_console.print(extras_table)
+            else:
+                rich_console.print("No variables found for this workflow.")
             return {
                 "name": workflow,
                 "description": wfjt.description,
                 "inventory": default_inv["name"],
-                "extra_vars": json.loads(wfjt.extra_vars),
+                "extra_vars": extra_vars,
             }
         elif workflows:
             workflows = [
@@ -1050,17 +1054,21 @@ class AnsibleTower(Provider):
                 title=f"{job_template} information",
             )
             rich_console.print(top_table)
-            extras_table = helpers.dict_to_table(
-                json.loads(jt.extra_vars),
-                title="Job Template Variables",
-                headers=("Variable", "Default Value"),
-            )
-            rich_console.print(extras_table)
+            extra_vars = json.loads(jt.extra_vars) if jt.extra_vars else None
+            if extra_vars:
+                extras_table = helpers.dict_to_table(
+                    extra_vars,
+                    title="Job Template Variables",
+                    headers=("Variable", "Default Value"),
+                )
+                rich_console.print(extras_table)
+            else:
+                rich_console.print("No variables found for this job template.")
             return {
                 "name": job_template,
                 "description": jt.description,
                 "inventory": default_inv["name"],
-                "extra_vars": json.loads(jt.extra_vars),
+                "extra_vars": extra_vars,
             }
         elif job_templates:
             job_templates = [
