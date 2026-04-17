@@ -37,10 +37,12 @@ def resolve_nick(nick, broker_settings=None):
 
 def kwargs_from_click_ctx(ctx):
     """Convert a Click context object to a dictionary of keyword arguments."""
-    # if users use `=` to note arg=value assignment, then we need to split it
+    # If users use `--opt=value`, split only on the first `=`. Do not split bare
+    # `key=value` tokens: those are often values for a preceding `--opt` when the
+    # value itself contains `=` (see broker#488).
     _args = []
     for arg in ctx.args:
-        if "=" in arg:
+        if arg.startswith("-") and "=" in arg:
             key, value = arg.split("=", 1)
             _args.extend([key, value])
         else:
