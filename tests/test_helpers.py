@@ -222,6 +222,24 @@ def test_kwargs_from_click_ctx_preserves_equals_in_spaced_value():
     assert kwargs == {"deploy_foreman_development_extra_vars": extra}
 
 
+def test_kwargs_from_click_ctx_naked_key_value():
+    """Leading-dash-less key=value pairs (foo=bar) are split into keys and values."""
+    class ctx:
+        args = ["foo=bar", "baz=qux"]
+
+    kwargs = helpers.kwargs_from_click_ctx(ctx)
+    assert kwargs == {"foo": "bar", "baz": "qux"}
+
+
+def test_kwargs_from_click_ctx_mixed_dashed_and_naked():
+    """Naked k=v pairs can follow dashed --opt value pairs."""
+    class ctx:
+        args = ["--a", "1", "foo=bar"]
+
+    kwargs = helpers.kwargs_from_click_ctx(ctx)
+    assert kwargs == {"a": "1", "foo": "bar"}
+
+
 def test_resolve_nick_raises_error_for_unknown_nick():
     """Test that resolve_nick raises UserError for a non-existent nick."""
     with pytest.raises(exceptions.UserError, match=r"Unknown nick: nothere"):
