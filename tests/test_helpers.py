@@ -196,6 +196,19 @@ def test_kwargs_from_click_ctx():
     assert kwargs == {"arg1": "value1", "arg2": "value2"}
 
 
+def test_kwargs_from_click_ctx_preserves_equals_in_value():
+    """Values with '=' (e.g. extra_vars) must stay one string; see SatelliteQE/broker#488."""
+    extra = (
+        "deploy_git_repository_remote_name=upstream,"
+        "deploy_git_repository_secondary_remote_name=origin"
+    )
+    class ctx:
+        args = [f"--deploy_foreman_development_extra_vars={extra}"]
+
+    kwargs = helpers.kwargs_from_click_ctx(ctx)
+    assert kwargs == {"deploy_foreman_development_extra_vars": extra}
+
+
 def test_resolve_nick_raises_error_for_unknown_nick():
     """Test that resolve_nick raises UserError for a non-existent nick."""
     with pytest.raises(exceptions.UserError, match=r"Unknown nick: nothere"):

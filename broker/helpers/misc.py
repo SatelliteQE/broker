@@ -41,7 +41,8 @@ def kwargs_from_click_ctx(ctx):
     _args = []
     for arg in ctx.args:
         if "=" in arg:
-            _args.extend(arg.split("="))
+            key, value = arg.split("=", 1)
+            _args.extend([key, value])
         else:
             _args.append(arg)
     ctx.args = _args
