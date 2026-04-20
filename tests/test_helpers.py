@@ -13,6 +13,12 @@ BROKER_ARGS_DATA = {
     "my_second_arg": "foo",
 }
 
+# Shared by kwargs_from_click_ctx tests: value contains '=' and must not be split (SatelliteQE/broker#488).
+_EXTRA_VARS_WITH_EQUALS = (
+    "deploy_git_repository_remote_name=upstream,"
+    "deploy_git_repository_secondary_remote_name=origin"
+)
+
 
 @pytest.fixture
 def tmp_file(tmp_path):
@@ -198,28 +204,20 @@ def test_kwargs_from_click_ctx():
 
 def test_kwargs_from_click_ctx_preserves_equals_in_value():
     """Values with '=' (e.g. extra_vars) must stay one string; see SatelliteQE/broker#488."""
-    extra = (
-        "deploy_git_repository_remote_name=upstream,"
-        "deploy_git_repository_secondary_remote_name=origin"
-    )
     class ctx:
-        args = [f"--deploy_foreman_development_extra_vars={extra}"]
+        args = [f"--deploy_foreman_development_extra_vars={_EXTRA_VARS_WITH_EQUALS}"]
 
     kwargs = helpers.kwargs_from_click_ctx(ctx)
-    assert kwargs == {"deploy_foreman_development_extra_vars": extra}
+    assert kwargs == {"deploy_foreman_development_extra_vars": _EXTRA_VARS_WITH_EQUALS}
 
 
 def test_kwargs_from_click_ctx_preserves_equals_in_spaced_value():
     """Space-separated --opt VALUE form; VALUE may contain '=' and must not be split."""
-    extra = (
-        "deploy_git_repository_remote_name=upstream,"
-        "deploy_git_repository_secondary_remote_name=origin"
-    )
     class ctx:
-        args = ["--deploy_foreman_development_extra_vars", extra]
+        args = ["--deploy_foreman_development_extra_vars", _EXTRA_VARS_WITH_EQUALS]
 
     kwargs = helpers.kwargs_from_click_ctx(ctx)
-    assert kwargs == {"deploy_foreman_development_extra_vars": extra}
+    assert kwargs == {"deploy_foreman_development_extra_vars": _EXTRA_VARS_WITH_EQUALS}
 
 
 def test_kwargs_from_click_ctx_naked_key_value():
