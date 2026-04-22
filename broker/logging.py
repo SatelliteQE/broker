@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 import click
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json
 from rich.logging import RichHandler
 
 from broker.settings import BROKER_DIRECTORY
@@ -207,7 +207,7 @@ def setup_logging(
 
             # JSON structured logging
             json_file_handler.setFormatter(
-                jsonlogger.JsonFormatter(
+                json.JsonFormatter(
                     "%(asctime)s %(name)s %(levelname)s %(message)s",
                     rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
                     datefmt="%d%b %H:%M:%S",
