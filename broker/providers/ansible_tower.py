@@ -555,6 +555,15 @@ class AnsibleTower(Provider):
                                 if ev.event_data.get("res", {}).get("msg")
                             ]
                         )
+        else:
+            # Get name and output directly from non-workflow job
+            failure_messages.append(
+                {
+                    "job": workflow.name,
+                    "reason": workflow.result_stdout,
+                }
+            )
+
         if not failure_messages:
             return {
                 "reason": f"Unable to determine failure cause for {workflow.name} at {workflow.url}"
