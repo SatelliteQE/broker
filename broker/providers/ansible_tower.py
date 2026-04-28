@@ -567,6 +567,9 @@ class AnsibleTower(Provider):
     def _try_get_dangling_hosts(self, failed_workflow):
         """Get one or more hosts that may have been left behind by a failed workflow."""
         hosts = []
+        # Avoid assertion errors looking up workflow nodes if this isn't a workflow job
+        if "workflow_nodes" not in failed_workflow.related:
+            return hosts
         for node in failed_workflow.get_related("workflow_nodes").results:
             if not (job_fields := node.summary_fields.get("job", {})) or job_fields.get(
                 "failed"
