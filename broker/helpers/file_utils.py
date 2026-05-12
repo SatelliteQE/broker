@@ -6,6 +6,7 @@ from io import BytesIO
 import json
 import logging
 from pathlib import Path
+import random
 import tarfile
 import time
 from uuid import uuid4
@@ -160,24 +161,38 @@ class FileLock:
     with FileLock("basic_file.txt"):
         Path("basic_file.txt").write_text("some text")
 
-    If a lock is already in place, FileLock will wait up to <timeout> seconds
+    If a lock is already in place, FileLock will wait up to <timeout> seconds before raising.
+
+    Use delay_start=True to introduce a random jitter (0.2-3.0s) before attempting to acquire
+    the lock. This is useful when many processes start simultaneously and would otherwise
+    collide on the same lock. The jitter occurs before the timeout countdown begins.
+
+    with FileLock("basic_file.txt", timeout=20, delay_start=True):
+        Path("basic_file.txt").write_text("some text")
     """
 
-    def __init__(self, file_name, timeout=10):
+    def __init__(self, file_name, timeout=10, delay_start=False):
         self.lock = Path(f"{file_name}.lock")
         self.timeout = timeout
+        self.delay_start = delay_start
 
-    def wait_file(self):
-        """Wait for the lock file to be released, then acquire it."""
-        timeout_after = time.time() + self.timeout
-        while self.lock.exists():
-            if time.time() <= timeout_after:
+    def wait_file(self, timeout=None, delay_start=None):
+        """Wait for the lock file to be released, then acquire it atomically."""
+        if delay_start is None:
+            delay_start = self.delay_start
+        if delay_start:
+            time.sleep(random.uniform(0.2, 3.0))
+        timeout_after = time.time() + (timeout if timeout is not None else self.timeout)
+        while True:
+            try:
+                self.lock.open("x").close()
+                return
+            except FileExistsError:  # noqa: PERF203
+                if time.time() >= timeout_after:
+                    raise exceptions.BrokerError(
+                        f"Timeout while waiting for lock release: {self.lock.absolute()}"
+                    )
                 time.sleep(1)
-            else:
-                raise exceptions.BrokerError(
-                    f"Timeout while waiting for lock release: {self.lock.absolute()}"
-                )
-        self.lock.touch()
 
     def return_file(self):
         """Release the lock file."""
