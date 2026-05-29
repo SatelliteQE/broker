@@ -111,15 +111,17 @@ def convert_pseudonamespaces(attr_dict):
     return out_dict
 
 
-def resilient_job_wait(job, broker_settings, job_timeout=None, max_wait=None):
+def resilient_job_wait(job, broker_settings, job_interval=None, job_timeout=None, max_wait=None):
     """Wait for a job to complete. Retry on errors.
 
     Args:
         job: The job object to wait for
         broker_settings: Settings object to use instead of the global one
+        job_interval: Interval between job status polls
         job_timeout: Timeout for individual job wait attempts
         max_wait: Maximum time to continue retrying before giving up
     """
+    job_interval = job_interval or broker_settings.ANSIBLETOWER.workflow_poll_interval
     job_timeout = job_timeout or broker_settings.ANSIBLETOWER.workflow_timeout
     max_wait = max_wait or broker_settings.ANSIBLETOWER.max_resilient_wait
     completed = False
@@ -137,7 +139,7 @@ def resilient_job_wait(job, broker_settings, job_timeout=None, max_wait=None):
             )
 
         try:
-            job.wait_until_completed(timeout=job_timeout)
+            job.wait_until_completed(interval=job_interval, timeout=job_timeout)
             completed = True
         except (ConnectionError, awxkit.exceptions.Unknown, awxkit.exceptions.Forbidden) as err:
             logger.error(f"Error occurred while waiting for job: {err}")
@@ -267,6 +269,7 @@ class AnsibleTower(Provider):
         Validator("ANSIBLETOWER.extend_workflow", default="extend-vm"),
         Validator("ANSIBLETOWER.new_expire_time", default="+172800"),
         Validator("ANSIBLETOWER.workflow_timeout", is_type_of=int, default=3600),
+        Validator("ANSIBLETOWER.workflow_poll_interval", is_type_of=int, default=5),
         Validator("ANSIBLETOWER.results_limit", is_type_of=int, default=20),
         Validator("ANSIBLETOWER.error_scope", default="last"),
         Validator("ANSIBLETOWER.base_url", must_exist=True),
