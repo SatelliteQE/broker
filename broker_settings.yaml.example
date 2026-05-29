@@ -44,6 +44,7 @@ AnsibleTower:
     extend_workflow: "extend-vm"
     new_expire_time: "+172800"
     workflow_timeout: 3600
+    workflow_poll_interval: 5
     max_resilient_wait: 7200
     results_limit: 50
 Container:
