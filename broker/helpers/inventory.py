@@ -1,17 +1,15 @@
 """Inventory management utilities."""
 
-import threading
-
 from ruamel.yaml import YAML
 
 from broker.helpers.dict_utils import dict_from_paths, merge_dicts
 from broker.helpers.file_utils import load_file
+from broker.helpers.misc import format_host_time_value
 
 yaml = YAML()
 yaml.default_flow_style = False
 yaml.sort_keys = False
 
-INVENTORY_LOCK = threading.Lock()
 SPECIAL_INVENTORY_FIELDS = {}  # use the _special_inventory_field decorator to add new fields
 
 
@@ -32,12 +30,14 @@ def load_inventory(filter=None):
 
     :return: list of dictionaries
     """
+    from broker.helpers.file_utils import FileLock
     from broker.helpers.results import eval_filter
     from broker.settings import inventory_path
 
-    inv_data = load_file(inventory_path, warn=False)
-    if inv_data and filter:
-        inv_data = eval_filter(inv_data, filter)
+    with FileLock(inventory_path):
+        inv_data = load_file(inventory_path, warn=False)
+        if inv_data and filter:
+            inv_data = eval_filter(inv_data, filter)
     return inv_data or []
 
 
@@ -49,6 +49,7 @@ def update_inventory(add=None, remove=None):
 
     :return: no return value
     """
+    from broker.helpers.file_utils import FileLock
     from broker.settings import inventory_path
 
     if add and not isinstance(add, list):
@@ -57,9 +58,12 @@ def update_inventory(add=None, remove=None):
         add = []
     if remove and not isinstance(remove, list):
         remove = [remove]
-    with INVENTORY_LOCK:
-        inv_data = load_inventory()
-        if inv_data:
+
+    with FileLock(inventory_path):
+        # Entire read-modify-write cycle under lock
+        inv_data = load_file(inventory_path, warn=False) or []
+
+        if inv_data and inventory_path.exists():
             inventory_path.unlink()
 
         if remove:
@@ -138,7 +142,10 @@ def _resolve_inv_field(field, host_dict, **extras):
     if special_field_func := SPECIAL_INVENTORY_FIELDS.get(field):
         return special_field_func(host_dict, **extras)
     # Otherwise, try to get the value from the host dictionary
-    return dict_from_paths(host_dict, {"_": field}, sep=".")["_"] or "Unknown"
+    result = dict_from_paths(host_dict, {"_": field}, sep=".")["_"]
+    if result is not None and field.endswith("_time"):
+        return format_host_time_value(result)
+    return result or "Unknown"
 
 
 @_special_inventory_field("$action")
@@ -159,3 +166,21 @@ def get_host_action(host_dict, provider_actions=None, **_):
         if action := host_dict["_broker_args"].get(opt):
             return action
     return "Unknown"
+
+
+def humanize_inventory_times(host_dict):
+    """Return a copy of host_dict with all ``*_time`` field values formatted for humans.
+
+    Fields whose names end with ``_time`` and whose values are numeric strings are
+    converted using :func:`format_host_time_value`.  Nested dicts are processed
+    recursively; other values are left unchanged.
+    """
+    result = {}
+    for key, value in host_dict.items():
+        if isinstance(value, dict):
+            result[key] = humanize_inventory_times(value)
+        elif key.endswith("_time") and value is not None:
+            result[key] = format_host_time_value(value)
+        else:
+            result[key] = value
+    return result

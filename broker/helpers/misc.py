@@ -7,7 +7,6 @@ import logging
 import os
 from pathlib import Path
 import sys
-import threading
 import time
 
 import click
@@ -80,8 +79,6 @@ class Emitter:
         helpers.emit({"key": "value", "another": 5})
     """
 
-    EMIT_LOCK = threading.Lock()
-
     def __init__(self, emit_file=None):
         """Can empty init and set the file later."""
         self.file = None
@@ -99,6 +96,8 @@ class Emitter:
 
     def emit_to_file(self, *args, **kwargs):
         """Emit data to the file, keeping existing data in-place."""
+        from broker.helpers.file_utils import FileLock
+
         if not self.file:
             return
         for arg in args:
@@ -108,7 +107,8 @@ class Emitter:
         for key, val in kwargs.items():
             if getattr(val, "json", None):
                 kwargs[key] = val.json
-        with self.EMIT_LOCK:
+
+        with FileLock(self.file):
             curr_data = json.loads(self.file.read_text() or "{}")
             curr_data.update(kwargs)
             self.file.write_text(json.dumps(curr_data, indent=4, sort_keys=True))
@@ -233,6 +233,42 @@ def find_origin():
             return prev or "Unknown fixture", jenkins_url
         prev, _frame = f"{frame.function}:{frame.filename}", frame
     return f"Unknown origin by {getpass.getuser()}", jenkins_url
+
+
+def format_host_time_value(value):
+    """Format a numeric time value to a human-readable string.
+
+    Values in Unix epoch timestamp range (year 2001-2100) are formatted as
+    human-readable dates in UTC. All other numeric values are treated as
+    durations and formatted as days/hours/minutes/seconds.
+    """
+    from datetime import datetime, timezone
+
+    # Unix epoch boundaries: Jan 1 2001 00:00:00 UTC and Jan 1 2100 00:00:00 UTC
+    _EPOCH_MIN = 978307200
+    _EPOCH_MAX = 4102444800
+
+    try:
+        ts = int(value)
+    except (ValueError, TypeError):
+        return str(value)
+    if _EPOCH_MIN <= ts <= _EPOCH_MAX:
+        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%b %d, %Y %H:%M UTC")
+    # Otherwise treat as a duration in seconds
+    days = ts // 86400
+    hours = (ts % 86400) // 3600
+    minutes = (ts % 3600) // 60
+    secs = ts % 60
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if secs and not days:
+        parts.append(f"{secs}s")
+    return " ".join(parts) if parts else f"{ts}s"
 
 
 def dictlist_to_table(dict_list, title=None, _id=False, headers=True):

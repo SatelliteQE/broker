@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 from concurrent.futures import ThreadPoolExecutor
 import pytest
+from click.testing import CliRunner
 from broker import helpers
 from broker import exceptions
 
@@ -242,3 +243,37 @@ def test_resolve_nick_raises_error_for_unknown_nick():
     """Test that resolve_nick raises UserError for a non-existent nick."""
     with pytest.raises(exceptions.UserError, match=r"Unknown nick: nothere"):
         helpers.resolve_nick("nothere")
+
+
+_TIME_HOST = {
+    "name": "myhost",
+    "hostname": "myhost.example.com",
+    "shutdown_time": "1779455297",
+    "remove_time": "432000",
+    "_broker_provider": "AnsibleTower",
+    "_broker_args": {},
+}
+
+
+def test_inventory_fields_to_dict_formats_time_fields():
+    """inventory_fields_to_dict auto-formats *_time fields in the table display path."""
+    inventory_fields = {"Host": "hostname", "Shutdown": "shutdown_time", "Remove": "remove_time"}
+    result = helpers.inventory_fields_to_dict(inventory_fields=inventory_fields, host_dict=_TIME_HOST)
+    assert result["Host"] == "myhost.example.com"
+    assert "2026" in result["Shutdown"] and "UTC" in result["Shutdown"]
+    assert result["Remove"] == "5d"
+
+
+def test_inventory_details_formats_time_fields(tmp_path, monkeypatch):
+    """``broker inventory --details`` renders *_time fields in human-readable form."""
+    from broker import settings
+    from broker.commands import cli
+
+    inv_file = tmp_path / "inventory.yaml"
+    helpers.yaml.dump([_TIME_HOST], inv_file)
+    monkeypatch.setattr(settings, "inventory_path", inv_file)
+
+    result = CliRunner().invoke(cli, ["inventory", "--details"])
+    assert result.exit_code == 0, result.output
+    assert "1779455297" not in result.output and "2026" in result.output
+    assert "432000" not in result.output and "5d" in result.output

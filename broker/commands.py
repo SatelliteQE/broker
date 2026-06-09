@@ -378,7 +378,8 @@ def inventory(details, _list, sync, filter):
     helpers.emit({"inventory": inventory})
     # details is handled differently than the normal and list views
     if details:
-        detailed = helpers.yaml_format(dict(enumerate(inventory)))
+        humanized = [helpers.humanize_inventory_times(host) for host in inventory]
+        detailed = helpers.yaml_format(dict(enumerate(humanized)))
         CONSOLE.print(Syntax(detailed, "yaml", background_color="default"))
         return
 
