@@ -47,12 +47,16 @@ class ConfigManager:
     no_global_config = False
 
     def __init__(self, settings_path=None):
+        from broker.helpers.file_utils import FileLock
+
         self._settings_path = settings_path
         if settings_path:
             if settings_path.exists():
-                self._cfg = yaml.load(self._settings_path)
+                with FileLock(self._settings_path):
+                    self._cfg = yaml.load(self._settings_path) or {}
             elif self.no_global_config or os.environ.get("BROKER_NO_GLOBAL_CONFIG"):
                 logger.info("Continuing without global config file.")
+                self._cfg = {}
                 return
             else:
                 click.secho(
@@ -109,6 +113,10 @@ class ConfigManager:
         """Construct a list of all applicable migrations."""
         from broker import config_migrations
 
+        # Guard against None config (can happen if file read during write)
+        if self._cfg is None:
+            return []
+
         config_version = Version(self._cfg.get("_version", "0.0.0"))
         if force_version:
             force_version = Version(force_version)
@@ -125,20 +133,29 @@ class ConfigManager:
 
     def backup(self):
         """Backup the current configuration file."""
+        from broker.helpers.file_utils import FileLock
+
         logger.debug(
             f"Backing up the configuration file to {self._settings_path.with_suffix('.bak')}"
         )
-        self._settings_path.with_suffix(".bak").write_text(self._settings_path.read_text())
+        with FileLock(self._settings_path):
+            self._settings_path.with_suffix(".bak").write_text(self._settings_path.read_text())
 
     def restore(self):
         """Restore the configuration file from a backup if it exists."""
+        from broker.helpers.file_utils import FileLock
+
         logger.debug(
             f"Restoring the configuration file from {self._settings_path.with_suffix('.bak')}"
         )
         backup_path = self._settings_path.with_suffix(".bak")
         if not backup_path.exists():
             raise exceptions.UserError("No backup file found.")
-        self._settings_path.write_text(backup_path.read_text())
+
+        with FileLock(self._settings_path):
+            self._settings_path.write_text(backup_path.read_text())
+            # Reload the config
+            self._cfg = yaml.load(self._settings_path) or {}
 
     def edit(self, chunk=None, content=None):
         """Open the config file in an editor."""
@@ -182,6 +199,8 @@ class ConfigManager:
 
     def update(self, chunk, new_val, curr_chunk=None):
         """Update a chunk of Broker's config or the whole config."""
+        from broker.helpers.file_utils import FileLock
+
         # Recursive down to find the chunk to update, then propagate the new value back up
         if not curr_chunk:  # we're at the top level, so update the config directly
             if chunk is None:  # the whole config is being updated
@@ -194,7 +213,9 @@ class ConfigManager:
             # update the config file if it exists
             if self._settings_path.exists():
                 self.backup()
-            yaml.dump(self._cfg, self._settings_path)
+
+            with FileLock(self._settings_path):
+                yaml.dump(self._cfg, self._settings_path)
         else:  # we're not at the top level, so keep going down
             if C_SEP in chunk:
                 curr, chunk = chunk.split(C_SEP, 1)
@@ -251,17 +272,25 @@ class ConfigManager:
 
     def migrate(self, force_version=None):
         """Migrate the config from a previous version of Broker."""
-        # get all available migrations
-        if not (migrations := self._get_migrations(force_version)):
-            logger.info("No migrations are applicable to your config.")
-            return
-        # run all migrations in order
-        working_config = self._cfg
-        for migration in sorted(migrations, key=lambda m: m.TO_VERSION):
-            working_config = migration.run_migrations(working_config)
-        self.backup()
-        yaml.dump(working_config, self._settings_path)
-        logger.info("Config migration complete.")
+        from broker.helpers.file_utils import FileLock
+
+        with FileLock(self._settings_path):
+            # Re-read config under lock to check if already migrated
+            self._cfg = yaml.load(self._settings_path) or {}
+
+            # get all available migrations
+            if not (migrations := self._get_migrations(force_version)):
+                logger.info("No migrations are applicable to your config.")
+                return
+            # run all migrations in order
+            working_config = self._cfg
+            for migration in sorted(migrations, key=lambda m: m.TO_VERSION):
+                working_config = migration.run_migrations(working_config)
+            self.backup()
+            yaml.dump(working_config, self._settings_path)
+            # Update in-memory config
+            self._cfg = working_config
+            logger.info("Config migration complete.")
 
     def validate(self, chunk, providers):
         """Validate a top-level chunk of Broker's config."""

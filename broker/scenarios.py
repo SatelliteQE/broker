@@ -49,10 +49,13 @@ CURRENT_SCHEMA_VERSION = 1
 
 def load_imports_manifest():
     """Load the imports manifest file."""
-    if not IMPORTS_FILE.exists():
-        return {"schema_version": CURRENT_SCHEMA_VERSION, "imports": []}
+    from broker.helpers.file_utils import FileLock
 
-    data = helpers.load_file(IMPORTS_FILE, warn=False) or {}
+    with FileLock(IMPORTS_FILE):
+        if not IMPORTS_FILE.exists():
+            return {"schema_version": CURRENT_SCHEMA_VERSION, "imports": []}
+
+        data = helpers.load_file(IMPORTS_FILE, warn=False) or {}
 
     # Handle version mismatch
     if data.get("schema_version", 0) > CURRENT_SCHEMA_VERSION:
@@ -66,7 +69,10 @@ def load_imports_manifest():
 
 def save_imports_manifest(data):
     """Save the imports manifest file."""
-    helpers.save_file(IMPORTS_FILE, data)
+    from broker.helpers.file_utils import FileLock
+
+    with FileLock(IMPORTS_FILE):
+        helpers.save_file(IMPORTS_FILE, data)
 
 
 def find_import_entry(manifest, source, ref="master"):
@@ -627,8 +633,11 @@ class ScenarioRunner:
 
     def _load_scenario_inventory(self):
         """Load existing scenario inventory from disk if it exists."""
+        from broker.helpers.file_utils import FileLock
+
         if self.inventory_path.exists():
-            inv_data = helpers.load_file(self.inventory_path, warn=False)
+            with FileLock(self.inventory_path):
+                inv_data = helpers.load_file(self.inventory_path, warn=False)
             if inv_data:
                 # Reconstruct host objects from the inventory data
                 hosts = [self._reconstruct_host_safe(h) for h in inv_data]
@@ -643,10 +652,14 @@ class ScenarioRunner:
 
     def _save_scenario_inventory(self):
         """Save the current scenario inventory to disk."""
+        from broker.helpers.file_utils import FileLock
+
         inv_data = [host.to_dict() for host in self.scenario_inventory]
         self.inventory_path.parent.mkdir(parents=True, exist_ok=True)
-        self.inventory_path.touch()
-        yaml.dump(inv_data, self.inventory_path)
+
+        with FileLock(self.inventory_path):
+            self.inventory_path.touch()
+            yaml.dump(inv_data, self.inventory_path)
 
     def _build_context(self, current_step_name, previous_step_memory):
         """Build the Jinja2 template context for a step.

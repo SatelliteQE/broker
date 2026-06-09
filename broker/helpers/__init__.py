@@ -39,10 +39,10 @@ from broker.helpers.git import (
 
 # Inventory utilities
 from broker.helpers.inventory import (
-    INVENTORY_LOCK,
     SPECIAL_INVENTORY_FIELDS,
     flip_provider_actions,
     get_host_action,
+    humanize_inventory_times,
     inventory_fields_to_dict,
     load_inventory,
     update_inventory,
@@ -56,6 +56,7 @@ from broker.helpers.misc import (
     emit,
     find_origin,
     fork_broker,
+    format_host_time_value,
     handle_keyboardinterrupt,
     kwargs_from_click_ctx,
     resolve_nick,
@@ -74,7 +75,6 @@ from broker.helpers.results import (
 )
 
 __all__ = [
-    "INVENTORY_LOCK",
     "SPECIAL_INVENTORY_FIELDS",
     "Emitter",
     "FileLock",
@@ -95,8 +95,10 @@ __all__ = [
     "flatten_dict",
     "flip_provider_actions",
     "fork_broker",
+    "format_host_time_value",
     "get_host_action",
     "handle_keyboardinterrupt",
+    "humanize_inventory_times",
     "inventory_fields_to_dict",
     "kwargs_from_click_ctx",
     "load_file",

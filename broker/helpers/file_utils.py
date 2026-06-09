@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 import random
 import tarfile
+import threading
 import time
 from uuid import uuid4
 
@@ -154,7 +155,7 @@ def yaml_format(in_struct, force_yaml_dict=False):
 
 
 class FileLock:
-    """Basic file locking class that acquires and releases locks.
+    """File locking class with both inter-process and intra-process protection.
 
     Recommended usage is the context manager which will handle everything for you
 
@@ -169,12 +170,38 @@ class FileLock:
 
     with FileLock("basic_file.txt", timeout=20, delay_start=True):
         Path("basic_file.txt").write_text("some text")
+
+    This implementation provides:
+    - Inter-process locking via .lock files (for pytest-xdist, concurrent CLI)
+    - Intra-process locking via threading.RLock (reentrant, allows nested locks by same thread)
+    - Acquisition counting to support nested locks from the same thread
+    - Optional random jitter to reduce lock contention when many processes start simultaneously
     """
 
+    # Class-level dict mapping file paths to threading locks
+    # This ensures all FileLock instances for the same file share the same thread lock
+    _thread_locks = {}
+    _thread_locks_lock = threading.Lock()  # Protects _thread_locks dict itself
+
+    # Class-level dict to track acquisition count per thread per file
+    # Format: {(thread_id, lock_key): count}
+    _acquisition_counts = {}
+
     def __init__(self, file_name, timeout=10, delay_start=False):
-        self.lock = Path(f"{file_name}.lock")
+        self.file_name = Path(file_name)
         self.timeout = timeout
         self.delay_start = delay_start
+
+        # Get or create a thread lock for this file path
+        # Use the normalized absolute path as the key to ensure consistency
+        # Use RLock (reentrant) to allow the same thread to acquire multiple times (nested locks)
+        # Also use the resolved path for the lock file to ensure all callers coordinate on the same lock
+        self.lock_key = str(self.file_name.resolve())
+        self.lock = Path(f"{self.lock_key}.lock")
+        with self._thread_locks_lock:
+            if self.lock_key not in self._thread_locks:
+                self._thread_locks[self.lock_key] = threading.RLock()
+            self._thread_lock = self._thread_locks[self.lock_key]
 
     def wait_file(self, timeout=None, delay_start=None):
         """Wait for the lock file to be released, then acquire it atomically."""
@@ -196,13 +223,57 @@ class FileLock:
 
     def return_file(self):
         """Release the lock file."""
-        self.lock.unlink()
+        with contextlib.suppress(FileNotFoundError):
+            self.lock.unlink()
 
     def __enter__(self):  # noqa: D105
-        self.wait_file()
+        # Acquire thread lock first (intra-process)
+        self._thread_lock.acquire()
+
+        # Track acquisition count for this thread
+        thread_id = threading.get_ident()
+        count_key = (thread_id, self.lock_key)
+
+        with self._thread_locks_lock:
+            count = self._acquisition_counts.get(count_key, 0)
+            self._acquisition_counts[count_key] = count + 1
+
+        try:
+            # Only acquire file lock on first acquisition (not on nested calls)
+            if count == 0:
+                self.wait_file()
+        except Exception:
+            # If file lock fails, decrement count and release thread lock
+            with self._thread_locks_lock:
+                self._acquisition_counts[count_key] -= 1
+                if self._acquisition_counts[count_key] == 0:
+                    del self._acquisition_counts[count_key]
+            self._thread_lock.release()
+            raise
+
+        return self
 
     def __exit__(self, *tb_info):  # noqa: D105
-        self.return_file()
+        thread_id = threading.get_ident()
+        count_key = (thread_id, self.lock_key)
+
+        # Decrement acquisition count
+        with self._thread_locks_lock:
+            count = self._acquisition_counts.get(count_key, 1)
+            count -= 1
+            if count > 0:
+                self._acquisition_counts[count_key] = count
+            elif count_key in self._acquisition_counts:
+                # Last release - clean up count tracker
+                del self._acquisition_counts[count_key]
+
+        try:
+            # Only release file lock on final release (not on nested exits)
+            if count == 0:
+                self.return_file()
+        finally:
+            # Always release thread lock
+            self._thread_lock.release()
 
 
 @contextmanager
