@@ -159,3 +159,22 @@ def get_host_action(host_dict, provider_actions=None, **_):
         if action := host_dict["_broker_args"].get(opt):
             return action
     return "Unknown"
+
+
+@_special_inventory_field("$expire_time_human")
+def get_expire_time_human(host_dict, **_):
+    """Convert Unix timestamp expire_time/shutdown_time to human-readable format."""
+    from datetime import datetime
+
+    # Try both expire_time and shutdown_time field names
+    expire_time = dict_from_paths(host_dict, {"_": "expire_time"}, sep=".")["_"]
+    if not expire_time or expire_time == "Unknown":
+        expire_time = dict_from_paths(host_dict, {"_": "shutdown_time"}, sep=".")["_"]
+
+    if not expire_time or expire_time == "Unknown":
+        return "Unknown"
+    try:
+        dt = datetime.fromtimestamp(int(expire_time))
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except (ValueError, OSError, TypeError):
+        return "Invalid"
