@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Convert Unix timestamps from broker inventory to human-readable dates."""
 
-import sys
 from datetime import datetime
-from pathlib import Path
+import sys
+
 
 def convert_timestamp(timestamp):
     """Convert Unix timestamp to human-readable format.
