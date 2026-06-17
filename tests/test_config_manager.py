@@ -64,3 +64,34 @@ def test_nicks(broker_settings_path):
     assert "test_nick" in nick_list
     test_nick = cfg_mgr.nicks("test_nick")
     assert test_nick == TEST_CFG_DATA["nicks"]["test_nick"]
+
+
+def test_init_config_file_with_interrupt_resume(broker_settings_path, monkeypatch):
+    """Test that init_config_file retries prompt when InterruptResumeError is raised."""
+    from broker import exceptions
+
+    # Create a config manager with existing settings file
+    cfg_mgr = ConfigManager(broker_settings_path)
+    cfg_mgr.interactive_mode = True
+
+    # Track how many times the prompt is called
+    call_count = 0
+
+    def mock_prompt(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # First call: simulate keyboard interrupt with resume
+            raise exceptions.InterruptResumeError()
+        else:
+            # Second call: user chooses not to overwrite
+            return "n"
+
+    # Patch click.prompt to use our mock
+    monkeypatch.setattr("click.prompt", mock_prompt)
+
+    # Call init_config_file - should retry after InterruptResumeError
+    cfg_mgr.init_config_file()
+
+    # Verify the prompt was called twice (once failed, once succeeded)
+    assert call_count == 2

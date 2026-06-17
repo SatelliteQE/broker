@@ -167,6 +167,9 @@ def handle_keyboardinterrupt(*args):
         raise exceptions.BrokerError("Broker killed by user.")
     elif choice == "r":
         click.echo("Resuming execution...")
+        # Raise a special exception to signal that execution should resume
+        # This allows the calling code to retry the interrupted operation
+        raise exceptions.InterruptResumeError()
 
 
 def translate_timeout(timeout):

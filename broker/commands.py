@@ -84,6 +84,10 @@ def guarded_command(group=None, *cli_args, **cli_kwargs):
                 )
                 helpers.emit(return_code=0)
                 return retval
+            except exceptions.InterruptResumeError:
+                # InterruptResumeError should never escape a retry loop - if it does,
+                # something is wrong. Re-raise to avoid masking the programming error.
+                raise
             except Exception as err:  # noqa: BLE001 -- we want to catch all exceptions
                 if isinstance(err, exceptions.ScenarioError):
                     # Show full message for scenario errors since context is important
@@ -929,9 +933,18 @@ def _handle_ambiguous_names(filtered_scenarios, name, category, import_all):
         for idx, s in enumerate(filtered_scenarios, 1):
             CONSOLE.print(f" {idx}. {s['path']}")
 
-        choice = click.prompt(
-            "Enter the number of the scenario to import (or 0 to cancel)", type=int, default=0
-        )
+        # Retry prompt on keyboard interrupt with resume
+        while True:
+            try:
+                choice = click.prompt(
+                    "Enter the number of the scenario to import (or 0 to cancel)",
+                    type=int,
+                    default=0,
+                )
+                break
+            except exceptions.InterruptResumeError:
+                logger.debug("Prompt interrupted, retrying...")
+                continue
         if choice == 0:
             return filtered_scenarios, filtered_paths, False
         if 1 <= choice <= len(filtered_scenarios):
