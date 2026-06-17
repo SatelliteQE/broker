@@ -292,3 +292,36 @@ def test_host_creation_with_lazy_loaded_artifacts(tower_stub):
     assert host.hostname == "test-satellite-host.example.com"
     assert host.name == "test-satellite-stream-172-rhel9.7"
     assert host.host_type == "satellite"
+
+
+def test_prompt_for_dangling_host_action_with_interrupt_resume(tower_stub, monkeypatch):
+    """Test that _prompt_for_dangling_host_action retries when InterruptResumeError is raised.
+
+    This test verifies the fix for the issue where keyboard interrupts followed by
+    resume would leave the prompt in a confused state with validation errors.
+    """
+    from broker import exceptions
+
+    # Create a mock that raises InterruptResumeError once, then returns valid choice
+    call_count = 0
+
+    def mock_prompt_ask(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # First call: simulate keyboard interrupt with resume
+            raise exceptions.InterruptResumeError()
+        else:
+            # Second call: return valid choice
+            return "c"
+
+    # Patch Prompt.ask to use our mock
+    monkeypatch.setattr("rich.prompt.Prompt.ask", mock_prompt_ask)
+
+    # Call the method - should retry after InterruptResumeError
+    result = tower_stub._prompt_for_dangling_host_action(reason="test reason")
+
+    # Verify it was called twice (once failed, once succeeded)
+    assert call_count == 2
+    # Verify it returned the valid choice from the second call
+    assert result == "c"

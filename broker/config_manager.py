@@ -235,14 +235,19 @@ class ConfigManager:
         """Check for the existence of the config file and create it if it doesn't exist."""
         if self.interactive_mode and self._settings_path.exists() and not chunk:
             # if the file exists, ask the user if they want to overwrite it
-            if (
-                click.prompt(
-                    f"Overwrite the settings file at {self._settings_path.absolute()}. Overwrite?",
-                    type=click.Choice(["y", "n"]),
-                    default="n",
-                )
-                != "y"
-            ):
+            # Retry prompt on keyboard interrupt with resume
+            while True:
+                try:
+                    choice = click.prompt(
+                        f"Overwrite the settings file at {self._settings_path.absolute()}. Overwrite?",
+                        type=click.Choice(["y", "n"]),
+                        default="n",
+                    )
+                    break
+                except exceptions.InterruptResumeError:
+                    logger.debug("Prompt interrupted, retrying...")
+                    continue
+            if choice != "y":
                 return
         raw_data = None
         if _from:

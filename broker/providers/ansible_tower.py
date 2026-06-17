@@ -593,6 +593,29 @@ class AnsibleTower(Provider):
                 hosts.append(vm_name)
         return list(set(hosts))
 
+    def _prompt_for_dangling_host_action(self, reason=None):
+        """Prompt user for action to take with a dangling host.
+
+        Handles keyboard interrupts with resume by retrying the prompt.
+
+        Returns:
+            str: User's choice ('c', 's', 'cA', or 'sA')
+        """
+        if reason:
+            logger.warning(f"Failure reason: {reason}")
+        # Retry prompt until we get a valid choice (handle keyboard interrupts with resume)
+        while True:
+            try:
+                return Prompt.ask(
+                    "What would you like to do with this host? [c/s/cA/sA]\n"
+                    "Checkin (c), Store (s), Checkin All (cA), Store All (sA)",
+                    choices=["c", "s", "cA", "sA"],
+                )
+            except exceptions.InterruptResumeError:  # noqa: PERF203
+                # If interrupted but user chose to resume, retry the prompt
+                # Exception handling in loop is intentional here to allow retry on resume
+                logger.debug("Prompt interrupted, retrying...")
+
     def handle_dangling_hosts(self, job, reason=None):
         """Attempt to check in dangling hosts associated with the given job."""
         dangling_hosts = self._try_get_dangling_hosts(job)
@@ -603,13 +626,7 @@ class AnsibleTower(Provider):
         for dangling_host in dangling_hosts:
             logger.warning(f"Found dangling host: {dangling_host}")
             if dangling_behavior == "prompt":
-                if reason:
-                    logger.warning(f"Failure reason: {reason}")
-                choice = Prompt.ask(
-                    "What would you like to do with this host? [c/s/cA/sA]\n"
-                    "Checkin (c), Store (s), Checkin All (cA), Store All (sA)",
-                    choices=["c", "s", "cA", "sA"],
-                )
+                choice = self._prompt_for_dangling_host_action(reason)
                 if choice == "cA":
                     dangling_behavior = "checkin"
                 elif choice == "sA":

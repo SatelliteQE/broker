@@ -122,3 +122,19 @@ class ScenarioError(BrokerError):
             self.message = message
 
         super().__init__(message=self.message)
+
+
+class InterruptResumeError(Exception):
+    """Raised when a keyboard interrupt is caught and user chooses to resume.
+
+    This is a control-flow exception used to signal that an interactive prompt
+    should be retried after a keyboard interrupt. It must be caught by a retry
+    loop wrapping the prompt - if it escapes to global exception handlers, it
+    indicates a programming error (missing retry loop).
+
+    This is NOT a BrokerError and should not be logged as an error. Global
+    exception handlers should re-raise it rather than converting it to a
+    BrokerError to avoid masking the programming error.
+    """
+
+    pass
