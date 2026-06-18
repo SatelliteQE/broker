@@ -10,9 +10,11 @@ Usage:
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import importlib
 import json
 import logging
 from pathlib import Path
+import pkgutil
 import sys
 
 import jinja2
@@ -45,6 +47,10 @@ SCENARIOS_DIR.mkdir(parents=True, exist_ok=True)
 # Import tracking
 IMPORTS_FILE = SCENARIOS_DIR / ".broker-imports.yaml"
 CURRENT_SCHEMA_VERSION = 1
+
+# Scenario format version support
+SUPPORTED_FORMAT_VERSIONS = [1, 2]  # List of all supported format versions
+CURRENT_FORMAT_VERSION = 2  # Latest format version
 
 
 def load_imports_manifest():
@@ -251,10 +257,51 @@ def render_template(template_str, context):
     try:
         env = jinja2.Environment(undefined=jinja2.StrictUndefined)
         template = env.from_string(template_str)
-        return template.render(**context)
+        # Add Python builtins to context for Pythonic syntax support
+        enhanced_context = _add_python_builtins(context)
+        return template.render(**enhanced_context)
     except jinja2.UndefinedError as e:
         logger.warning(f"Template rendering warning: {e}")
         raise ScenarioError(f"Undefined variable in template: {e}") from e
+
+
+def _add_python_builtins(context):
+    """Add useful Python builtins to the Jinja2 context.
+
+    This allows more Pythonic syntax in templates, e.g.:
+    - {{ len(my_list) }} instead of {{ my_list | length }}
+    - {{ int(my_var) }} instead of {{ my_var | int }}
+
+    Args:
+        context: Dictionary of template variables
+
+    Returns:
+        Context dictionary with Python builtins added
+    """
+    # Add common Python builtins that are safe and useful
+    python_builtins = {
+        "len": len,
+        "int": int,
+        "str": str,
+        "bool": bool,
+        "float": float,
+        "list": list,
+        "dict": dict,
+        "set": set,
+        "tuple": tuple,
+        "sum": sum,
+        "min": min,
+        "max": max,
+        "abs": abs,
+        "round": round,
+        "sorted": sorted,
+        "reversed": reversed,
+        "enumerate": enumerate,
+        "zip": zip,
+        "any": any,
+        "all": all,
+    }
+    return {**python_builtins, **context}
 
 
 def evaluate_expression(expression, context):
@@ -263,6 +310,8 @@ def evaluate_expression(expression, context):
     Unlike render_template which always returns a string, this function
     returns the actual Python object resulting from the expression evaluation.
     This is useful for getting iterables, dicts, etc.
+
+    Supports both Jinja2 filters and Python builtins for flexibility.
 
     Args:
         expression: A Jinja2 expression (without {{ }} delimiters)
@@ -274,7 +323,9 @@ def evaluate_expression(expression, context):
     try:
         env = jinja2.Environment(undefined=jinja2.StrictUndefined)
         compiled_expr = env.compile_expression(expression)
-        return compiled_expr(**context)
+        # Add Python builtins to context for Pythonic syntax support
+        enhanced_context = _add_python_builtins(context)
+        return compiled_expr(**enhanced_context)
     except jinja2.UndefinedError as e:
         logger.warning(f"Expression evaluation warning: {e}")
         raise ScenarioError(f"Undefined variable in expression: {e}") from e
@@ -283,7 +334,8 @@ def evaluate_expression(expression, context):
 def evaluate_condition(expression, context):
     """Evaluate a Jinja2 expression returning a boolean.
 
-    Used for 'when' conditions in steps.
+    Used for 'when' conditions and 'assert' actions in steps.
+    Supports both Jinja2 filters and Python builtins.
 
     Args:
         expression: A string expression that should evaluate to True/False
@@ -376,6 +428,137 @@ def resolve_hosts_reference(hosts_ref, scenario_inventory, context, broker_inst=
     return []
 
 
+def get_scenario_migrations(current_version, force_version=None):
+    """Get applicable scenario migrations.
+
+    Args:
+        current_version: Current format version of the scenario
+        force_version: If specified, only return migration for this specific version
+
+    Returns:
+        List of migration modules sorted by TO_VERSION
+    """
+    from broker import scenario_migrations
+
+    migrations = []
+    for _, name, _ in pkgutil.iter_modules(scenario_migrations.__path__):
+        if "example" in name:
+            continue
+
+        module = importlib.import_module(f"broker.scenario_migrations.{name}")
+        if hasattr(module, "run_migrations") and hasattr(module, "TO_VERSION"):
+            to_version = module.TO_VERSION
+
+            if force_version is not None:
+                if to_version == force_version:
+                    migrations.append(module)
+                    break
+            elif to_version > current_version:
+                migrations.append(module)
+
+    return sorted(migrations, key=lambda m: m.TO_VERSION)
+
+
+def migrate_scenario(scenario_path, dry_run=False, force_version=None):
+    """Migrate a scenario file to a newer format version.
+
+    Args:
+        scenario_path: Path to the scenario file
+        dry_run: If True, show what would change without modifying the file
+        force_version: If specified, only run migration for this version
+
+    Returns:
+        Dictionary with migration results
+
+    Raises:
+        ScenarioError: If migration fails
+    """
+    from broker.helpers.file_utils import FileLock
+
+    scenario_path = Path(scenario_path)
+    if not scenario_path.exists():
+        raise ScenarioError(f"Scenario file not found: {scenario_path}")
+
+    # Load the current scenario
+    try:
+        with scenario_path.open() as f:
+            scenario_data = yaml.load(f)
+    except Exception as e:
+        raise ScenarioError(f"Failed to load scenario: {e}") from e
+
+    if not isinstance(scenario_data, dict):
+        raise ScenarioError(f"Scenario file is empty or has invalid format: {scenario_path}")
+
+    current_version = scenario_data.get("_spec_ver", 1)
+
+    # Get applicable migrations
+    migrations = get_scenario_migrations(current_version, force_version)
+
+    if not migrations:
+        return {
+            "migrated": False,
+            "message": f"No migrations needed. Scenario is already at format version {current_version}.",
+            "current_version": current_version,
+            "target_version": current_version,
+        }
+
+    target_version = migrations[-1].TO_VERSION
+
+    if dry_run:
+        # Show what would be migrated
+        return {
+            "migrated": False,
+            "dry_run": True,
+            "message": f"Would migrate from version {current_version} to {target_version}",
+            "current_version": current_version,
+            "target_version": target_version,
+            "migrations": [f"v{m.TO_VERSION}" for m in migrations],
+        }
+
+    # Create backup
+    backup_path = scenario_path.with_name(f"{scenario_path.name}.bak")
+    try:
+        with FileLock(scenario_path):
+            # Re-read file under lock to ensure we have latest content
+            with scenario_path.open() as f:
+                scenario_data = yaml.load(f)
+
+            # Create backup
+            with backup_path.open("w") as f:
+                yaml.dump(scenario_data, f)
+
+            # Run migrations in order
+            for migration in migrations:
+                logger.info(f"Running migration to version {migration.TO_VERSION}")
+                scenario_data = migration.run_migrations(scenario_data)
+
+            # Validate the migrated scenario
+            schema = get_schema()
+            if schema:
+                try:
+                    jsonschema.validate(instance=scenario_data, schema=schema)
+                except jsonschema.ValidationError as e:
+                    raise ScenarioError(f"Migrated scenario failed validation: {e.message}") from e
+
+            # Write the migrated scenario
+            with scenario_path.open("w") as f:
+                yaml.dump(scenario_data, f)
+
+    except Exception as e:
+        # Restore backup on error
+        if backup_path.exists():
+            backup_path.replace(scenario_path)
+        raise ScenarioError(f"Migration failed: {e}") from e
+
+    return {
+        "migrated": True,
+        "message": f"Successfully migrated from version {current_version} to {target_version}",
+        "current_version": current_version,
+        "target_version": target_version,
+        "backup_path": str(backup_path),
+    }
+
+
 class StepMemory:
     """Memory storage for a single step's execution state."""
 
@@ -430,6 +613,9 @@ class ScenarioRunner:
         # Load and validate the scenario file
         self.data = self._load_and_validate()
 
+        # Store format version (defaults to 1 for scenarios without _spec_ver)
+        self.format_version = self.data.get("_spec_ver", 1)
+
         # Initialize configuration
         self.config = self.data.get("config", {})
         self._apply_cli_config_overrides()
@@ -474,6 +660,29 @@ class ScenarioRunner:
                 data = yaml.load(f)
         except Exception as e:
             raise ScenarioError(f"Failed to parse scenario file: {e}") from e
+
+        if not isinstance(data, dict):
+            raise ScenarioError(
+                f"Scenario file is empty or has invalid format: {self.scenario_path}"
+            )
+
+        # Check format version before schema validation
+        format_version = data.get("_spec_ver", 1)
+
+        if format_version not in SUPPORTED_FORMAT_VERSIONS:
+            raise ScenarioError(
+                f"Unsupported scenario format version: {format_version}. "
+                f"This version of Broker supports format versions: {SUPPORTED_FORMAT_VERSIONS}. "
+                f"Please upgrade Broker to use this scenario."
+            )
+
+        # Log info message for older format versions
+        if format_version < CURRENT_FORMAT_VERSION:
+            logger.info(
+                f"This scenario uses format version {format_version}. "
+                f"Consider running 'broker scenarios migrate {self.scenario_path.stem}' "
+                f"to upgrade to format version {CURRENT_FORMAT_VERSION}."
+            )
 
         # Validate against schema if available
         schema = get_schema()
@@ -720,65 +929,133 @@ class ScenarioRunner:
 
         logger.info(f"Executing step: {step_name} (action: {action})")
 
-        try:
-            # Resolve target hosts if 'with' is specified
-            target_hosts = None
-            if "with" in step_data:
-                hosts_ref = step_data["with"]["hosts"]
-                broker_inst = Broker(broker_settings=self._settings)
-                target_hosts = resolve_hosts_reference(
-                    hosts_ref, self.scenario_inventory, context, broker_inst
-                )
+        # Get retry configuration
+        retry_config = step_data.get("retry", {})
+        retry_count = retry_config.get("count", 1)
+        retry_delay = retry_config.get("delay", 0)
 
-            # Execute the action (loop or single)
-            if "loop" in step_data:
-                # For loops, pass raw arguments - they'll be rendered per-iteration
-                # with loop variables available in context
-                raw_arguments = step_data.get("arguments", {})
-                result = self._execute_loop(step_data, raw_arguments, target_hosts, context)
-            else:
-                # Render arguments with template context
-                arguments = recursive_render(step_data.get("arguments", {}), context)
-                parallel = step_data.get("parallel", True)
-                result = self._dispatch_action(step_data, arguments, target_hosts, parallel)
+        # Support flexible delay format (e.g., "30s", "2m", 10)
+        # Integers are already seconds per schema; translate_timeout only converts strings
+        if retry_delay:
+            if isinstance(retry_delay, str):
+                retry_delay = helpers.translate_timeout(retry_delay) / 1000
 
-            # Update step memory
-            step_mem.output = result
-            step_mem.status = "completed"
+        for attempt in range(1, retry_count + 1):
+            try:
+                if attempt > 1:
+                    logger.info(f"Retry attempt {attempt}/{retry_count} for step '{step_name}'")
+                    if retry_delay > 0:
+                        import time
 
-            # Handle capture
-            if "capture" in step_data:
-                self._capture_output(step_data["capture"], result, context)
+                        time.sleep(retry_delay)
 
-        except Exception as e:
-            logger.error(f"Step '{step_name}' failed: {e}")
-            step_mem.output = str(e)
-            step_mem._error = e
-            step_mem.status = "failed"
+                # Add retry context to template variables
+                context["retry"] = {"attempt": attempt, "max_attempts": retry_count}
 
-            # Handle on_error - can be "continue" string or list of recovery steps
-            on_error = step_data.get("on_error")
-            if on_error == "continue":
-                logger.warning(f"Step '{step_name}' failed but on_error=continue, continuing")
-            elif isinstance(on_error, list):
-                logger.info(f"Executing on_error handler for step '{step_name}'")
-                try:
-                    self._execute_steps(on_error)
-                except SystemExit:
-                    # Let SystemExit pass through (from exit action in error handler)
-                    raise
-                except Exception as handler_err:
-                    # If the error handler itself failed, this is a secondary failure
-                    # Re-raise it so it terminates the scenario
-                    raise handler_err from e
-            elif step_data.get("exit_on_error", True):
-                raise ScenarioError(
-                    f"Step failed: {e}",
-                    step_name=step_name,
-                    scenario_name=self.scenario_name,
-                ) from e
-            else:
-                logger.warning(f"Step '{step_name}' failed but exit_on_error=False, continuing")
+                # Resolve target hosts if 'with' is specified
+                target_hosts = None
+                if "with" in step_data:
+                    hosts_ref = step_data["with"]["hosts"]
+                    broker_inst = Broker(broker_settings=self._settings)
+                    target_hosts = resolve_hosts_reference(
+                        hosts_ref, self.scenario_inventory, context, broker_inst
+                    )
+
+                # Execute the action (loop or single), with optional timeout
+                step_timeout = step_data.get("timeout")
+                # Integers are already seconds per schema; translate_timeout only converts strings
+                if step_timeout and isinstance(step_timeout, str):
+                    step_timeout = helpers.translate_timeout(step_timeout) / 1000
+
+                if step_timeout:
+                    # Wrap execution in ThreadPoolExecutor for timeout support.
+                    # Avoid context manager so shutdown(wait=False) can be called on timeout,
+                    # preventing the calling thread from blocking until the worker finishes.
+                    from concurrent.futures import TimeoutError as FuturesTimeoutError
+
+                    executor = ThreadPoolExecutor(max_workers=1)
+                    if "loop" in step_data:
+                        raw_arguments = step_data.get("arguments", {})
+                        future = executor.submit(
+                            self._execute_loop, step_data, raw_arguments, target_hosts, context
+                        )
+                    else:
+                        arguments = recursive_render(step_data.get("arguments", {}), context)
+                        parallel = step_data.get("parallel", True)
+                        future = executor.submit(
+                            self._dispatch_action, step_data, arguments, target_hosts, parallel
+                        )
+
+                    try:
+                        result = future.result(timeout=step_timeout)
+                        executor.shutdown(wait=True)
+                    except FuturesTimeoutError:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        raise ScenarioError(
+                            f"Step '{step_name}' timed out after {step_timeout} seconds"
+                        )
+                # No timeout - execute directly
+                elif "loop" in step_data:
+                    # For loops, pass raw arguments - they'll be rendered per-iteration
+                    # with loop variables available in context
+                    raw_arguments = step_data.get("arguments", {})
+                    result = self._execute_loop(step_data, raw_arguments, target_hosts, context)
+                else:
+                    # Render arguments with template context
+                    arguments = recursive_render(step_data.get("arguments", {}), context)
+                    parallel = step_data.get("parallel", True)
+                    result = self._dispatch_action(step_data, arguments, target_hosts, parallel)
+
+                # Update step memory
+                step_mem.output = result
+                step_mem.status = "completed"
+
+                # Handle capture
+                if "capture" in step_data:
+                    self._capture_output(step_data["capture"], result, context)
+
+                # Success - break out of retry loop
+                break
+
+            except Exception as e:
+                if attempt < retry_count:
+                    # Still have retries left
+                    logger.warning(f"Step '{step_name}' failed on attempt {attempt}: {e}")
+                    continue
+                else:
+                    # Final attempt failed
+                    logger.error(f"Step '{step_name}' failed after {retry_count} attempts: {e}")
+                    step_mem.output = str(e)
+                    step_mem._error = e
+                    step_mem.status = "failed"
+
+                    # Handle on_error - can be "continue" string or list of recovery steps
+                    on_error = step_data.get("on_error")
+                    if on_error == "continue":
+                        logger.warning(
+                            f"Step '{step_name}' failed but on_error=continue, continuing"
+                        )
+                    elif isinstance(on_error, list):
+                        logger.info(f"Executing on_error handler for step '{step_name}'")
+                        try:
+                            self._execute_steps(on_error)
+                        except SystemExit:
+                            # Let SystemExit pass through (from exit action in error handler)
+                            raise
+                        except Exception as handler_err:
+                            # If the error handler itself failed, this is a secondary failure
+                            # Re-raise it so it terminates the scenario
+                            raise handler_err from e
+                    elif step_data.get("exit_on_error", True):
+                        raise ScenarioError(
+                            f"Step failed: {e}",
+                            step_name=step_name,
+                            scenario_name=self.scenario_name,
+                        ) from e
+                    else:
+                        logger.warning(
+                            f"Step '{step_name}' failed but exit_on_error=False, continuing"
+                        )
 
         return step_mem
 
@@ -912,7 +1189,7 @@ class ScenarioRunner:
 
         return loop_output
 
-    def _dispatch_action(self, step_data, arguments, hosts=None, parallel=True):  # noqa: PLR0911
+    def _dispatch_action(self, step_data, arguments, hosts=None, parallel=True):  # noqa: PLR0911, PLR0912
         """Dispatch an action to the appropriate handler.
 
         Args:
@@ -947,6 +1224,8 @@ class ScenarioRunner:
             return self._action_run_scenarios(arguments)
         elif action == "output":
             return self._action_output(arguments)
+        elif action == "assert":
+            return self._action_assert(arguments)
         elif action == "provider_info":
             return self._action_provider_info(step_name, arguments)
         else:
@@ -1229,6 +1508,68 @@ class ScenarioRunner:
             logger.debug(f"Wrote output to file: {destination}")
 
         return content
+
+    def _action_assert(self, arguments):
+        """Handle assert action - validate conditions and fail if they're not met.
+
+        Args:
+            arguments: Dictionary containing:
+                - that: A condition string or list of condition strings to evaluate.
+                        Supports both Jinja2 filters and Python builtins.
+                        All must evaluate to true for the assertion to pass.
+                - fail_msg: Optional custom error message to display on failure.
+
+        Returns:
+            True if all assertions pass
+
+        Raises:
+            ScenarioError: If any assertion fails
+        """
+        that = arguments.get("that")
+        if that is None:
+            raise ScenarioError("Assert action requires 'that' argument")
+
+        fail_msg = arguments.get("fail_msg", "Assertion failed")
+
+        # Convert single condition to list for uniform handling
+        conditions = [that] if isinstance(that, str) else that
+
+        if not isinstance(conditions, list):
+            raise ScenarioError("Assert 'that' must be a string or list of strings")
+
+        # Build context with all current variables and scenario state
+        context = {
+            **self.variables,
+            "scenario_inventory": self.scenario_inventory,
+            "steps": dict(self.steps_memory.items()),
+        }
+
+        # Evaluate each condition
+        for i, condition in enumerate(conditions, 1):
+            if not isinstance(condition, str):
+                raise ScenarioError(
+                    f"Assert condition #{i} must be a string, got "
+                    f"{type(condition).__name__}: {condition!r}"
+                )
+            try:
+                result = evaluate_condition(condition, context)
+                if not result:
+                    # Construct detailed error message
+                    if len(conditions) == 1:
+                        error_msg = f"{fail_msg}: {condition}"
+                    else:
+                        error_msg = f"{fail_msg} (condition #{i}): {condition}"
+                    raise ScenarioError(error_msg)
+            except (jinja2.TemplateError, ScenarioError) as e:
+                # If evaluation fails, treat as assertion failure
+                if len(conditions) == 1:
+                    error_msg = f"{fail_msg}: {condition} (error: {e})"
+                else:
+                    error_msg = f"{fail_msg} (condition #{i}): {condition} (error: {e})"
+                raise ScenarioError(error_msg) from e
+
+        logger.debug(f"All assertions passed ({len(conditions)} condition(s))")
+        return True
 
     def _action_provider_info(self, step_name, arguments):
         """Handle provider_info action - query provider for available resources.

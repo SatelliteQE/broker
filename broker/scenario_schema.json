@@ -4,6 +4,11 @@
   "description": "A schema for validating scenario YAML files based on the defined specification.",
   "type": "object",
   "properties": {
+    "_spec_ver": {
+      "type": "integer",
+      "description": "Internal scenario specification version. Defaults to 1 if not specified.",
+      "minimum": 1
+    },
     "description": {
       "type": "string",
       "description": "A brief description of the scenario's purpose and actions."
@@ -55,7 +60,7 @@
   "required": [
     "steps"
   ],
-  "additionalProperties": false,
+  "additionalProperties": true,
   "definitions": {
     "step": {
       "type": "object",
@@ -63,6 +68,10 @@
         "name": {
           "type": "string",
           "description": "A human-readable name for the step."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description explaining what the step does."
         },
         "action": {
           "type": "string",
@@ -78,7 +87,8 @@
             "run_scenarios",
             "exit",
             "output",
-            "provider_info"
+            "provider_info",
+            "assert"
           ]
         },
         "arguments": {
@@ -102,6 +112,29 @@
         "when": {
           "type": "string",
           "description": "A conditional expression that must evaluate to true for the step to run."
+        },
+        "retry": {
+          "type": "object",
+          "description": "Retry configuration for failed steps.",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "description": "Number of retry attempts",
+              "minimum": 1
+            },
+            "delay": {
+              "oneOf": [
+                {"type": "integer", "minimum": 0},
+                {"type": "string", "pattern": "^[0-9]+[smhd]$"}
+              ],
+              "description": "Delay between retry attempts. Integer (seconds) or string with unit (e.g., '30s', '2m', '1h')",
+              "default": 0
+            }
+          },
+          "required": [
+            "count"
+          ],
+          "additionalProperties": false
         },
         "loop": {
           "type": "object",
@@ -179,6 +212,13 @@
           "type": "boolean",
           "description": "If False, forces the action to run sequentially when targeting multiple hosts.",
           "default": true
+        },
+        "timeout": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "string", "pattern": "^[0-9]+[smhd]$"}
+          ],
+          "description": "Maximum time for the step to complete. Integer (seconds) or string with unit (e.g., '5m', '2h', '1d')"
         }
       },
       "required": [
