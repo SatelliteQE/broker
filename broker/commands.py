@@ -624,15 +624,63 @@ def scenarios():
 
 
 @guarded_command(group=scenarios, name="list")
-def scenarios_list():
-    """List all available scenarios in the scenarios directory."""
-    from broker.scenarios import SCENARIOS_DIR, list_scenarios
+@click.option(
+    "--filter", "filter_expr", type=str, help="Filter scenarios using Broker's filter syntax"
+)
+@click.option("--tag", type=str, help="Filter scenarios by tag (convenience for --filter)")
+def scenarios_list(filter_expr, tag):
+    """List all available scenarios in the scenarios directory.
+
+    Examples:
+        broker scenarios list
+
+        broker scenarios list --tag provisioning
+
+        broker scenarios list --filter '"Jake" in @res.author'
+
+        broker scenarios list --filter '@res.priority == "high"'
+    """
+    from broker import helpers
+    from broker.scenarios import SCENARIOS_DIR, find_scenario, list_scenarios
     from broker.settings import BROKER_DIRECTORY
 
     scenario_paths = list_scenarios()
     if not scenario_paths:
         CONSOLE.print(f"No scenarios found in {SCENARIOS_DIR}")
         return
+
+    # Build filter expression from --tag if provided
+    if tag:
+        filter_expr = f'"{tag}" in @res.tags'
+
+    # If filtering, load each scenario's metadata
+    filtered_scenarios = []
+    if filter_expr:
+        from broker.helpers import eval_filter
+
+        for rel_path in scenario_paths:
+            scenario_path = find_scenario(rel_path)
+            scenario_data = helpers.load_file(scenario_path, warn=False)
+            if scenario_data:
+                # Build @res context with scenario metadata
+                # Exclude internal fields (prefixed with _) and core structure fields
+                res_context = {
+                    k: v
+                    for k, v in scenario_data.items()
+                    if k not in ("config", "variables", "steps") and not k.startswith("_")
+                }
+                # Evaluate filter
+                try:
+                    if eval_filter([res_context], filter_expr, filter_key="res"):
+                        filtered_scenarios.append(rel_path)
+                except (KeyError, TypeError, AttributeError) as e:
+                    logger.debug(f"Filter evaluation failed for {rel_path}: {e}")
+
+        scenario_paths = filtered_scenarios
+
+        if not scenario_paths:
+            CONSOLE.print(f"No scenarios match the filter: {filter_expr}")
+            return
 
     table = Table(title="Available Scenarios")
     table.add_column("Name", style="cyan")
@@ -751,6 +799,39 @@ def scenarios_validate(scenario):
             CONSOLE.print(f"[yellow]Warning:[/yellow] {error_msg}")
     else:
         CONSOLE.print(f"[red]Scenario '{scenario}' is invalid:[/red] {error_msg}")
+
+
+@guarded_command(group=scenarios, name="migrate")
+@click.argument("scenario", type=str)
+@click.option("--dry-run", is_flag=True, help="Show what would change without modifying the file")
+@click.option("--force-version", type=int, help="Force migration to a specific version")
+def scenarios_migrate(scenario, dry_run, force_version):
+    """Migrate a scenario file to a newer format version.
+
+    Creates a backup (.yaml.bak) before making changes.
+
+    Examples:
+        broker scenarios migrate my_scenario
+
+        broker scenarios migrate my_scenario --dry-run
+
+        broker scenarios migrate my_scenario --force-version 2
+    """
+    from broker.scenarios import find_scenario, migrate_scenario
+
+    scenario_path = find_scenario(scenario)
+    result = migrate_scenario(scenario_path, dry_run=dry_run, force_version=force_version)
+
+    if result.get("dry_run"):
+        CONSOLE.print(f"[yellow]Dry-run mode:[/yellow] {result['message']}")
+        CONSOLE.print(f"  Current version: {result['current_version']}")
+        CONSOLE.print(f"  Target version: {result['target_version']}")
+        CONSOLE.print(f"  Migrations to apply: {', '.join(result['migrations'])}")
+    elif result.get("migrated"):
+        CONSOLE.print(f"[green]{result['message']}[/green]")
+        CONSOLE.print(f"  Backup saved to: {result['backup_path']}")
+    else:
+        CONSOLE.print(f"[blue]{result['message']}[/blue]")
 
 
 def _display_imported_scenarios(manifest):
