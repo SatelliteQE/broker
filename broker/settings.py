@@ -102,7 +102,9 @@ def _create_and_configure_settings(file_path, file_exists, config_dict):
     )
 
     # Remove vault loader if set somehow
-    new_settings._loaders = [loader for loader in new_settings._loaders if "vault" not in loader]
+    new_settings.__core__.config.loaders = [
+        loader for loader in new_settings.loaders_for_dynaconf if "vault" not in loader
+    ]
 
     # Add any configuration values passed in, merging nested dicts
     if config_dict:
