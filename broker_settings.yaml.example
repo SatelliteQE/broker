@@ -13,6 +13,8 @@ inventory_fields:
   Provider: _broker_provider  # just pull the _broker_provider value
   Action: $action  # some special field values are possible, check the wiki
   OS: os_distribution os_distribution_version  # you can combine multiple values with a space between
+  Version: _broker_args.deploy_sat_version
+  Snap: _broker_args.deploy_snap_version
 # Much like you can set a variable lookup order for inventory fields
 inventory_list_vars: hostname | name | ip
 # Optionally set a limit for the number of threads Broker can use for actions

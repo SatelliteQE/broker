@@ -86,6 +86,8 @@ def add_inventory_fields(config_dict):
         "Provider": "_broker_provider",
         "Action": "$action",
         "OS": "os_distribution os_distribution_version",
+        "Version": "_broker_args.deploy_sat_version",
+        "Snap": "_broker_args.deploy_snap_version",
     }
     config_dict["inventory_list_vars"] = "hostname | name"
     return config_dict
