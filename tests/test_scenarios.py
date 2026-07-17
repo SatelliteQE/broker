@@ -397,6 +397,165 @@ def test_dispatch_action_unknown():
     assert "Unknown action" in str(exc_info.value)
 
 
+# --- local_exec action tests ---
+
+
+def test_action_local_exec_basic():
+    """local_exec should capture stdout, empty stderr, and exit status 0."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "echo hello"})
+
+    assert isinstance(result, Result)
+    assert result.stdout.strip() == "hello"
+    assert result.stderr == ""
+    assert result.status == 0
+
+
+def test_action_local_exec_stderr():
+    """local_exec should capture stderr separately from stdout."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "echo error >&2"})
+
+    assert result.stderr.strip() == "error"
+    assert result.status == 0
+
+
+def test_action_local_exec_nonzero_exit():
+    """local_exec should not raise on non-zero exit; status is captured in Result."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "exit 42"})
+
+    assert result.status == 42
+
+
+def test_action_local_exec_missing_command():
+    """local_exec without a command argument should raise ScenarioError."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+
+    with pytest.raises(ScenarioError) as exc_info:
+        runner._action_local_exec({})
+    assert "requires 'command'" in str(exc_info.value)
+
+
+def test_action_local_exec_with_cwd(tmp_path):
+    """local_exec should execute in the specified working directory."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "pwd", "cwd": str(tmp_path)})
+
+    assert result.stdout.strip() == str(tmp_path)
+    assert result.status == 0
+
+
+def test_action_local_exec_with_env():
+    """local_exec should merge extra env vars into the command environment."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec(
+        {"command": "echo $BROKER_TEST_VAR", "env": {"BROKER_TEST_VAR": "broker_test_value"}}
+    )
+
+    assert result.stdout.strip() == "broker_test_value"
+    assert result.status == 0
+
+
+def test_action_local_exec_timeout():
+    """local_exec should return Result with status=-1 on timeout, not raise."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "sleep 10", "timeout": 1})
+
+    assert isinstance(result, Result)
+    assert result.status == -1
+
+
+def test_action_local_exec_invalid_timeout():
+    """local_exec should raise ScenarioError for a non-numeric, non-duration timeout."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+
+    with pytest.raises(ScenarioError, match="'timeout' must be"):
+        runner._action_local_exec({"command": "echo hi", "timeout": object()})
+
+
+def test_action_local_exec_string_timeout():
+    """local_exec should normalize duration strings (e.g. '1s') like step-level timeouts."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "sleep 10", "timeout": "1s"})
+
+    assert isinstance(result, Result)
+    assert result.status == -1
+
+
+def test_action_local_exec_invalid_env():
+    """local_exec should raise ScenarioError when 'env' is not a dict."""
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+
+    with pytest.raises(ScenarioError, match="'env' must be"):
+        runner._action_local_exec({"command": "echo hi", "env": "not-a-dict"})
+
+
+def test_action_local_exec_stream_basic(capsys):
+    """Stream mode should capture output in the Result and echo it to the terminal."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "echo streamed", "stream": True})
+
+    assert isinstance(result, Result)
+    assert result.stdout.strip() == "streamed"
+    assert result.status == 0
+    captured = capsys.readouterr()
+    assert "streamed" in captured.out
+
+
+def test_action_local_exec_stream_timeout():
+    """Stream mode should return Result with status=-1 on timeout, killing the process group."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._action_local_exec({"command": "sleep 10", "timeout": 1, "stream": True})
+
+    assert isinstance(result, Result)
+    assert result.status == -1
+
+
+def test_action_local_exec_dispatch():
+    """Dispatch should route 'local_exec' correctly and return a valid Result."""
+    from broker.helpers.results import Result
+
+    runner = scenarios.ScenarioRunner(VALID_SCENARIO_PATH)
+    result = runner._dispatch_action(
+        {"name": "test", "action": "local_exec"}, {"command": "echo dispatch_test"}, None
+    )
+
+    assert isinstance(result, Result)
+    assert "dispatch_test" in result.stdout
+
+
+def test_result_from_subprocess():
+    """Result.from_subprocess should map CompletedProcess fields correctly."""
+    import subprocess as sp
+
+    from broker.helpers.results import Result
+
+    completed = sp.CompletedProcess(args="echo hi", returncode=0, stdout="hi\n", stderr="")
+    result = Result.from_subprocess(completed)
+
+    assert result.status == 0
+    assert result.stdout == "hi\n"
+    assert result.stderr == ""
+
+    completed_err = sp.CompletedProcess(
+        args="exit 1", returncode=1, stdout="", stderr="oops\n"
+    )
+    result_err = Result.from_subprocess(completed_err)
+    assert result_err.status == 1
+    assert result_err.stderr == "oops\n"
+
+
 # --- Import manifest function tests ---
 
 
