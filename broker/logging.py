@@ -8,10 +8,12 @@ This module provides logging setup that supports two distinct modes:
 import copy
 from enum import IntEnum
 import logging
+import os
 from pathlib import Path
 
 import click
 from pythonjsonlogger import json
+from rich.console import Console
 from rich.logging import RichHandler
 
 from broker.settings import BROKER_DIRECTORY
@@ -92,6 +94,23 @@ def resolve_log_level(level):
     return LOG_LEVEL.INFO
 
 
+def _resolve_console_width():
+    """Determine the width to force on the console handler's Rich Console.
+
+    Rich auto-detects the real terminal width for interactive terminals, which
+    we don't want to interfere with. But when stdout isn't a real terminal
+    (e.g. output piped/redirected, as happens in CI) and the COLUMNS env var
+    isn't set, Rich silently falls back to 80 columns. RichHandler always
+    renders the log message in a table column with overflow="fold", so at that
+    narrow fallback width, long unbreakable tokens like URLs get hard-wrapped
+    mid-string. Widen the fallback so links stay on one line in captured logs.
+    """
+    probe_console = Console()
+    if probe_console.is_terminal or "COLUMNS" in os.environ:
+        return None
+    return 200
+
+
 def setup_logging(
     console_level=None,
     file_level=None,
@@ -143,6 +162,7 @@ def setup_logging(
     if console_level != "silent":
         # Console handler with rich formatting
         console_handler = RichHandler(
+            console=Console(width=_resolve_console_width()),
             rich_tracebacks=True,
             tracebacks_suppress=[click],
             show_time=True,
