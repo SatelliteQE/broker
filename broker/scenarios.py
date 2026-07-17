@@ -13,8 +13,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import importlib
 import json
 import logging
+import os
 from pathlib import Path
 import pkgutil
+import signal
+import subprocess
 import sys
 
 import jinja2
@@ -49,8 +52,8 @@ IMPORTS_FILE = SCENARIOS_DIR / ".broker-imports.yaml"
 CURRENT_SCHEMA_VERSION = 1
 
 # Scenario format version support
-SUPPORTED_FORMAT_VERSIONS = [1, 2]  # List of all supported format versions
-CURRENT_FORMAT_VERSION = 2  # Latest format version
+SUPPORTED_FORMAT_VERSIONS = [1, 2, 3]  # List of all supported format versions
+CURRENT_FORMAT_VERSION = 3  # Latest format version
 
 
 def load_imports_manifest():
@@ -902,7 +905,6 @@ class ScenarioRunner:
             StepMemory for this step
         """
         step_name = step_data["name"]
-        action = step_data["action"]
 
         # Initialize or reset step memory
         if step_name not in self.steps_memory:
@@ -927,7 +929,8 @@ class ScenarioRunner:
                 step_mem.status = "skipped"
                 return step_mem
 
-        logger.info(f"Executing step: {step_name} (action: {action})")
+        if "loop" not in step_data:
+            logger.info(f"Executing step: {step_name}")
 
         # Get retry configuration
         retry_config = step_data.get("retry", {})
@@ -1164,6 +1167,8 @@ class ScenarioRunner:
                     logger.warning(f"Error evaluating 'when' condition for iteration {item}: {e}")
                     continue
 
+            logger.info(f"Executing step: {step_data['name']} [{default_loop_key}]")
+
             # Re-render arguments with the loop variable
             iter_args = recursive_render(base_arguments, loop_context)
 
@@ -1228,6 +1233,8 @@ class ScenarioRunner:
             return self._action_assert(arguments)
         elif action == "provider_info":
             return self._action_provider_info(step_name, arguments)
+        elif action == "local_exec":
+            return self._action_local_exec(arguments)
         else:
             raise ScenarioError(f"Unknown action: {action}")
 
@@ -1249,6 +1256,7 @@ class ScenarioRunner:
     def _action_checkout(self, step_name, arguments):
         """Handle checkout action."""
         mapped_args = self._map_argument_names(arguments)
+        mapped_args.setdefault("_broker_origin", f"scenario:{self.scenario_name}")
         broker_inst = Broker(broker_settings=self._settings, **mapped_args)
         self.steps_memory[step_name]._broker_inst = broker_inst
 
@@ -1326,6 +1334,145 @@ class ScenarioRunner:
             return results
         else:
             return {h.hostname: h.execute(command, timeout=timeout) for h in hosts}
+
+    @staticmethod
+    def _parse_local_exec_args(arguments):
+        """Validate and normalize local_exec arguments.
+
+        Returns:
+            A (command, timeout, cwd, stream, exec_env) tuple.
+
+        Raises:
+            ScenarioError: If 'command' is missing or any argument has an invalid type.
+        """
+        command = arguments.get("command")
+        if not command:
+            raise ScenarioError("local_exec action requires 'command' argument")
+
+        timeout = arguments.get("timeout")
+        # Integers are already seconds per schema; translate_timeout only converts strings
+        if isinstance(timeout, str):
+            timeout = helpers.translate_timeout(timeout) / 1000
+        elif timeout is not None and not isinstance(timeout, (int, float)):
+            raise ScenarioError("local_exec 'timeout' must be a number or duration string")
+
+        cwd = arguments.get("cwd")
+        if cwd is not None and not isinstance(cwd, str):
+            raise ScenarioError("local_exec 'cwd' must be a string")
+
+        stream = arguments.get("stream", False)
+        if not isinstance(stream, bool):
+            raise ScenarioError("local_exec 'stream' must be a boolean")
+
+        exec_env = None
+        extra_env = arguments.get("env")
+        if extra_env:
+            if not isinstance(extra_env, dict):
+                raise ScenarioError("local_exec 'env' must be a dict of environment variables")
+            exec_env = os.environ.copy()
+            exec_env.update({str(key): str(value) for key, value in extra_env.items()})
+
+        return command, timeout, cwd, stream, exec_env
+
+    def _action_local_exec(self, arguments):
+        """Handle local_exec action - execute a command on the local machine.
+
+        Args:
+            arguments: Dictionary containing:
+                - command: The command string to execute (required)
+                - timeout: Maximum seconds to wait (optional)
+                - cwd: Working directory for the command (optional)
+                - env: Additional environment variables as a dict (optional, merged with os.environ)
+                - stream: If True, write stdout/stderr to the terminal in real-time while also
+                          capturing them for the returned Result (default: False)
+
+        Returns:
+            A Result object with stdout, stderr, and status attributes.
+            On timeout, returns a Result with status=-1 and any partial output.
+
+        Raises:
+            ScenarioError: If 'command' is missing, an argument has an invalid type, or the
+                command cannot be started.
+        """
+        command, timeout, cwd, stream, exec_env = self._parse_local_exec_args(arguments)
+
+        logger.debug(f"local_exec: running command: {command!r}")
+        if cwd:
+            logger.debug(f"local_exec: working directory: {cwd}")
+
+        if stream:
+            try:
+                process = subprocess.Popen(  # noqa: S602
+                    command,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    cwd=cwd,
+                    env=exec_env,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                raise ScenarioError(f"local_exec failed to start command: {exc}") from exc
+
+            stdout_lines: list[str] = []
+            stderr_lines: list[str] = []
+
+            def _pipe_reader(pipe, collector, dest):
+                for line in pipe:
+                    collector.append(line)
+                    dest.write(line)
+                    dest.flush()
+
+            timed_out = False
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                executor.submit(_pipe_reader, process.stdout, stdout_lines, sys.stdout)
+                executor.submit(_pipe_reader, process.stderr, stderr_lines, sys.stderr)
+                try:
+                    process.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    # Kill the whole process group, not just the shell, so pipelines and
+                    # subshells spawned by `shell=True` don't survive as orphans.
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                    timed_out = True
+                    logger.warning(f"local_exec: command timed out after {timeout}s: {command!r}")
+            # ThreadPoolExecutor exit waits for both readers to drain before returning
+
+            return helpers.Result(
+                stdout="".join(stdout_lines),
+                stderr="".join(stderr_lines),
+                status=-1 if timed_out else process.returncode,
+            )
+
+        try:
+            process = subprocess.Popen(  # noqa: S602
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=cwd,
+                env=exec_env,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            raise ScenarioError(f"local_exec failed to start command: {exc}") from exc
+
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kill the whole process group, not just the shell, so pipelines and
+            # subshells spawned by `shell=True` don't survive as orphans.
+            os.killpg(process.pid, signal.SIGKILL)
+            stdout, stderr = process.communicate()
+            logger.warning(f"local_exec: command timed out after {timeout}s: {command!r}")
+            return helpers.Result(stdout=stdout or "", stderr=stderr or "", status=-1)
+
+        completed = subprocess.CompletedProcess(
+            args=command, returncode=process.returncode, stdout=stdout, stderr=stderr
+        )
+        return helpers.Result.from_subprocess(completed)
 
     def _action_scp(self, arguments, hosts, parallel):
         """Handle scp action.
@@ -1509,6 +1656,24 @@ class ScenarioRunner:
 
         return content
 
+    def _evaluate_assert_condition(self, condition, context, fail_msg, i, total):
+        """Evaluate one assert condition, returning (result, label).
+
+        Raises ScenarioError on type mismatch or template error.
+        """
+        if isinstance(condition, bool):
+            return condition, str(condition)
+        if isinstance(condition, str):
+            try:
+                return evaluate_condition(condition, context), condition
+            except (jinja2.TemplateError, ScenarioError) as e:
+                prefix = fail_msg if total == 1 else f"{fail_msg} (condition #{i})"
+                raise ScenarioError(f"{prefix}: {condition} (error: {e})") from e
+        raise ScenarioError(
+            f"Assert condition #{i} must be a string or bool, got "
+            f"{type(condition).__name__}: {condition!r}"
+        )
+
     def _action_assert(self, arguments):
         """Handle assert action - validate conditions and fail if they're not met.
 
@@ -1531,44 +1696,33 @@ class ScenarioRunner:
 
         fail_msg = arguments.get("fail_msg", "Assertion failed")
 
-        # Convert single condition to list for uniform handling
-        conditions = [that] if isinstance(that, str) else that
+        # Convert single condition to list for uniform handling.
+        # A condition may already be a bool if the template expression was rendered
+        # before reaching here (e.g. "{{ x == 0 }}" -> True).
+        if isinstance(that, (str, bool)):
+            conditions = [that]
+        else:
+            conditions = that
 
         if not isinstance(conditions, list):
-            raise ScenarioError("Assert 'that' must be a string or list of strings")
+            raise ScenarioError(
+                "Assert 'that' must be a string, boolean, or list of strings/booleans"
+            )
 
-        # Build context with all current variables and scenario state
         context = {
             **self.variables,
             "scenario_inventory": self.scenario_inventory,
             "steps": dict(self.steps_memory.items()),
         }
 
-        # Evaluate each condition
+        total = len(conditions)
         for i, condition in enumerate(conditions, 1):
-            if not isinstance(condition, str):
-                raise ScenarioError(
-                    f"Assert condition #{i} must be a string, got "
-                    f"{type(condition).__name__}: {condition!r}"
-                )
-            try:
-                result = evaluate_condition(condition, context)
-                if not result:
-                    # Construct detailed error message
-                    if len(conditions) == 1:
-                        error_msg = f"{fail_msg}: {condition}"
-                    else:
-                        error_msg = f"{fail_msg} (condition #{i}): {condition}"
-                    raise ScenarioError(error_msg)
-            except (jinja2.TemplateError, ScenarioError) as e:
-                # If evaluation fails, treat as assertion failure
-                if len(conditions) == 1:
-                    error_msg = f"{fail_msg}: {condition} (error: {e})"
-                else:
-                    error_msg = f"{fail_msg} (condition #{i}): {condition} (error: {e})"
-                raise ScenarioError(error_msg) from e
+            result, label = self._evaluate_assert_condition(condition, context, fail_msg, i, total)
+            if not result:
+                suffix = label if total == 1 else f"(condition #{i}): {label}"
+                raise ScenarioError(f"{fail_msg}: {suffix}")
 
-        logger.debug(f"All assertions passed ({len(conditions)} condition(s))")
+        logger.debug(f"All assertions passed ({total} condition(s))")
         return True
 
     def _action_provider_info(self, step_name, arguments):

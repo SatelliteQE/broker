@@ -138,3 +138,12 @@ class Result:
             stdout=nonduplex_exec.output.decode("utf-8"),
             stderr="",
         )
+
+    @classmethod
+    def from_subprocess(cls, completed_process):
+        """Create a Result object from a subprocess.CompletedProcess."""
+        return cls(
+            status=completed_process.returncode,
+            stdout=completed_process.stdout or "",
+            stderr=completed_process.stderr or "",
+        )
