@@ -651,7 +651,7 @@ class AnsibleTower(Provider):
     def _compile_host_info(self, host):
         try:
             host_facts = host.related.ansible_facts.get()
-        except awxkit.exceptions.Forbidden as err:
+        except (awxkit.exceptions.Forbidden, awxkit.exceptions.NotFound) as err:
             logger.warning(f"Unable to get facts for {host.name}: {err}")
             host_facts = {}
 
