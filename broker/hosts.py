@@ -209,9 +209,10 @@ class Host:
         """
         ret_dict = {
             "name": getattr(self, "name", None),
-            "_broker_provider_instance": getattr(self, "_prov_inst", None) and self._prov_inst.instance,
             "type": "host",
         }
+        if prov_inst := getattr(self, "_prov_inst", None):
+            ret_dict["_broker_provider_instance"] = prov_inst.instance
         ret_dict.update({k: v for k, v in self.__dict__.items() if k in self.keep_keys})
         return ret_dict
 
