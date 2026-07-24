@@ -102,17 +102,14 @@ def _create_and_configure_settings(file_path, file_exists, config_dict):
     )
 
     # Remove vault loader if set somehow
-    # In dynaconf 3.2.0+, __core__ was removed. Use _loaders directly instead.
+    # In dynaconf >= 3.3.0, settings exposes `__core__`; older versions rely on `_loaders`.
+    filtered_loaders = [
+        loader for loader in new_settings.loaders_for_dynaconf if "vault" not in loader
+    ]
     if hasattr(new_settings, "__core__"):
-        # dynaconf < 3.2.0
-        new_settings.__core__.config.loaders = [
-            loader for loader in new_settings.loaders_for_dynaconf if "vault" not in loader
-        ]
+        new_settings.__core__.config.loaders = filtered_loaders
     else:
-        # dynaconf >= 3.2.0
-        new_settings._loaders = [
-            loader for loader in new_settings._loaders if "vault" not in loader
-        ]
+        new_settings._loaders = filtered_loaders
 
     # Add any configuration values passed in, merging nested dicts
     if config_dict:
