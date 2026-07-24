@@ -23,7 +23,7 @@ classifiers = [
 ]
 dependencies = [
     "click",
-    "dynaconf>=3.3.0,<4.0.0",
+    "dynaconf<4.0.0",
     "jinja2",
     "jsonschema",
     "packaging",
