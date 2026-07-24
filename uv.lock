@@ -161,7 +161,7 @@ wheels = [
 
 [[package]]
 name = "broker"
-version = "0.8.10"
+version = "0.8.11"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -263,7 +263,7 @@ requires-dist = [
     { name = "docker", marker = "extra == 'all'" },
     { name = "docker", marker = "extra == 'dev'" },
     { name = "docker", marker = "extra == 'docker'" },
-    { name = "dynaconf", specifier = ">=3.3.0,<4.0.0" },
+    { name = "dynaconf", specifier = "<4.0.0" },
     { name = "hussh", marker = "extra == 'all'", specifier = ">=0.1.7" },
     { name = "hussh", marker = "extra == 'hussh'", specifier = ">=0.1.7" },
     { name = "hussh", marker = "extra == 'satlab'", specifier = ">=0.1.7" },
