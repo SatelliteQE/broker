@@ -283,7 +283,8 @@ class Foreman(Provider):
 
         host["hostgroup_id"] = self.runtime.obtain_id_from_name("hostgroups", hostgroup)
         host["build"] = True
-        host["compute_attributes"] = {"start": "1"}
+        if "compute_attributes" not in host:
+            host["compute_attributes"] = {"start": "1"}
         host["organization_id"] = self.organization_id
         host["location_id"] = self.location_id
 
