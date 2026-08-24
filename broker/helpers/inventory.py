@@ -49,8 +49,16 @@ def update_inventory(add=None, remove=None):
 
     :return: no return value
     """
+    from dynaconf.utils.boxing import DynaBox
+
     from broker.helpers.file_utils import FileLock
     from broker.settings import inventory_path
+
+    # Configure ruamel yaml representer for Dynabox
+    yaml.representer.add_representer(
+        DynaBox,
+        lambda dumper, data: dumper.represent_dict(dict(data)),
+    )
 
     if add and not isinstance(add, list):
         add = [add]
