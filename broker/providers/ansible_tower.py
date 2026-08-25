@@ -944,11 +944,24 @@ class AnsibleTower(Provider):
     def get_inventory(self, user=None):
         """Compile a list of hosts based on any inventory a user's name is mentioned."""
         user = user or self.username
-        invs = [
-            inv
-            for inv in self._v2.inventory.get(page_size=200).results
-            if user in inv.name or user == "@ll"
-        ]
+        invs = []
+        page = 1
+
+        while page_invs := self._v2.inventory.get(page_size=100, page=page).results:
+            for inv in page_invs:
+                if user in inv.name or user == "@ll":
+                    invs.append(inv)  # noqa: PERF401
+
+            # Stop early if we found user inventory and not syncing all
+            if invs and user != "@ll":
+                break
+
+            # Check if there are more results
+            if len(page_invs) < 100:  # noqa: PLR2004
+                break
+
+            page += 1
+
         hosts = []
         for inv in invs:
             inv_hosts = inv.get_related("hosts", page_size=200).results
