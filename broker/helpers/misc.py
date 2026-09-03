@@ -209,7 +209,7 @@ def simple_retry(
         new_wait = _cur_timeout * 2
         if new_wait > max_timeout:
             raise err
-        logger.warning(
+        logger.debug(
             f"Tried {cmd=} with {cmd_args=}, {cmd_kwargs=} but received {err=}"
             f"\nTrying again in {_cur_timeout} seconds."
         )
@@ -236,6 +236,25 @@ def find_origin():
             return prev or "Unknown fixture", jenkins_url
         prev, _frame = f"{frame.function}:{frame.filename}", frame
     return f"Unknown origin by {getpass.getuser()}", jenkins_url
+
+
+def is_running_as_root():
+    """Check if the current process is running as root/with sudo privileges.
+
+    On Unix-like systems, checks if the effective user ID is 0 (root).
+    On Windows, always returns False as sudo is not applicable.
+
+    Returns:
+        bool: True if running as root (uid 0), False otherwise
+
+    Example:
+        >>> if helpers.is_running_as_root():
+        ...     print("Running with elevated privileges")
+    """
+    # os.geteuid() only exists on Unix-like systems (Linux, macOS, BSD, etc.)
+    if not hasattr(os, "geteuid"):
+        return False
+    return os.geteuid() == 0
 
 
 def format_host_time_value(value):

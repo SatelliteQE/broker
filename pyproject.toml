@@ -8,7 +8,7 @@ version = "0.8.11"
 description = "The infrastructure middleman."
 readme = "README.md"
 requires-python = ">=3.10"
-keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker", "openstack"]
+keywords = ["broker", "AnsibleTower", "docker", "podman", "beaker", "openstack", "libvirt"]
 authors = [{ name = "Jacob J Callahan", email = "jacob.callahan05@gmail.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -54,6 +54,7 @@ dev = [
 ]
 docker = ["docker", "paramiko"]
 hussh = ["hussh>=0.1.7"]
+libvirt = ["libvirt-python", "pycdlib"]
 openstack = ["openstacksdk"]
 paramiko = ["paramiko"]
 podman = ["podman>=5.2"]
@@ -68,6 +69,7 @@ all = [
     "docker",
     "hussh>=0.1.7",
     "ipython",
+    "libvirt-python",
     "openstacksdk",
     "paramiko",
     "pexpect",
@@ -210,9 +212,16 @@ combine-as-imports = true
     "E402",    # Intentional: logging setup before imports
     "PLR0911", # CLI commands may have multiple return paths for different modes
     "PLR0912", # CLI commands may have multiple branches for options/modes
+    "PLR0917", # CLI commands may have many positional arguments due to click decorators
 ]
-"broker/providers/*.py" = ["E402"] # logger defined before other imports
-"broker/binds/*.py" = ["E402"] # logger defined before other imports
+"broker/providers/*.py" = [
+    "E402",    # logger defined before other imports
+    "PLR0917", # Provider methods may have many positional arguments for flexibility
+]
+"broker/binds/*.py" = [
+    "E402",    # logger defined before other imports
+    "PLR0917", # Bind utility functions may have many positional arguments
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 25
