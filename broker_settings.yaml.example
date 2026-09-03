@@ -30,6 +30,8 @@ ssh:
     host_ipv6: False
     # If IPv6 connection attempts fail, fallback to IPv4
     host_ipv4_fallback: True
+    # Choose how Broker authenticates to hosts: "key" or "basic" (password)
+    auth_method: key
 # Provider settings
 AnsibleTower:
     base_url: "https://<ansible tower host>/"
@@ -86,6 +88,31 @@ Foreman:
 Beaker:
     hub_url:
     max_job_wait: 24h
+Libvirt:
+    # instances:
+    #     local:
+    #         uri: qemu:///system
+    #         default: True
+    #     remote:
+    #         uri: qemu+ssh://broker@hypervisor.example.com/system
+    uri: qemu:///system
+    storage_pool: default
+    network: default
+    default_memory: 2048
+    default_cpus: 2
+    default_disk_size: 10
+    virt_type: kvm             # use "qemu" for software emulation (no KVM)
+    firmware: bios             # use "efi" for UEFI/OVMF images
+    dangling_behavior: checkin # on failed checkout: checkin (destroy+undefine) | store | prompt
+    # name_prefix: test          # defaults to your local username
+    # default_username: root     # falls back to ssh.host_username if unset
+    # default_password: "<pw>"
+    # default_key_filename: "</path/to/key>"
+    # auth_override: null        # Apply auth to all checkouts: null (default) | broker_basic | broker_key
+                                 # - null: don't override base image credentials
+                                 # - broker_basic: inject default username:password from SSH config
+                                 # - broker_key: inject default SSH key from SSH config
+                                 # Can be overridden per-checkout with --auth flag
 SCENARIO_IMPORT:
     git_hosts:
         - url: "https://github.com"
