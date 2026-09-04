@@ -183,6 +183,27 @@ class Broker:
     def _checkin(self, host):
         logger.info(f"Checking in {host.hostname or host.name}")
         host.close()
+
+        # Check if this is a read-only host (synced from hypervisor, not broker-managed)
+        if getattr(host, "_read_only", False):
+            logger.warning(
+                f"Host {host.name} is read-only (not managed by Broker). "
+                "Removing from inventory without destroying VM."
+            )
+            # Import at function level to avoid circular import
+            from rich.console import Console
+
+            from broker.settings import settings
+
+            console = Console(no_color=settings.less_colors)
+            console.print(
+                f"[yellow]Warning:[/yellow] Host {host.name} is read-only (not managed by Broker). "
+                "Removing from inventory without destroying VM."
+            )
+            # Skip release() but still return host for inventory removal
+            return host
+
+        # Normal broker-managed host - perform full release
         try:
             host.release()
         except Exception as err:
