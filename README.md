@@ -162,15 +162,15 @@ import logging
 
 # Configure logging for your application
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 # Optionally, control Broker's log level specifically
-logging.getLogger('broker').setLevel(logging.DEBUG)
+logging.getLogger("broker").setLevel(logging.DEBUG)
 
 # Now import and use Broker
 from broker import Broker
+
 broker = Broker()
 ```
 
