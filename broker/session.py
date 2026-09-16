@@ -38,6 +38,7 @@ def make_session(broker_settings=None, **kwargs):
     Returns:
         A Session instance from the configured backend
     """
+    # TODO(libvirt-proxyjump): thread proxy_jump here — see Hussh#82
     _settings = broker_settings or clone_global_settings()
     backend = _settings.SSH.BACKEND
 

@@ -143,6 +143,7 @@ class Host:
             # Create a session using the entry-points based approach
             from broker.session import make_session
 
+            auth_method = self._settings.get("SSH", {}).get("AUTH_METHOD", "key")
             self._session = make_session(
                 broker_settings=self._settings,
                 hostname=self.hostname,
@@ -152,15 +153,21 @@ class Host:
                     "username",
                     self._settings.get("SSH", {}).get("HOST_USERNAME", self.DEFAULT_USER),
                 ),
+                # auth_method only decides which settings-level default to fall back to; an
+                # explicit password/key_filename set on the host instance always wins.
                 password=getattr(
                     self,
                     "password",
-                    self._settings.get("SSH", {}).get("HOST_PASSWORD", None),
+                    self._settings.get("SSH", {}).get("HOST_PASSWORD", None)
+                    if auth_method == "basic"
+                    else None,
                 ),
                 key_filename=getattr(
                     self,
                     "key_filename",
-                    self._settings.get("SSH", {}).get("HOST_SSH_KEY_FILENAME", None),
+                    self._settings.get("SSH", {}).get("HOST_SSH_KEY_FILENAME", None)
+                    if auth_method == "key"
+                    else None,
                 ),
                 timeout=getattr(
                     self,
@@ -168,6 +175,7 @@ class Host:
                     self._settings.get("SSH", {}).get("HOST_CONNECTION_TIMEOUT", 60),
                 ),
                 host=self.hostname,  # For hussh backend compatibility
+                # TODO(libvirt-proxyjump): thread proxy_jump here — see Hussh#82
             )
 
     def close(self):

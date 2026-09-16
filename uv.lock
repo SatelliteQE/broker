@@ -188,6 +188,7 @@ all = [
     { name = "ipython", version = "8.39.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "ipython", version = "9.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "ipython", version = "9.12.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "libvirt-python" },
     { name = "openstacksdk" },
     { name = "paramiko" },
     { name = "pexpect" },
@@ -223,6 +224,10 @@ docker = [
 ]
 hussh = [
     { name = "hussh" },
+]
+libvirt = [
+    { name = "libvirt-python" },
+    { name = "pycdlib" },
 ]
 openstack = [
     { name = "openstacksdk" },
@@ -271,6 +276,8 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'shell'" },
     { name = "jinja2" },
     { name = "jsonschema" },
+    { name = "libvirt-python", marker = "extra == 'all'" },
+    { name = "libvirt-python", marker = "extra == 'libvirt'" },
     { name = "openstacksdk", marker = "extra == 'all'" },
     { name = "openstacksdk", marker = "extra == 'openstack'" },
     { name = "packaging" },
@@ -284,6 +291,7 @@ requires-dist = [
     { name = "podman", marker = "extra == 'satlab'", specifier = ">=5.2" },
     { name = "pre-commit", marker = "extra == 'all'" },
     { name = "pre-commit", marker = "extra == 'dev'" },
+    { name = "pycdlib", marker = "extra == 'libvirt'" },
     { name = "pytest", marker = "extra == 'all'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-randomly", marker = "extra == 'all'" },
@@ -301,7 +309,7 @@ requires-dist = [
     { name = "tox-uv", marker = "extra == 'dev'" },
     { name = "typing-extensions" },
 ]
-provides-extras = ["ansible-pylibssh", "ansibletower", "beaker", "dev", "docker", "hussh", "openstack", "paramiko", "podman", "shell", "ssh2-python", "satlab", "all"]
+provides-extras = ["ansible-pylibssh", "ansibletower", "beaker", "dev", "docker", "hussh", "libvirt", "openstack", "paramiko", "podman", "shell", "ssh2-python", "satlab", "all"]
 
 [[package]]
 name = "cachetools"
@@ -1028,6 +1036,12 @@ wheels = [
 ]
 
 [[package]]
+name = "libvirt-python"
+version = "12.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1d/18/b64bc6c6739405fddd451f78e756c17411d309265ec748683b806bd1dd47/libvirt_python-12.6.0.tar.gz", hash = "sha256:f390abff81d4afd6c33157ade82912863b87de9c35172e9b0c9f0dfcdc09b139", size = 252693, upload-time = "2026-08-03T09:51:28.683Z" }
+
+[[package]]
 name = "lxml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1487,6 +1501,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/05/0a34433a064256a578f1783a10da6df098ceaa4a57bbeaa96a6c0352786b/pure_eval-0.2.3.tar.gz", hash = "sha256:5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42", size = 19752, upload-time = "2024-07-21T12:58:21.801Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl", hash = "sha256:1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0", size = 11842, upload-time = "2024-07-21T12:58:20.04Z" },
+]
+
+[[package]]
+name = "pycdlib"
+version = "1.20.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/01/7fdd73e832b95a1b32e137be2fbeed05abef3aec527bcfebca4c313969a6/pycdlib-1.20.0.tar.gz", hash = "sha256:1d768eb491d761a3bace188270f152ef40f33fb0d3daf6cf39bc38a81272072c", size = 328278, upload-time = "2026-08-05T13:59:47.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/2e/624824081e1ceb69bcd2c3b2358d01e8ba7e7c84a0f019bf24e1e822ec01/pycdlib-1.20.0-py2.py3-none-any.whl", hash = "sha256:cb675959dd6d61e94f02560ed7e9a5d368a3188b5f7f31813bc25a750cff0863", size = 228561, upload-time = "2026-08-05T13:59:45.007Z" },
 ]
 
 [[package]]
