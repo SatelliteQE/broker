@@ -5,7 +5,7 @@ import inspect
 import logging
 from pathlib import Path
 import socket
-from uuid import uuid4
+from uuid import UUID, uuid4
 from xml.etree import ElementTree as ET
 
 import click
@@ -31,6 +31,23 @@ class Libvirt(Provider):
     """Libvirt provider class providing a Broker interface around the libvirt bind."""
 
     _MAX_VOLUMES_DISPLAY = 20  # Maximum number of volumes to display in pool info
+    _DOMAIN_STATES = {
+        0: "No State",
+        1: "Running",
+        2: "Blocked",
+        3: "Paused",
+        4: "Shutdown",
+        5: "Shut off",
+        6: "Crashed",
+        7: "PM Suspended",
+    }
+    _POOL_STATES = {
+        0: "Inactive",
+        1: "Building",
+        2: "Running",
+        3: "Degraded",
+        4: "Inaccessible",
+    }
 
     _validators = [
         Validator("LIBVIRT.uri", default="qemu:///system"),
@@ -91,24 +108,12 @@ class Libvirt(Provider):
 
     @staticmethod
     def _build_metadata_from_kwargs(**kwargs):
-        """Build metadata dict from kwargs, filtering to serializable values.
-
-        Stores all user-provided arguments (like --note) so they can be recovered
-        during inventory sync.
-        """
-        metadata = {"owner": getpass.getuser()}
-
-        # Store all kwargs that are simple types (str, int, bool, None)
-        # This includes user args like --note, --cpus, --ram, --libvirt-image, etc.
-        for key, value in kwargs.items():
-            # Skip internal/private keys and None values
-            if key.startswith("_") or value is None:
-                continue
-            # Only store simple types that can be serialized to strings
-            if isinstance(value, (str, int, bool)):
-                metadata[key] = str(value)
-
-        return metadata
+        """Build metadata dict from kwargs, filtering to serializable values."""
+        return {"owner": getpass.getuser()} | {
+            k: str(v)
+            for k, v in kwargs.items()
+            if not k.startswith("_") and v is not None and isinstance(v, (str, int, bool))
+        }
 
     def _set_attributes(self, host_inst, broker_args=None):
         host_inst.__dict__.update(
@@ -123,14 +128,16 @@ class Libvirt(Provider):
 
     def _resolve_creds(self):
         """Return only the SSH credential overrides explicitly configured for Libvirt."""
-        creds = {}
-        if username := self._settings.LIBVIRT.default_username:
-            creds["username"] = username
-        if password := self._settings.LIBVIRT.default_password:
-            creds["password"] = password
-        if key_filename := self._settings.LIBVIRT.default_key_filename:
-            creds["key_filename"] = key_filename
-        return creds
+        cfg = self._settings.LIBVIRT
+        return {
+            k: v
+            for k, v in {
+                "username": cfg.default_username,
+                "password": cfg.default_password,
+                "key_filename": cfg.default_key_filename,
+            }.items()
+            if v
+        }
 
     def _parse_auth_spec(self, auth_spec):  # noqa: PLR0911
         """Parse --auth argument or config auth_override into (method, user, credential).
@@ -286,9 +293,11 @@ runcmd:
         return host_inst
 
     @staticmethod
-    def _inject_identity(xml_str, name, uuid_str):
-        """Overwrite the name/uuid of a custom domain XML definition."""
+    def _inject_identity_and_metadata(xml_str, name, uuid_str, metadata):
+        """Inject name, UUID, and broker metadata into domain XML in one pass."""
         root = ET.fromstring(xml_str)
+
+        # Inject identity
         name_elem = root.find("name")
         if name_elem is None:
             name_elem = ET.SubElement(root, "name")
@@ -297,31 +306,16 @@ runcmd:
         if uuid_elem is None:
             uuid_elem = ET.SubElement(root, "uuid")
         uuid_elem.text = uuid_str
-        return ET.tostring(root, encoding="unicode")
 
-    @staticmethod
-    def _inject_metadata(xml_str, metadata):
-        """Inject broker metadata into existing domain XML.
-
-        :param xml_str: Domain XML string
-        :param metadata: Dict of key-value pairs to store as metadata
-        :return: Updated XML string with metadata injected
-        """
-        root = ET.fromstring(xml_str)
-
-        # Find or create metadata section
+        # Inject metadata
         metadata_elem = root.find("metadata")
         if metadata_elem is None:
             metadata_elem = ET.SubElement(root, "metadata")
-
-        # Create broker:origin element with namespace
         broker_meta = ET.SubElement(
             metadata_elem,
             "broker:origin",
             attrib={"xmlns:broker": "https://github.com/SatelliteQE/broker"},
         )
-
-        # Add each metadata key as a child element
         for key, value in metadata.items():
             ET.SubElement(broker_meta, f"broker:{key}").text = str(value)
 
@@ -370,12 +364,10 @@ runcmd:
                 meta_data, user_data = self._generate_cloud_init_configs(auth_config)
 
             if kwargs.get("libvirt_xml"):
-                xml_str = self._inject_identity(
-                    Path(kwargs["libvirt_xml"]).read_text(), name, str(uuid4())
-                )
-                # Also inject metadata so custom XML VMs are trackable via inventory sync
                 metadata = self._build_metadata_from_kwargs(**kwargs)
-                xml_str = self._inject_metadata(xml_str, metadata)
+                xml_str = self._inject_identity_and_metadata(
+                    Path(kwargs["libvirt_xml"]).read_text(), name, str(uuid4()), metadata
+                )
             else:
                 image = kwargs.get("libvirt_image")
                 if not image or not self.bind.base_volume_exists(image):
@@ -717,32 +709,12 @@ runcmd:
 
     def _get_state_name(self, state_code, domain=True):
         """Map libvirt state codes to human-readable names."""
-        if domain:
-            domain_states = {
-                0: "No State",
-                1: "Running",
-                2: "Blocked",
-                3: "Paused",
-                4: "Shutdown",
-                5: "Shut off",
-                6: "Crashed",
-                7: "PM Suspended",
-            }
-            return domain_states.get(state_code, f"Unknown ({state_code})")
-        else:
-            pool_states = {
-                0: "Inactive",
-                1: "Building",
-                2: "Running",
-                3: "Degraded",
-                4: "Inaccessible",
-            }
-            return pool_states.get(state_code, f"Unknown ({state_code})")
+        states = self._DOMAIN_STATES if domain else self._POOL_STATES
+        return states.get(state_code, f"Unknown ({state_code})")
 
     def _format_uuid(self, uuid_bytes):
         """Convert UUID bytes to standard hex string format (8-4-4-4-12)."""
-        hex_str = uuid_bytes.hex()
-        return f"{hex_str[:8]}-{hex_str[8:12]}-{hex_str[12:16]}-{hex_str[16:20]}-{hex_str[20:]}"
+        return str(UUID(bytes=uuid_bytes))
 
     def _search_volume_in_pools(self, volume_name):
         """Search for a volume across all storage pools.
