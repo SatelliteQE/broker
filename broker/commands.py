@@ -362,7 +362,7 @@ def checkin(hosts, background, all_, sequential, filter):
 @click.option("--append", is_flag=True, help="Append NOTE to the existing note")
 @click.option("--clear", is_flag=True, help="Remove the note from the host")
 def inventory_note_command(host, note, append, clear):
-    """Set, append, or clear a description for a host in the local inventory.
+    r"""Set, append, or clear a description for a host in the local inventory.
 
     NOTE is the text stored as the host's inventory description. For example:
 
