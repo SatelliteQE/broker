@@ -65,6 +65,14 @@ BASE_VALIDATORS = [
     Validator("SCENARIO_IMPORT.GIT_HOSTS", default=[]),
 ]
 
+DEFAULT_INVENTORY_FIELDS = {
+    "Host": "hostname | name",
+    "Provider": "_broker_provider",
+    "Action": "$action",
+    "OS": "os_distribution os_distribution_version",
+    "Notes": "_broker_args.description",
+}
+
 
 def _handle_migrations(cfg_manager, file_exists):
     """Handle settings file migrations if needed."""
@@ -121,6 +129,9 @@ def _create_and_configure_settings(file_path, file_exists, config_dict):
                 new_settings[key] = merge_dicts(existing, value)
             else:
                 new_settings[key] = value
+
+    if new_settings.get("inventory_fields") is None:
+        new_settings["inventory_fields"] = DEFAULT_INVENTORY_FIELDS.copy()
 
     return new_settings
 
