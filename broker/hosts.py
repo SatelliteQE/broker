@@ -42,6 +42,7 @@ class Host:
         "tower_inventory",
         "deploy_network_type",
         "job_id",
+        "_read_only",
         "_attrs",
         "ip",
         "os_distribution",
@@ -93,10 +94,18 @@ class Host:
                 raise HostError("Host must be constructed with a hostname or ip")
         self.name = kwargs.pop("name", None)
         self.username = kwargs.pop("username", self._settings.SSH.HOST_USERNAME)
-        self.password = kwargs.pop("password", self._settings.SSH.HOST_PASSWORD)
+        has_auth_override = "password" in kwargs or "key_filename" in kwargs
+        password = kwargs.pop("password", None)
+        key_filename = kwargs.pop("key_filename", None)
+        if not has_auth_override:
+            if self._settings.SSH.AUTH_METHOD == "basic":
+                password = self._settings.SSH.HOST_PASSWORD
+            else:
+                key_filename = self._settings.SSH.HOST_SSH_KEY_FILENAME
+        self.password = password
         self.timeout = kwargs.pop("connection_timeout", self._settings.SSH.HOST_CONNECTION_TIMEOUT)
         self.port = kwargs.pop("port", self._settings.SSH.HOST_SSH_PORT)
-        self.key_filename = kwargs.pop("key_filename", self._settings.SSH.HOST_SSH_KEY_FILENAME)
+        self.key_filename = key_filename
         self.ipv6 = kwargs.pop("ipv6", self._settings.SSH.HOST_IPV6)
         self.ipv4_fallback = kwargs.pop("ipv4_fallback", self._settings.SSH.HOST_IPV4_FALLBACK)
         self.__dict__.update(kwargs)  # Make every other kwarg an attribute

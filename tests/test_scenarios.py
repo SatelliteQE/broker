@@ -13,7 +13,6 @@ from broker import scenarios
 from broker.exceptions import ScenarioError
 from broker.helpers import MockStub
 
-
 TEST_SCENARIOS_DIR = Path(__file__).parent / "data" / "scenarios"
 VALID_SCENARIO_PATH = TEST_SCENARIOS_DIR / "valid_scenario.yaml"
 INVALID_SCHEMA_PATH = TEST_SCENARIOS_DIR / "invalid_schema.yaml"
@@ -212,6 +211,27 @@ def test_scenario_runner_init_valid():
     assert runner.variables["my_var"] == "test_value"
     assert runner.variables["my_count"] == 2
     assert runner.config.get("inventory_path") == "/tmp/test_inventory.yaml"
+
+
+def test_requires_sudo_allows_inspection_but_blocks_run(tmp_path, monkeypatch):
+    scenario_path = tmp_path / "root_only.yaml"
+    scenario_path.write_text("requires_sudo: true\nsteps: []\n")
+    monkeypatch.setattr(scenarios.helpers, "is_running_as_root", lambda: False)
+    runner = scenarios.ScenarioRunner(scenario_path)
+    runner.inventory_path = tmp_path / "inventory.yaml"
+
+    assert runner.get_info()["name"] == "root_only"
+    with pytest.raises(scenarios.PermissionError, match="requires sudo/root privileges"):
+        runner.run()
+
+
+def test_requires_sudo_runs_as_root(tmp_path, monkeypatch):
+    scenario_path = tmp_path / "root_only.yaml"
+    scenario_path.write_text("requires_sudo: true\nsteps: []\n")
+    monkeypatch.setattr(scenarios.helpers, "is_running_as_root", lambda: True)
+    runner = scenarios.ScenarioRunner(scenario_path)
+    runner.inventory_path = tmp_path / "inventory.yaml"
+    runner.run()
 
 
 def test_scenario_runner_cli_vars_override():

@@ -1,8 +1,8 @@
 """A collection of classes to ease interaction with the libvirt API."""
 
 import contextlib
+import ipaddress
 import logging
-import platform
 import threading
 from xml.etree import ElementTree as ET
 
@@ -10,9 +10,6 @@ from xml.etree import ElementTree as ET
 libvirt = None
 
 logger = logging.getLogger(__name__)
-
-LOOPBACK_PREFIXES = ("127.",)
-LINK_LOCAL_PREFIXES = ("169.254.", "fe80:")
 
 OVMF_CODE_CANDIDATES = (
     "/usr/share/OVMF/OVMF_CODE.fd",
@@ -28,7 +25,11 @@ OVMF_VARS_CANDIDATES = (
 
 def _is_loopback_or_link_local(addr):
     """Return True if an address string is loopback or link-local."""
-    return addr.startswith(LOOPBACK_PREFIXES) or addr.startswith(LINK_LOCAL_PREFIXES)
+    try:
+        address = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return address.is_loopback or address.is_link_local
 
 
 def _select_address(addresses, prefer_ipv6=False, ipv4_fallback=True):
@@ -111,7 +112,8 @@ def _build_domain_xml(
     ET.SubElement(features, "acpi")
     ET.SubElement(features, "apic")
 
-    ET.SubElement(domain, "cpu", mode="host-passthrough", check="none")
+    if virt_type == "kvm":
+        ET.SubElement(domain, "cpu", mode="host-passthrough", check="none")
 
     devices = ET.SubElement(domain, "devices")
     ET.SubElement(devices, "emulator").text = emulator
@@ -206,9 +208,9 @@ class LibvirtBind:
         would silently boot guests under the wrong architecture, so the host's native
         architecture is preferred and other matches are only used as a fallback.
         """
-        host_arch = platform.machine()
         matches = []
         caps = ET.fromstring(self.connection.getCapabilities())
+        host_arch = caps.findtext("./host/cpu/arch")
         for guest in caps.findall("guest"):
             if guest.findtext("os_type") != "hvm":
                 continue
@@ -347,11 +349,14 @@ class LibvirtBind:
         vol_xml = _build_volume_xml(overlay_name, size_gib, base_vol.path())
         return pool.createXML(vol_xml, 0)
 
-    def define_and_start(self, domain_xml):
-        """Define a domain from XML and start it."""
-        domain = self.connection.defineXML(domain_xml)
+    def define_domain(self, domain_xml):
+        """Define and return a persistent domain without starting it."""
+        return self.connection.defineXML(domain_xml)
+
+    @staticmethod
+    def start_domain(domain):
+        """Start a previously defined domain."""
         domain.create()
-        return domain
 
     def lookup_domain(self, name):
         """Look up a domain by name, returning None only if it genuinely doesn't exist.
@@ -525,19 +530,26 @@ class LibvirtBind:
 
         vol = pool.createXML(vol_xml, 0)
 
-        # Upload ISO data to the volume
-        stream = self.connection.newStream(0)
-        vol.upload(stream, 0, iso_size, 0)
+        stream = None
+        try:
+            stream = self.connection.newStream(0)
+            vol.upload(stream, 0, iso_size, 0)
 
-        # Write data in chunks
-        chunk_size = 1024 * 1024  # 1MB chunks
-        offset = 0
-        while offset < iso_size:
-            chunk = iso_data[offset : offset + chunk_size]
-            stream.send(chunk)
-            offset += len(chunk)
+            offset = 0
+            while offset < iso_size:
+                sent = stream.send(iso_data[offset : offset + 1024 * 1024])
+                if sent <= 0:
+                    raise RuntimeError("Libvirt stream made no progress uploading cloud-init ISO")
+                offset += sent
 
-        stream.finish()
+            stream.finish()
+        except Exception:
+            if stream is not None:
+                with contextlib.suppress(Exception):
+                    stream.abort()
+            with contextlib.suppress(Exception):
+                self.delete_volume(vol)
+            raise
 
         return vol
 

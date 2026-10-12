@@ -654,7 +654,6 @@ class ScenarioRunner:
 
         Raises:
             ScenarioError: If the file cannot be loaded or validation fails
-            PermissionError: If the scenario requires sudo but is not running as root
         """
         if not self.scenario_path.exists():
             raise ScenarioError(f"Scenario file not found: {self.scenario_path}")
@@ -695,14 +694,6 @@ class ScenarioRunner:
                 jsonschema.validate(instance=data, schema=schema)
             except jsonschema.ValidationError as e:
                 raise ScenarioError(f"Scenario validation failed: {e.message}") from e
-
-        # Check sudo requirements (after schema validation)
-        if data.get("requires_sudo", False):
-            if not helpers.is_running_as_root():
-                raise PermissionError(
-                    f"Scenario '{self.scenario_path.stem}' requires sudo/root privileges. "
-                    f"Please run with sudo:\n  sudo broker scenarios execute {self.scenario_path.stem}"
-                )
 
         return data
 
@@ -1836,6 +1827,12 @@ class ScenarioRunner:
         Raises:
             ScenarioError: If the scenario execution fails
         """
+        if self.data.get("requires_sudo", False) and not helpers.is_running_as_root():
+            raise PermissionError(
+                f"Scenario '{self.scenario_path.stem}' requires sudo/root privileges. "
+                f"Please run with sudo:\n  sudo broker scenarios execute {self.scenario_path.stem}"
+            )
+
         logger.info(f"Starting scenario: {self.scenario_name}")
 
         # Clear any existing scenario inventory for a fresh run

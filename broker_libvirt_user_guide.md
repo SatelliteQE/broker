@@ -39,17 +39,17 @@ SSH auth Broker will use). They are **idempotent** — safe to re-run.
 ### Local
 
 ```bash
-broker scenarios run scenario_libvirt_setup_local.yaml \
-  --vars AUTH_METHOD=key PUBKEY_PATH=~/.ssh/id_ed25519.pub \
-         BASE_IMAGE_URL=https://.../base.qcow2 BASE_IMAGE_NAME=base.qcow2
+sudo broker scenarios execute scenario_libvirt_setup_local.yaml \
+  --AUTH_METHOD key --PUBKEY_PATH ~/.ssh/id_ed25519.pub \
+  --BASE_IMAGE_URL https://.../base.qcow2 --BASE_IMAGE_NAME base.qcow2
 ```
 
 ### Remote
 
 ```bash
-broker scenarios run scenario_libvirt_setup_remote.yaml \
-  --vars HYPERVISOR=kvm01.example.com SSH_USER=broker SSH_KEY=~/.ssh/id_ed25519 \
-         AUTH_METHOD=key PUBKEY_PATH=~/.ssh/id_ed25519.pub
+broker scenarios execute scenario_libvirt_setup_remote.yaml \
+  --HYPERVISOR kvm01.example.com --SSH_USER broker --SSH_KEY ~/.ssh/id_ed25519 \
+  --AUTH_METHOD key --PUBKEY_PATH ~/.ssh/id_ed25519.pub
 ```
 
 > ⚠️ The image-customization step edits the base `qcow2` **in place**. Run it **before** any

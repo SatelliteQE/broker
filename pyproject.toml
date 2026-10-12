@@ -70,6 +70,7 @@ all = [
     "hussh>=0.1.7",
     "ipython",
     "libvirt-python",
+    "pycdlib",
     "openstacksdk",
     "paramiko",
     "pexpect",

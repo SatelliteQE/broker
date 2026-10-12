@@ -1,10 +1,16 @@
 """Tests for the Libvirt provider using a stubbed LibvirtBind (no libvirt-python required)."""
 
+import json
+import threading
+from types import SimpleNamespace
+from xml.etree import ElementTree as ET
+
+import click
 import pytest
 
 from broker import exceptions
+from broker.binds.libvirt import LibvirtBind, _build_domain_xml, _select_address
 from broker.broker import Broker
-from broker.binds.libvirt import _build_domain_xml, _select_address
 from broker.helpers import MockStub
 from broker.providers.libvirt import Libvirt
 
@@ -28,7 +34,7 @@ class FakeDomain:
 
     def __init__(self, name, xml=""):
         self._name = name
-        self.active = True
+        self.active = False
         self._xml = xml
 
     def name(self):
@@ -39,6 +45,9 @@ class FakeDomain:
 
     def destroy(self):
         self.active = False
+
+    def create(self):
+        self.active = True
 
     def info(self):
         return [1, 2048 * 1024, 2048 * 1024, 2, 0]
@@ -53,7 +62,7 @@ class LibvirtApiStub(MockStub):
     Stubbing for:
      - base_volume_exists / list_base_volumes
      - create_overlay_volume / delete_volume
-     - build_domain_xml / define_and_start
+     - build_domain_xml / define_domain / start_domain
      - lookup_domain / list_domains
      - get_domain_ip
      - destroy_domain / undefine_domain / get_domain_disk_volumes
@@ -68,6 +77,9 @@ class LibvirtApiStub(MockStub):
         self.ip = "192.168.122.50"
         self.raise_on_get_ip = False
         self.last_action = None
+        self.fail_start = False
+        self.last_address_args = None
+        self.cloud_init_user_data = None
         super().__init__(in_dict=kwargs)
 
     def base_volume_exists(self, name):
@@ -88,21 +100,45 @@ class LibvirtApiStub(MockStub):
         return vol
 
     def build_domain_xml(self, **kwargs):
-        return f"<domain><name>{kwargs['name']}</name></domain>"
+        return (
+            f"<domain><name>{kwargs['name']}</name><devices><disk><source pool='default' "
+            f"volume='{kwargs['disk_name']}' /></disk></devices></domain>"
+        )
 
-    def define_and_start(self, domain_xml):
-        name = domain_xml.split("<name>")[1].split("</name>")[0]
+    def define_domain(self, domain_xml):
+        name = ET.fromstring(domain_xml).findtext("name")
         dom = FakeDomain(name, xml=domain_xml)
         self.domains[name] = dom
         return dom
+
+    def start_domain(self, domain):
+        if self.fail_start:
+            raise RuntimeError("VM failed to start")
+        domain.create()
 
     def lookup_domain(self, name):
         return self.domains.get(name)
 
     def get_domain_ip(self, domain, prefer_ipv6=False, ipv4_fallback=True):
+        self.last_address_args = (prefer_ipv6, ipv4_fallback)
         if self.raise_on_get_ip:
             raise Exception("IP not yet available")
         return self.ip
+
+    def create_cloud_init_iso(self, name, meta_data, user_data):
+        self.cloud_init_user_data = user_data
+        vol = FakeVolume(name)
+        self.volumes[name] = vol
+        return vol
+
+    def attach_cloud_init_iso(self, domain_xml, iso_volume_name):
+        root = ET.fromstring(domain_xml)
+        devices = root.find("devices")
+        if devices is None:
+            devices = ET.SubElement(root, "devices")
+        disk = ET.SubElement(devices, "disk", device="cdrom")
+        ET.SubElement(disk, "source", pool="default", volume=iso_volume_name)
+        return ET.tostring(root, encoding="unicode")
 
     def destroy_domain(self, domain):
         domain.destroy()
@@ -111,8 +147,12 @@ class LibvirtApiStub(MockStub):
         self.domains.pop(domain.name(), None)
 
     def get_domain_disk_volumes(self, domain):
-        vol = self.volumes.get(f"{domain.name()}.qcow2")
-        return [vol] if vol else []
+        root = ET.fromstring(domain.XMLDesc())
+        return [
+            self.volumes[name]
+            for source in root.findall("./devices/disk/source")
+            if (name := source.get("volume")) in self.volumes
+        ]
 
     def delete_volume(self, vol):
         vol.delete()
@@ -136,7 +176,11 @@ class LibvirtApiStub(MockStub):
             # Non-broker domain - no metadata
             return {}
         # Broker-managed domain with metadata
-        return {"owner": "testuser", "libvirt_image": "base.qcow2", "cpus": "2", "ram": "2048"}
+        root = ET.fromstring(domain.XMLDesc())
+        origin = root.find("./metadata/{https://github.com/SatelliteQE/broker}origin")
+        return {
+            child.tag.split("}")[-1]: child.text for child in origin or [] if child.text is not None
+        }
 
 
 @pytest.fixture
@@ -164,6 +208,7 @@ def config_stub():
         in_dict={
             "HOST_IPV6": False,
             "HOST_IPV4_FALLBACK": True,
+            "AUTH_METHOD": "key",
             "HOST_SSH_PORT": 22,
             "HOST_USERNAME": "root",
             "HOST_PASSWORD": "password",
@@ -187,14 +232,31 @@ def libvirt_stub(api_stub, config_stub, monkeypatch):
 
 def test_construct_host_from_checkout_result(libvirt_stub):
     bx = Broker()
-    provider_params = {"hostname": "192.168.122.50", "name": "broker_test_1234"}
+    provider_params = {
+        "hostname": "192.168.122.50",
+        "ip": "192.168.122.50",
+        "name": "broker_test_1234",
+    }
     host = libvirt_stub.construct_host(provider_params, bx.host_classes)
     assert isinstance(host, bx.host_classes["host"])
     assert host.hostname == "192.168.122.50"
+    assert host.ip == "192.168.122.50"
     assert host.name == "broker_test_1234"
     assert host._broker_provider == "Libvirt"
     assert host._prov_inst is libvirt_stub
     assert callable(host.release)
+
+
+def test_construct_host_uses_checkout_auth_override(libvirt_stub):
+    provider_params = {"hostname": "192.168.122.55", "ip": "192.168.122.55", "name": "vm"}
+    host = libvirt_stub.construct_host(
+        provider_params,
+        Broker().host_classes,
+        auth="guest:checkout-password",
+    )
+    assert host.username == "guest"
+    assert host.password == "checkout-password"
+    assert host.key_filename is None
 
 
 def test_construct_host_reconstruction(libvirt_stub):
@@ -208,6 +270,49 @@ def test_construct_host_reconstruction(libvirt_stub):
     )
     assert host.name == "broker_test_5678"
     assert host.hostname == "192.168.122.51"
+
+
+def test_construct_host_reconstruction_preserves_settings_auth_and_read_only(
+    libvirt_stub, config_stub
+):
+    from broker.hosts import Host
+
+    config_stub.SSH.AUTH_METHOD = "basic"
+    host = libvirt_stub.construct_host(
+        None,
+        Broker().host_classes,
+        name="external_vm",
+        hostname="192.168.122.52",
+        ip="192.168.122.52",
+        _read_only=True,
+        _broker_args={"auth": "guest:checkout-password"},
+    )
+    assert isinstance(host, Host)
+    assert host._settings is config_stub
+    assert host.username == "guest"
+    assert host.password == "checkout-password"
+    assert host.key_filename is None
+    assert host.to_dict()["_read_only"] is True
+    assert host.to_dict()["ip"] == "192.168.122.52"
+    assert host.to_dict()["_broker_args"]["auth"] == "guest:checkout-password"
+
+    restored = libvirt_stub.construct_host(None, Broker().host_classes, **host.to_dict())
+    assert restored._read_only is True
+    assert restored.password == "checkout-password"
+    assert restored.to_dict()["_broker_args"] == {"auth": "guest:checkout-password"}
+
+
+def test_host_uses_auth_method_and_explicit_credentials(config_stub):
+    from broker.hosts import Host
+
+    config_stub.SSH.AUTH_METHOD = "basic"
+    host = Host(hostname="192.168.122.53", broker_settings=config_stub)
+    assert host.password == config_stub.SSH.HOST_PASSWORD
+    assert host.key_filename is None
+
+    explicit = Host(hostname="192.168.122.54", broker_settings=config_stub, password="one-off")
+    assert explicit.password == "one-off"
+    assert explicit.key_filename is None
 
 
 def test_checkout_image_overlay_success(libvirt_stub, api_stub):
@@ -224,6 +329,91 @@ def test_checkout_custom_xml_success(libvirt_stub, api_stub, tmp_path):
     result = libvirt_stub.checkout(libvirt_xml=str(xml_file))
     assert result["name"] in api_stub.domains
     assert result["name"] != "placeholder"
+
+
+def test_custom_xml_checkin_preserves_unowned_volume(libvirt_stub, api_stub, tmp_path):
+    shared = FakeVolume("shared-base.iso")
+    api_stub.volumes[shared.name()] = shared
+    xml_file = tmp_path / "custom.xml"
+    xml_file.write_text(
+        "<domain><devices><disk><source pool='default' volume='shared-base.iso' />"
+        "</disk></devices></domain>"
+    )
+
+    result = libvirt_stub.checkout(libvirt_xml=str(xml_file))
+    host = MockStub(in_dict={"name": result["name"], "_broker_args": {}})
+    libvirt_stub.release(host)
+
+    assert result["name"] not in api_stub.domains
+    assert api_stub.volumes["shared-base.iso"] is shared
+    assert not shared.deleted
+
+
+def test_auth_checkout_injects_public_key_and_keeps_secrets_out_of_metadata(
+    libvirt_stub, api_stub, tmp_path
+):
+    private_key = tmp_path / "id_ed25519"
+    private_key.write_text("private-key-material")
+    public_key = tmp_path / "id_ed25519.pub"
+    public_key.write_text("ssh-ed25519 AAAATEST public-key")
+
+    result = libvirt_stub.checkout(libvirt_image="base.qcow2", auth=str(private_key))
+    domain = api_stub.domains[result["name"]]
+    metadata = api_stub.get_broker_metadata(domain)
+
+    assert "ssh-ed25519 AAAATEST public-key" in api_stub.cloud_init_user_data
+    assert "private-key-material" not in api_stub.cloud_init_user_data
+    assert "auth" not in metadata
+    assert "owned_volumes" in metadata
+    assert set(json.loads(metadata["owned_volumes"])) == {
+        f"{result['name']}.qcow2",
+        f"{result['name']}_cidata.iso",
+    }
+
+
+def test_checkout_failure_cleans_seed_and_overlay(libvirt_stub, api_stub, monkeypatch, tmp_path):
+    key = tmp_path / "id_rsa"
+    key.write_text("private-key")
+    (tmp_path / "id_rsa.pub").write_text("ssh-ed25519 AAAATEST public-key")
+
+    def fail_attachment(domain_xml, iso_name):
+        raise RuntimeError("XML attachment failed")
+
+    monkeypatch.setattr(api_stub, "attach_cloud_init_iso", fail_attachment)
+    with pytest.raises(RuntimeError, match="XML attachment failed"):
+        libvirt_stub.checkout(libvirt_image="base.qcow2", auth=str(key))
+    assert api_stub.volumes == {}
+
+
+def test_metadata_builder_excludes_arbitrary_credentials():
+    metadata = Libvirt._build_metadata_from_kwargs(
+        auth="guest:secret",
+        password="secret",
+        key_filename="/private/key",
+        libvirt_image="base.qcow2",
+        cpus=2,
+    )
+    assert metadata["libvirt_image"] == "base.qcow2"
+    assert metadata["cpus"] == "2"
+    assert not {"auth", "password", "key_filename"} & metadata.keys()
+
+
+def test_snapshot_description_is_registered_as_a_click_option():
+    def callback(**kwargs):
+        pass
+
+    for option in Libvirt._execute_options:
+        callback = option(callback)
+    command = click.command()(callback)
+    assert "snapshot_description" in {param.name for param in command.params}
+
+
+def test_failed_start_runs_dangling_cleanup(libvirt_stub, api_stub):
+    api_stub.fail_start = True
+    with pytest.raises(RuntimeError, match="VM failed to start"):
+        libvirt_stub.checkout(libvirt_image="base.qcow2")
+    assert api_stub.domains == {}
+    assert api_stub.volumes == {}
 
 
 def test_checkout_missing_image_raises_user_error(libvirt_stub):
@@ -254,6 +444,7 @@ def test_dangling_behavior_store_on_failure(libvirt_stub, api_stub, config_stub,
     assert len(stored) == 1
     assert stored[0]["deploy_failed"] is True
     assert stored[0]["name"] in api_stub.domains
+    assert stored[0]["_broker_provider_instance"] == libvirt_stub.instance
 
 
 def test_release_checkin(libvirt_stub, api_stub):
@@ -271,6 +462,18 @@ def test_release_idempotent_when_domain_missing(libvirt_stub):
     host.name = "does-not-exist"
     host._broker_args = {}
     libvirt_stub.release(host)  # should not raise
+
+
+def test_checkout_prefix_and_inventory_address_preferences(api_stub, config_stub, libvirt_stub):
+    config_stub.LIBVIRT.name_prefix = "test"
+    config_stub.SSH.HOST_IPV6 = True
+    config_stub.SSH.HOST_IPV4_FALLBACK = False
+    provider = Libvirt(bind=api_stub, broker_settings=config_stub)
+    result = provider.checkout(libvirt_image="base.qcow2")
+    assert result["name"].startswith("test_")
+
+    provider.get_inventory()
+    assert api_stub.last_address_args == (True, False)
 
 
 def test_get_inventory(libvirt_stub, api_stub):
@@ -345,7 +548,10 @@ def test_execute_missing_target_raises(libvirt_stub):
             "2001:db8::1",
         ),
         (
-            [{"addr": "192.168.122.10", "family": "ipv4"}, {"addr": "2001:db8::1", "family": "ipv6"}],
+            [
+                {"addr": "192.168.122.10", "family": "ipv4"},
+                {"addr": "2001:db8::1", "family": "ipv6"},
+            ],
             True,
             True,
             "2001:db8::1",
@@ -357,10 +563,21 @@ def test_execute_missing_target_raises(libvirt_stub):
             False,
             "2001:db8::1",
         ),
+        (
+            [
+                {"addr": "0:0:0:0:0:0:0:1", "family": "ipv6"},
+                {"addr": "2001:db8::1", "family": "ipv6"},
+            ],
+            True,
+            False,
+            "2001:db8::1",
+        ),
     ],
 )
 def test_select_address(addresses, prefer_ipv6, ipv4_fallback, expected):
-    assert _select_address(addresses, prefer_ipv6=prefer_ipv6, ipv4_fallback=ipv4_fallback) == expected
+    assert (
+        _select_address(addresses, prefer_ipv6=prefer_ipv6, ipv4_fallback=ipv4_fallback) == expected
+    )
 
 
 @pytest.mark.parametrize("firmware", ["bios", "efi"])
@@ -386,6 +603,48 @@ def test_build_domain_xml_portable(firmware):
     else:
         assert "<loader" not in xml_str
         assert "<nvram" not in xml_str
+
+
+def test_build_domain_xml_qemu_uses_emulated_cpu():
+    xml_str = _build_domain_xml(
+        name="qemu-test",
+        uuid_str="11111111-1111-1111-1111-111111111111",
+        memory_mb=1024,
+        vcpus=1,
+        disk_name="qemu-test.qcow2",
+        storage_pool="default",
+        arch="x86_64",
+        machine="pc",
+        emulator="/usr/bin/qemu-system-x86_64",
+        virt_type="qemu",
+        firmware="bios",
+        network_name="default",
+    )
+    assert "<cpu" not in xml_str
+
+
+def test_resolve_domain_target_uses_remote_host_architecture():
+    capabilities = """
+    <capabilities>
+      <host><cpu><arch>aarch64</arch></cpu></host>
+      <guest><os_type>hvm</os_type><arch name="x86_64"><domain type="qemu">
+        <emulator>/usr/bin/qemu-x86_64</emulator><machine>pc</machine>
+      </domain></arch></guest>
+      <guest><os_type>hvm</os_type><arch name="aarch64"><domain type="qemu">
+        <emulator>/usr/bin/qemu-aarch64</emulator><machine>virt</machine>
+      </domain></arch></guest>
+    </capabilities>
+    """
+    connection = SimpleNamespace(isAlive=lambda: True, getCapabilities=lambda: capabilities)
+    bind = LibvirtBind.__new__(LibvirtBind)
+    bind._local = threading.local()
+    bind._local.conn = connection
+
+    assert bind._resolve_domain_target("qemu") == (
+        "aarch64",
+        "virt",
+        "/usr/bin/qemu-aarch64",
+    )
 
 
 def test_get_inventory_sync_unmanaged_disabled(libvirt_stub, api_stub):
@@ -434,6 +693,7 @@ def test_get_inventory_sync_unmanaged_enabled(api_stub, monkeypatch):
         in_dict={
             "HOST_IPV6": False,
             "HOST_IPV4_FALLBACK": True,
+            "AUTH_METHOD": "key",
             "HOST_SSH_PORT": 22,
             "HOST_USERNAME": "root",
             "HOST_PASSWORD": "password",

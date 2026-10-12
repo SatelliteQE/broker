@@ -1023,7 +1023,7 @@ class AnsibleTower(Provider):
                 title=f"{workflow} information",
             )
             rich_console.print(top_table)
-            extra_vars = json.loads(wfjt.extra_vars) if wfjt.extra_vars else None
+            extra_vars = self._pull_extra_vars(wfjt.extra_vars)
             if extra_vars:
                 extras_table = helpers.dict_to_table(
                     extra_vars,
@@ -1099,7 +1099,7 @@ class AnsibleTower(Provider):
                 title=f"{job_template} information",
             )
             rich_console.print(top_table)
-            extra_vars = json.loads(jt.extra_vars) if jt.extra_vars else None
+            extra_vars = self._pull_extra_vars(jt.extra_vars)
             if extra_vars:
                 extras_table = helpers.dict_to_table(
                     extra_vars,

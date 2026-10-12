@@ -2,6 +2,7 @@
 
 import getpass
 import inspect
+import json
 import logging
 from pathlib import Path
 import socket
@@ -84,6 +85,7 @@ class Libvirt(Provider):
             type=str,
             help="Hypervisor-level lifecycle command (power-off, reboot, create-snapshot, restore-snapshot, delete-snapshot, list-snapshots)",
         ),
+        click.option("--snapshot-description", type=str, help="Description for a new snapshot"),
     ]
     _extend_options = []
     _sensitive_attrs = ["default_password"]
@@ -108,11 +110,13 @@ class Libvirt(Provider):
 
     @staticmethod
     def _build_metadata_from_kwargs(**kwargs):
-        """Build metadata dict from kwargs, filtering to serializable values."""
+        """Keep only non-sensitive arguments needed to describe a managed domain."""
         return {"owner": getpass.getuser()} | {
             k: str(v)
             for k, v in kwargs.items()
-            if not k.startswith("_") and v is not None and isinstance(v, (str, int, bool))
+            if k in {"libvirt_image", "libvirt_disk_size", "cpus", "ram"}
+            and v is not None
+            and isinstance(v, (str, int, bool))
         }
 
     def _set_attributes(self, host_inst, broker_args=None):
@@ -126,18 +130,28 @@ class Libvirt(Provider):
             }
         )
 
-    def _resolve_creds(self):
-        """Return only the SSH credential overrides explicitly configured for Libvirt."""
+    def _resolve_creds(self, auth_spec=None):
+        """Return the single SSH method selected for the Host."""
         cfg = self._settings.LIBVIRT
+        if auth_spec:
+            method, username, credential = self._parse_auth_spec(auth_spec)
+        else:
+            method = "password" if self._settings.SSH.AUTH_METHOD == "basic" else "key"
+            username = cfg.default_username or self._settings.SSH.HOST_USERNAME
+            credential = (
+                (cfg.default_password or self._settings.SSH.HOST_PASSWORD)
+                if method == "password"
+                else (cfg.default_key_filename or self._settings.SSH.HOST_SSH_KEY_FILENAME)
+            )
         return {
-            k: v
-            for k, v in {
-                "username": cfg.default_username,
-                "password": cfg.default_password,
-                "key_filename": cfg.default_key_filename,
-            }.items()
-            if v
+            "username": username,
+            "password": credential if method == "password" else None,
+            "key_filename": credential if method == "key" else None,
         }
+
+    def _host_auth_spec(self, kwargs):
+        broker_args = kwargs.get("_broker_args") or {}
+        return kwargs.get("auth") or broker_args.get("auth") or self._settings.LIBVIRT.auth_override
 
     def _parse_auth_spec(self, auth_spec):  # noqa: PLR0911
         """Parse --auth argument or config auth_override into (method, user, credential).
@@ -240,13 +254,15 @@ runcmd:
 """
 
         elif method == "key":
-            # SSH key-based authentication
-            # Read the public key file
-            pubkey_path = Path(credential).expanduser()
+            # Keep the private path for SSH, but inject only its public companion.
+            key_path = Path(credential).expanduser()
+            pubkey_path = key_path if key_path.suffix == ".pub" else Path(f"{key_path}.pub")
             if not pubkey_path.exists():
-                raise exceptions.UserError(f"SSH public key not found: {credential}")
+                raise exceptions.UserError(f"SSH public key not found: {pubkey_path}")
 
             pubkey_content = pubkey_path.read_text().strip()
+            if pubkey_content.startswith("-----BEGIN "):
+                raise exceptions.UserError(f"Expected an SSH public key in {pubkey_path}")
 
             user_data = f"""#cloud-config
 disable_root: false
@@ -280,14 +296,19 @@ runcmd:
         :return: broker object of constructed host instance
         """
         if not provider_params:
-            host_inst = host_classes[kwargs.get("type", "host")](**kwargs)
-            self._set_attributes(host_inst, broker_args=kwargs)
+            host_args = kwargs | self._resolve_creds(self._host_auth_spec(kwargs))
+            host_args["broker_settings"] = self._settings
+            host_inst = host_classes[kwargs.get("type", "host")](
+                **host_args,
+            )
+            self._set_attributes(host_inst, broker_args=kwargs.get("_broker_args", kwargs))
             return host_inst
         host_inst = host_classes[kwargs.get("type", "host")](
             hostname=provider_params["hostname"],
             name=provider_params["name"],
+            ip=provider_params.get("ip"),
             broker_settings=self._settings,
-            **self._resolve_creds(),
+            **self._resolve_creds(self._host_auth_spec(kwargs)),
         )
         self._set_attributes(host_inst, broker_args=kwargs)
         return host_inst
@@ -311,13 +332,14 @@ runcmd:
         metadata_elem = root.find("metadata")
         if metadata_elem is None:
             metadata_elem = ET.SubElement(root, "metadata")
-        broker_meta = ET.SubElement(
-            metadata_elem,
-            "broker:origin",
-            attrib={"xmlns:broker": "https://github.com/SatelliteQE/broker"},
-        )
+        namespace = "{https://github.com/SatelliteQE/broker}"
+        broker_meta = metadata_elem.find(f"{namespace}origin")
+        if broker_meta is None:
+            broker_meta = ET.SubElement(metadata_elem, f"{namespace}origin")
+        else:
+            broker_meta.clear()
         for key, value in metadata.items():
-            ET.SubElement(broker_meta, f"broker:{key}").text = str(value)
+            ET.SubElement(broker_meta, f"{namespace}{key}").text = str(value)
 
         return ET.tostring(root, encoding="unicode")
 
@@ -348,7 +370,9 @@ runcmd:
         domain = None
         overlay_vol = None
         cloud_init_vol = None
-        name = f"{getpass.getuser()}_{str(uuid4()).split('-')[0]}"
+        name = f"{self._name_prefix}_{str(uuid4()).split('-')[0]}"
+        domain_uuid = str(uuid4())
+        owned_volumes = []
 
         # Determine auth override (CLI --auth flag takes precedence over config)
         auth_spec = kwargs.get("auth") or self._settings.LIBVIRT.auth_override
@@ -365,9 +389,7 @@ runcmd:
 
             if kwargs.get("libvirt_xml"):
                 metadata = self._build_metadata_from_kwargs(**kwargs)
-                xml_str = self._inject_identity_and_metadata(
-                    Path(kwargs["libvirt_xml"]).read_text(), name, str(uuid4()), metadata
-                )
+                xml_str = Path(kwargs["libvirt_xml"]).read_text()
             else:
                 image = kwargs.get("libvirt_image")
                 if not image or not self.bind.base_volume_exists(image):
@@ -377,41 +399,46 @@ runcmd:
                     f"{name}.qcow2",
                     kwargs.get("libvirt_disk_size") or self._settings.LIBVIRT.default_disk_size,
                 )
+                owned_volumes.append(overlay_vol.name())
 
-                # Build metadata from all user-provided args for recovery during sync
+                # Persist only supported, non-sensitive fields for inventory recovery.
                 metadata = self._build_metadata_from_kwargs(**kwargs)
 
                 xml_str = self.bind.build_domain_xml(
                     name=name,
-                    uuid_str=str(uuid4()),
+                    uuid_str=domain_uuid,
                     memory_mb=kwargs.get("ram") or self._settings.LIBVIRT.default_memory,
                     vcpus=kwargs.get("cpus") or self._settings.LIBVIRT.default_cpus,
                     disk_name=f"{name}.qcow2",
                     virt_type=self._settings.LIBVIRT.virt_type,
                     firmware=self._settings.LIBVIRT.firmware,
                     network_name=self._settings.LIBVIRT.network,
-                    extra_metadata=metadata,
+                    extra_metadata=None,
                 )
 
             # Create and attach cloud-init ISO if auth config provided
             if meta_data and user_data:
                 iso_name = f"{name}_cidata.iso"
                 cloud_init_vol = self.bind.create_cloud_init_iso(iso_name, meta_data, user_data)
+                owned_volumes.append(iso_name)
                 xml_str = self.bind.attach_cloud_init_iso(xml_str, iso_name)
                 logger.info("Attached cloud-init ISO for SSH configuration")
 
-            domain = self.bind.define_and_start(xml_str)
+            metadata["owned_volumes"] = json.dumps(owned_volumes)
+            xml_str = self._inject_identity_and_metadata(xml_str, name, domain_uuid, metadata)
+            domain = self.bind.define_domain(xml_str)
+            self.bind.start_domain(domain)
             ip = self._get_ip(domain)
             self._wait_for_ssh(ip)
 
             return {"hostname": ip, "ip": ip, "name": domain.name(), "_broker_args": kwargs}
         except Exception as err:
             if domain is not None:
-                self._handle_dangling(domain, err)
-            elif cloud_init_vol is not None:
-                self.bind.delete_volume(cloud_init_vol)
-            elif overlay_vol is not None:
-                self.bind.delete_volume(overlay_vol)
+                self._handle_dangling(domain, err, broker_args=kwargs)
+            else:
+                for vol in (cloud_init_vol, overlay_vol):
+                    if vol is not None:
+                        self._delete_volume_quietly(vol, name)
             raise
 
     def _prompt_for_dangling_host_action(self, reason=None):
@@ -428,7 +455,7 @@ runcmd:
             except exceptions.InterruptResumeError:  # noqa: PERF203
                 logger.debug("Prompt interrupted, retrying...")
 
-    def _handle_dangling(self, domain, err):
+    def _handle_dangling(self, domain, err, broker_args=None):
         """Clean up (or store) a domain that failed checkout partway through, per settings."""
         behavior = self._settings.LIBVIRT.dangling_behavior
         if behavior == "prompt":
@@ -438,7 +465,11 @@ runcmd:
             self._teardown_domain(domain)
         elif behavior == "store":
             try:
-                ip = self.bind.get_domain_ip(domain)
+                ip = self.bind.get_domain_ip(
+                    domain,
+                    prefer_ipv6=self._settings.SSH.HOST_IPV6,
+                    ipv4_fallback=self._settings.SSH.HOST_IPV4_FALLBACK,
+                )
             except Exception:  # noqa: BLE001
                 ip = None
             helpers.update_inventory(
@@ -446,7 +477,10 @@ runcmd:
                     {
                         "name": domain.name(),
                         "hostname": ip,
+                        "ip": ip,
                         "_broker_provider": "Libvirt",
+                        "_broker_provider_instance": self.instance,
+                        "_broker_args": broker_args or {},
                         "deploy_failed": True,
                     }
                 ]
@@ -459,9 +493,15 @@ runcmd:
             logger.warning(f"Could not delete volume for domain {domain_name}")
 
     def _teardown_domain(self, domain):
-        """Destroy, undefine, and delete the storage volumes for a domain."""
+        """Destroy a domain and delete only volumes explicitly owned by Broker."""
+        metadata = self.bind.get_broker_metadata(domain)
         try:
-            volumes = self.bind.get_domain_disk_volumes(domain)
+            owned_names = set(json.loads(metadata.get("owned_volumes", "[]")))
+            volumes = [
+                vol
+                for vol in self.bind.get_domain_disk_volumes(domain)
+                if vol.name() in owned_names
+            ]
         except Exception:  # noqa: BLE001
             volumes = []
         self.bind.destroy_domain(domain)
@@ -635,7 +675,11 @@ runcmd:
                 continue
 
             try:
-                ip = self.bind.get_domain_ip(dom)
+                ip = self.bind.get_domain_ip(
+                    dom,
+                    prefer_ipv6=self._settings.SSH.HOST_IPV6,
+                    ipv4_fallback=self._settings.SSH.HOST_IPV4_FALLBACK,
+                )
             except Exception:  # noqa: BLE001
                 ip = None
 
@@ -647,11 +691,11 @@ runcmd:
                 broker_args = {}
                 for key, value in broker_metadata.items():
                     # Skip owner - it's metadata, not a broker arg
-                    if key == "owner":
+                    if key in {"owner", "owned_volumes"}:
                         continue
 
                     # Convert known int fields
-                    if key in ("cpus", "ram"):
+                    if key in ("cpus", "ram", "libvirt_disk_size"):
                         try:
                             broker_args[key] = int(value)
                         except (ValueError, TypeError):

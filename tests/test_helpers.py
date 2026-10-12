@@ -109,9 +109,9 @@ def test_find_origin_fixture_basic(basic_origin):
     assert basic_origin[0].startswith("basic_origin")
 
 
-def test_find_origin_fixture(request_origin):
+def test_find_origin_fixture(request_origin, request):
     """Test that we can get the request object information from the fixture"""
-    assert "test_find_origin_fixture" in request_origin[0]
+    assert request_origin[0].endswith(f" for {request.node.nodeid}")
 
 
 @pytest.mark.parametrize("set_envars", [[("BUILD_URL", "fake")]], indirect=True)
