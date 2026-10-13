@@ -36,6 +36,7 @@ class Session:
             ConnectionError: If the connection fails.
             FileNotFoundError: If the key file is not found.
         """
+        # TODO(libvirt-proxyjump): thread proxy_jump here — see Hussh#82
         host = kwargs.get("hostname", "localhost")
         user = kwargs.get("username", "root")
         port = kwargs.get("port", 22)
