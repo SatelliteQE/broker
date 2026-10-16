@@ -356,6 +356,55 @@ def checkin(hosts, background, all_, sequential, filter):
         Broker(hosts=to_remove).checkin(sequential=sequential)
 
 
+@cli.command(name="inventory-note")
+@click.argument("host", type=str, metavar="HOST[,HOST...]")
+@click.argument("note", type=str, required=False, metavar="NOTE")
+@click.option("--append", is_flag=True, help="Append NOTE to the existing note")
+@click.option("--clear", is_flag=True, help="Remove the note from the host")
+def inventory_note_command(host, note, append, clear):
+    r"""Set, append, or clear a description for a host in the local inventory.
+
+    NOTE is the text stored as the host's inventory description. For example:
+
+    \b
+      broker inventory-note 7,8 "ADHOC: test deployment"
+      broker inventory-note host1,host2 --append "Owner: example-user"
+      broker inventory-note 7,8 --clear
+    """
+    if clear and (note is not None or append):
+        raise click.UsageError("--clear cannot be used with NOTE")
+    if not clear and note is None:
+        raise click.UsageError("NOTE is required unless --clear is used")
+
+    inventory = helpers.load_inventory()
+    selectors = [selector.strip() for selector in host.split(",") if selector.strip()]
+    if not selectors:
+        raise click.UsageError("HOST must contain at least one host selector")
+
+    matches = []
+    unmatched = []
+    for selector in selectors:
+        selector_matches = [
+            entry
+            for index, entry in enumerate(inventory)
+            if selector in {str(index), entry.get("hostname"), entry.get("name")}
+        ]
+        if len(selector_matches) == 1:
+            if selector_matches[0] not in matches:
+                matches.append(selector_matches[0])
+        elif not selector_matches:
+            unmatched.append(selector)
+        else:
+            raise click.ClickException(f"Host selector matched multiple hosts: {selector}")
+
+    if unmatched:
+        raise click.ClickException(f"Hosts not found in inventory: {', '.join(unmatched)}")
+
+    for match in matches:
+        helpers.update_inventory_note(match, None if clear else note, append=append)
+    CONSOLE.print(f"Updated inventory note for {len(matches)} host(s): {host}")
+
+
 @guarded_command()
 @click.option("--details", is_flag=True, help="Display all host details")
 @click.option("--list", "_list", is_flag=True, help="Display only hostnames and local ids")

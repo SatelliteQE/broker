@@ -46,6 +46,7 @@ from broker.helpers.inventory import (
     inventory_fields_to_dict,
     load_inventory,
     update_inventory,
+    update_inventory_note,
 )
 
 # Miscellaneous utilities
@@ -113,6 +114,7 @@ __all__ = [
     "temporary_tar",
     "translate_timeout",
     "update_inventory",
+    "update_inventory_note",
     "update_log_level",
     "yaml",
     "yaml_format",
