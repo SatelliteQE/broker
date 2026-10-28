@@ -1,5 +1,7 @@
 """Test file for broker.config_manager module."""
 
+import pytest
+
 from ruamel.yaml import YAML
 from broker.config_manager import ConfigManager, GH_CFG
 
@@ -95,3 +97,50 @@ def test_init_config_file_with_interrupt_resume(broker_settings_path, monkeypatc
 
     # Verify the prompt was called twice (once failed, once succeeded)
     assert call_count == 2
+
+
+@pytest.mark.parametrize("extension", ["yaml", "yml"])
+def test_directory_nicks(tmp_path, monkeypatch, extension):
+    """CLI lookup and Broker resolution share directory nicks and conflict rules."""
+    from broker import exceptions, helpers, settings
+
+    monkeypatch.setattr(settings, "BROKER_DIRECTORY", tmp_path)
+    config = tmp_path / "broker_settings.yaml"
+    config.write_text("nicks:\n  shared:\n    workflow: main\n")
+    directory = tmp_path / "conf" / "nicks"
+    directory.mkdir(parents=True)
+    (directory / f"first.{extension}").write_text(
+        "unique:\n  workflow: unique\nshared:\n  workflow: first\n"
+        "duplicate:\n  workflow: first\n"
+    )
+    nested = directory / "nested"
+    nested.mkdir()
+    (nested / "first.yaml").write_text("duplicate:\n  workflow: nested\n")
+    (directory / ".hidden.yaml").write_text("hidden:\n  workflow: hidden\n")
+    manager = ConfigManager(config)
+    assert set(manager.nicks()) == {
+        "unique", "shared", "first/shared", "first/duplicate", "nested/first/duplicate"
+    }
+    assert manager.nicks("shared") == {"workflow": "main"}
+    assert manager.nicks("first/shared") == {"workflow": "first"}
+    custom = settings.create_settings(
+        config_dict={"NICKS": {"shared": {"workflow": "custom"}}},
+        config_file=config,
+        skip_validation=True,
+    )
+    assert helpers.resolve_nick("shared", custom) == {"workflow": "custom"}
+    assert helpers.resolve_nick("unique", custom) == {"workflow": "unique"}
+    assert helpers.resolve_nick("nested/first/duplicate", custom) == {"workflow": "nested"}
+    with pytest.raises(exceptions.UserError, match="Unknown nick: missing"):
+        manager.nicks("missing")
+
+
+def test_missing_nicks_directory(tmp_path, monkeypatch):
+    """A configuration without nicknames works without creating directories."""
+    from broker import settings
+
+    monkeypatch.setattr(settings, "BROKER_DIRECTORY", tmp_path)
+    config = tmp_path / "broker_settings.yaml"
+    config.write_text("{}\n")
+    assert ConfigManager(config).nicks() == []
+    assert not (tmp_path / "conf").exists()

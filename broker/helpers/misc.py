@@ -26,12 +26,16 @@ def resolve_nick(nick, broker_settings=None):
 
     :return: a dictionary mapping argument names and values
     """
+    from broker.config_manager import ConfigManager
+
     _settings = broker_settings or clone_global_settings()
-    nick_names = _settings.get("NICKS") or {}
-    if nick in nick_names:
-        return _settings.NICKS[nick].to_dict()
-    else:
-        raise exceptions.UserError(f"Unknown nick: {nick}")
+    main_nicks = _settings.get("NICKS") or {}
+    if nick in main_nicks:
+        return main_nicks[nick].to_dict()
+    directory_nicks = ConfigManager()._load_directory_nicks(main_nicks)
+    if nick in directory_nicks:
+        return directory_nicks[nick]
+    raise exceptions.UserError(f"Unknown nick: {nick}")
 
 
 def kwargs_from_click_ctx(ctx):
@@ -231,7 +235,7 @@ def find_origin():
         if frame.function == "call_fixture_func":
             # attempt to find the test name from the fixture's request object
             if _frame and (request := _frame.frame.f_locals.get("request")):
-                return f"{prev} for {request.node._nodeid}", jenkins_url
+                return f"{prev} for {request.node.nodeid}", jenkins_url
             # otherwise, return the fixture name and filename
             return prev or "Unknown fixture", jenkins_url
         prev, _frame = f"{frame.function}:{frame.filename}", frame
