@@ -224,12 +224,71 @@ class ConfigManager:
                 curr_chunk[chunk] = new_val
             return curr_chunk
 
+    def _load_directory_nicks(self, main_nicks=None):
+        """Load directory nicks, qualifying names that conflict with other definitions."""
+        from broker.helpers.file_utils import load_file
+        from broker.settings import BROKER_DIRECTORY
+
+        main_nicks = main_nicks or {}
+        nicks_dir = BROKER_DIRECTORY / "conf" / "nicks"
+
+        # Load all nick files
+        by_file = {}  # {stem: {nick: data}}
+        for f in sorted(nicks_dir.rglob("*.yaml")) + sorted(nicks_dir.rglob("*.yml")):
+            if f.name.startswith("."):
+                continue
+            data = load_file(f, warn=False) or {}
+            if isinstance(data, dict):
+                by_file[f.relative_to(nicks_dir).with_suffix("").as_posix()] = data
+
+        # Find conflicts: nick appears in multiple files OR with main config
+        nick_to_files = {}  # {nick: [file1, file2, ...]}
+        for stem, nicks in by_file.items():
+            for nick in nicks:
+                nick_to_files.setdefault(nick, []).append(stem)
+
+        # Build result, qualifying conflicts
+        result = {}
+        warned = set()
+        for stem, nicks in by_file.items():
+            for nick, data in nicks.items():
+                # Check for file-to-file conflicts
+                has_file_conflict = len(nick_to_files[nick]) > 1
+                # Check for main config conflict
+                has_main_conflict = nick in main_nicks
+
+                if has_file_conflict or has_main_conflict:
+                    # Qualify this nick
+                    result[f"{stem}/{nick}"] = data
+                    if has_file_conflict and nick not in warned:
+                        files = ", ".join(nick_to_files[nick])
+                        qualified = ", ".join(f"{s}/{nick}" for s in nick_to_files[nick])
+                        logger.warning(
+                            f"Nick '{nick}' defined in multiple files ({files}), "
+                            f"use qualified names: {qualified}"
+                        )
+                        warned.add(nick)
+                else:
+                    result[nick] = data
+
+        return result
+
     def nicks(self, nick=None):
         """Get a list of nicks or single nick information."""
-        nicks = self.get("nicks")
+        # Get main config nicks (highest priority, never qualified)
+        main_nicks = self.get("nicks", suppress=True) or {}
+
+        # Get directory nicks (pass main_nicks for conflict detection)
+        dir_nicks = self._load_directory_nicks(main_nicks)
+
+        # Merge: main nicks override, directory nicks add qualified versions
+        all_nicks = {**dir_nicks, **main_nicks}
+
         if nick:
-            return nicks[nick]
-        return list(nicks.keys())
+            if nick not in all_nicks:
+                raise exceptions.UserError(f"Unknown nick: {nick}")
+            return all_nicks[nick]
+        return list(all_nicks.keys())
 
     def init_config_file(self, chunk=None, _from=None):
         """Check for the existence of the config file and create it if it doesn't exist."""

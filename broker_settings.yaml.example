@@ -94,7 +94,9 @@ SCENARIO_IMPORT:
         - url: "https://gitlab.com"
           token: ""
           type: "gitlab"
-# You can set a nickname as a shortcut for arguments
+# You can set a nickname as a shortcut for arguments.
+# Additional nick mappings load from BROKER_DIRECTORY/conf/nicks/**/*.yaml (or .yml).
+# Main config nicks take priority; conflicting file nicks use <relative-file-path>/<nick>.
 nicks:
     rhel9:
         workflow: deploy-rhel
