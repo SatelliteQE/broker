@@ -84,3 +84,7 @@ tox -m ssh
 *   **Configuration:** The application uses a `broker_settings.yaml` file for configuration. An example file is provided as `broker_settings.yaml.example`.
 *   **Providers:** The provider-specific logic is located in the `broker/providers/` directory. Each provider is a class that inherits from a base provider class and implements methods for actions like `checkout`, `checkin`, etc.
 *   **CLI:** The command-line interface is defined in `broker/commands.py` using `rich_click`. Commands are organized into groups for better usability.
+
+## Scenario authoring
+
+Keep new scenarios local in the ignored `scenarios/` directory by default. A scenario request does not imply a contribution to Broker or the shared scenarios repository. Avoid `.gitignore` exceptions, permanent project tests, and scenario-engine changes unless requested or needed to fix an engine bug. Validate YAML and use temporary local checks for embedded logic.
