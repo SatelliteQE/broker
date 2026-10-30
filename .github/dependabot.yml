@@ -12,17 +12,16 @@ updates:
     labels:
       - "dependencies"
 
-  # Python dependencies - managed manually with uv
+  # Update pyproject.toml; manage uv.lock separately.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "daily"
+  # Disable uv version and security update PRs.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "daily"
     open-pull-requests-limit: 0
-
-# uv ecosystem (native support added in dependabot) - managed manually
-- package-ecosystem: "uv"
-  directory: "/"
-  schedule:
-    interval: "daily"
-  open-pull-requests-limit: 0
-
+    ignore:
+      - dependency-name: "*"
