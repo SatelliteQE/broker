@@ -1010,7 +1010,8 @@ class AnsibleTower(Provider):
         results_limit = kwargs.get("results_limit", self._settings.ANSIBLETOWER.results_limit)
         rich_console = Console(no_color=self._settings.less_colors)
         # if a user passes a different tower inventory, let's try using that
-        self._inventory = tower_inventory
+        if tower_inventory:
+            self._inventory = tower_inventory
         if workflow:
             if wfjt := self._v2.workflow_job_templates.get(name=workflow).results:
                 wfjt = wfjt.pop()
