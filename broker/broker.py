@@ -202,6 +202,8 @@ class Broker:
 
         :param sequential: boolean whether to run checkins sequentially
         :param in_context: Whether checkin is part of context manager
+
+        :raises BrokerError: If any hosts fail, after removing successful checkins from inventory
         """
         # default to hosts listed on the instance
         hosts = host or self._hosts
@@ -227,17 +229,29 @@ class Broker:
             if self._settings.thread_limit
             else None
         )
+        checked_in = []
+        errors = []
         with ThreadPoolExecutor(max_workers=1 if sequential else max_workers) as workers:
-            completed_checkins = as_completed(
+            checkins = {
                 # reversing over a copy of the list to avoid skipping
-                workers.submit(self._checkin, _host)
+                workers.submit(self._checkin, _host): _host
                 for _host in hosts[::-1]
-            )
-            for completed in completed_checkins:
-                _host = completed.result()
-                self._hosts = [h for h in self._hosts if h.to_dict() != _host.to_dict()]
-                logger.debug(f"Completed checkin process for {_host.hostname or _host.name}")
-        helpers.update_inventory(remove=[h.name for h in hosts])
+            }
+            for completed in as_completed(checkins):
+                _host = checkins[completed]
+                try:
+                    completed.result()
+                except Exception as err:  # noqa: BLE001
+                    message = err.message if isinstance(err, exceptions.BrokerError) else str(err)
+                    errors.append(f"{_host.hostname or _host.name}: {message}")
+                else:
+                    self._hosts = [h for h in self._hosts if h.to_dict() != _host.to_dict()]
+                    checked_in.append(_host.name or _host.hostname)
+                    logger.debug(f"Completed checkin process for {_host.hostname or _host.name}")
+        if checked_in:
+            helpers.update_inventory(remove=checked_in)
+        if errors:
+            raise self.BrokerError("Failed to check in hosts:\n" + "\n".join(errors))
 
     def _extend(self, host):
         """Extend a single VM."""

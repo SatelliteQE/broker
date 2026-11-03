@@ -4,6 +4,38 @@ import pytest
 from broker.commands import _handle_ambiguous_names
 
 
+@pytest.mark.parametrize("selection", [["--all"], ["0", "1"], ["good.example.com", "bad.example.com"]])
+@pytest.mark.parametrize("named", [True, False])
+def test_checkin_partial_failure(broker_settings, monkeypatch, tmp_path, selection, named):
+    """CLI checkin reports failure after saving successful releases to inventory."""
+    from click.testing import CliRunner
+    from broker import Broker, helpers, settings
+    from broker.commands import cli
+    from broker.providers.test_provider import TestProvider
+
+    monkeypatch.setattr(settings, "inventory_path", tmp_path / "inventory.yaml")
+    monkeypatch.setattr("broker.broker.clone_global_settings", lambda: broker_settings)
+    inventory = [
+        {"name": name, "hostname": f"{name}.example.com", "_broker_provider": "TestProvider"}
+        for name in ("good", "bad")
+    ]
+    if not named:
+        for host in inventory:
+            host.pop("name")
+    helpers.update_inventory(add=inventory)
+
+    def release(provider, host):
+        if host.hostname == "bad.example.com":
+            raise Broker.ProviderError("TestProvider", "release failed")
+
+    monkeypatch.setattr(TestProvider, "release", release)
+    result = CliRunner().invoke(cli, ["checkin", *selection])
+
+    assert result.exit_code == Broker.BrokerError.error_code
+    assert helpers.load_inventory() == [inventory[1]]
+    assert "BrokerError" in result.output
+
+
 def test_handle_ambiguous_names_with_interrupt_resume(monkeypatch, capsys):
     """Test that _handle_ambiguous_names retries prompt when InterruptResumeError is raised."""
     from broker import exceptions

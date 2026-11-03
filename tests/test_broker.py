@@ -1,4 +1,5 @@
 from broker import broker, Broker, helpers, settings
+from broker.hosts import Host
 from broker.providers import test_provider
 import pytest
 
@@ -57,6 +58,53 @@ def test_broker_empty_checkin(broker_settings):
     broker_inst = Broker(nick="test_nick", broker_settings=broker_settings)
     assert not broker_inst._hosts
     broker_inst.checkin()
+
+
+@pytest.mark.parametrize("sequential", [False, True])
+@pytest.mark.parametrize("failure_stage", ["release", "close"])
+@pytest.mark.parametrize("failed_indices", [(), (2,), (0, 2), (0, 1, 2)])
+def test_broker_checkin_failures(
+    broker_settings, monkeypatch, tmp_path, sequential, failure_stage, failed_indices
+):
+    """Save successful checkins before reporting every failed host."""
+    monkeypatch.setattr("broker.settings.inventory_path", tmp_path / "inventory.yaml")
+    hosts = [
+        Host(hostname=f"host-{i}.example.com", name=f"vm-{i}", broker_settings=broker_settings)
+        for i in range(3)
+    ]
+    failed_hosts = [hosts[i] for i in failed_indices]
+    attempts = []
+
+    def close(host):
+        attempts.append(("close", host.name))
+        if failure_stage == "close" and host in failed_hosts:
+            raise RuntimeError(f"close failed for {host.name}")
+
+    def release(host):
+        attempts.append(("release", host.name))
+        if failure_stage == "release" and host in failed_hosts:
+            raise Broker.ProviderError("TestProvider", f"release failed for {host.name}")
+
+    monkeypatch.setattr(Host, "close", close)
+    monkeypatch.setattr(Host, "release", release)
+    helpers.update_inventory(add=[host.to_dict() for host in hosts])
+    broker_inst = Broker(hosts=hosts, broker_settings=broker_settings)
+
+    if failed_hosts:
+        with pytest.raises(Broker.BrokerError) as exc_info:
+            broker_inst.checkin(sequential=sequential)
+        for host in failed_hosts:
+            assert host.hostname in str(exc_info.value)
+            assert f"{failure_stage} failed for {host.name}" in str(exc_info.value)
+    else:
+        broker_inst.checkin(sequential=sequential)
+
+    assert broker_inst._hosts == failed_hosts
+    assert helpers.load_inventory() == [host.to_dict() for host in failed_hosts]
+    for host in hosts:
+        assert attempts.count(("close", host.name)) == 1
+        expected_releases = 0 if failure_stage == "close" and host in failed_hosts else 1
+        assert attempts.count(("release", host.name)) == expected_releases
 
 
 def test_broker_checkin_n_sync_empty_hostname(broker_settings):
