@@ -492,7 +492,10 @@ def execute(ctx, background, nick, output_format, artifacts, args_file, provider
         click.echo(result)
     elif output_format == "log":
         logger.info(result)
-        CONSOLE.print(result)
+        if isinstance(result, dict):
+            CONSOLE.print(Syntax(helpers.yaml_format(result), "yaml", background_color="default"))
+        else:
+            CONSOLE.print(result)
     elif output_format == "yaml":
         click.echo(helpers.yaml_format(result))
 
