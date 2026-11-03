@@ -43,6 +43,7 @@ BASE_VALIDATORS = [
     Validator("SSH.HOST_SSH_KEY_FILENAME", default=None),
     Validator("SSH.HOST_IPV6", default=False),
     Validator("SSH.HOST_IPV4_FALLBACK", default=True),
+    Validator("SSH.AUTH_METHOD", is_in=["basic", "key"], default="key"),
     Validator("SSH.BACKEND", default="hussh"),
     Validator("LOGGING", is_type_of=dict),
     Validator(
