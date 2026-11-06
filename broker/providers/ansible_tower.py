@@ -993,7 +993,7 @@ class AnsibleTower(Provider):
         )
 
     @Provider.help_override(tower_inventory="Filter results by the specified inventory.")
-    def provider_help(  # noqa: PLR0911, PLR0912, PLR0915 - Possible TODO refactor
+    def provider_help(  # noqa: C901, PLR0911, PLR0912, PLR0915 - Possible TODO refactor
         self,
         workflows=False,
         workflow=None,
@@ -1018,7 +1018,10 @@ class AnsibleTower(Provider):
             else:
                 logger.warning(f"Workflow {workflow} not found!")
                 return
-            default_inv = self._v2.inventory.get(id=wfjt.inventory).results.pop()
+            if inv_results := self._v2.inventory.get(id=wfjt.inventory).results:
+                default_inv = inv_results.pop()
+            else:
+                default_inv = {"name": "N/A"}
             top_table = helpers.dict_to_table(
                 {"Description": wfjt.description, "Inventory": default_inv["name"]},
                 title=f"{workflow} information",
@@ -1094,7 +1097,10 @@ class AnsibleTower(Provider):
             else:
                 logger.warning(f"Job Template {job_template} not found!")
                 return
-            default_inv = self._v2.inventory.get(id=jt.inventory).results.pop()
+            if inv_results := self._v2.inventory.get(id=jt.inventory).results:
+                default_inv = inv_results.pop()
+            else:
+                default_inv = {"name": "N/A"}
             top_table = helpers.dict_to_table(
                 {"Description": jt.description, "Inventory": default_inv["name"]},
                 title=f"{job_template} information",
