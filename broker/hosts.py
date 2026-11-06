@@ -187,6 +187,19 @@ class Host:
                 return mgr
         return None
 
+    @staticmethod
+    def _is_stale_ssh_session(exc):
+        """Return True when the SSH session died after a long idle wait."""
+        text = f"{exc}"
+        if "Session(-43)" in text or "Timed out establishing channel session" in text:
+            return True
+        if "SocketRecvError" in text:
+            return True
+        cause = getattr(exc, "__cause__", None)
+        if cause is not None and cause is not exc:
+            return Host._is_stale_ssh_session(cause)
+        return False
+
     def execute(self, command, timeout=None):
         """Execute a command on the host using SSH.
 
@@ -196,10 +209,22 @@ class Host:
 
         Returns:
             str: The output of the command executed on the host.
+
+        If the SSH session is dead (`Session(-43)`, channel timeout, or
+        `SocketRecvError`), close it and retry the command once.
         """
         timeout = self.DEFAULT_TIMEOUT if timeout is None else timeout
         logger.debug(f"{self.hostname} executing command: {command}")
-        res = self.session.run(command, timeout=timeout)
+        try:
+            res = self.session.run(command, timeout=timeout)
+        except TimeoutError as err:
+            if not self._is_stale_ssh_session(err):
+                raise
+            logger.warning(
+                f"SSH session to {self.hostname} is dead ({err}); reconnecting and retrying once"
+            )
+            self.close()
+            res = self.session.run(command, timeout=timeout)
         logger.debug(f"{self.hostname} command result:\n{res}")
         return res
 
