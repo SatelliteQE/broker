@@ -11,9 +11,6 @@ class BrokerError(Exception):
     error_code = 1
 
     def __init__(self, message="An unhandled exception occured!"):
-        # Log the exception if the logger is set to DEBUG
-        if logger.level == logging.DEBUG and isinstance(message, Exception):
-            logger.exception(message)
         self.message = message
         logger.error(f"{self.__class__.__name__}: {self.message}")
 

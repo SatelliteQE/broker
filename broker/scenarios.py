@@ -22,11 +22,11 @@ import sys
 
 import jinja2
 import jsonschema
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
 from broker import helpers
 from broker.broker import Broker
-from broker.exceptions import ScenarioError
+from broker.exceptions import PermissionError, ScenarioError
 from broker.logging import setup_logging
 from broker.providers import PROVIDERS
 from broker.settings import BROKER_DIRECTORY, create_settings
@@ -654,6 +654,7 @@ class ScenarioRunner:
 
         Raises:
             ScenarioError: If the file cannot be loaded or validation fails
+            PermissionError: If the scenario requires sudo but is not running as root
         """
         if not self.scenario_path.exists():
             raise ScenarioError(f"Scenario file not found: {self.scenario_path}")
@@ -694,6 +695,14 @@ class ScenarioRunner:
                 jsonschema.validate(instance=data, schema=schema)
             except jsonschema.ValidationError as e:
                 raise ScenarioError(f"Scenario validation failed: {e.message}") from e
+
+        # Check sudo requirements (after schema validation)
+        if data.get("requires_sudo", False):
+            if not helpers.is_running_as_root():
+                raise PermissionError(
+                    f"Scenario '{self.scenario_path.stem}' requires sudo/root privileges. "
+                    f"Please run with sudo:\n  sudo broker scenarios execute {self.scenario_path.stem}"
+                )
 
         return data
 
@@ -1881,7 +1890,7 @@ def validate_scenario(scenario_path):
     try:
         with path.open() as f:
             data = yaml.load(f)
-    except (OSError, yaml.YAMLError) as e:
+    except (OSError, YAMLError) as e:
         return False, f"Failed to parse YAML: {e}"
 
     schema = get_schema()
