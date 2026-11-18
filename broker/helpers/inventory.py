@@ -93,6 +93,34 @@ def update_inventory(add=None, remove=None):
         yaml.dump(inv_data, inventory_path)
 
 
+def update_inventory_note(host, note=None, append=False):
+    """Set, append, or clear the description associated with an inventory host."""
+    from broker.helpers.file_utils import FileLock
+    from broker.settings import inventory_path
+
+    with FileLock(inventory_path):
+        inv_data = load_file(inventory_path, warn=False) or []
+        index = next(
+            index
+            for index, entry in enumerate(inv_data)
+            if entry.get("hostname") == host.get("hostname")
+            and entry.get("name") == host.get("name")
+        )
+
+        args = inv_data[index].setdefault("_broker_args", {})
+        if note is None:
+            args.pop("description", None)
+        elif append and args.get("description"):
+            args["description"] = f"{args['description']}\n{note}"
+        else:
+            args["description"] = note
+
+        if inventory_path.exists():
+            inventory_path.unlink()
+        inventory_path.touch()
+        yaml.dump(inv_data, inventory_path)
+
+
 def flip_provider_actions(provider_actions):
     """Flip the mapping of actions->provider to provider->actions."""
     flipped = {}
